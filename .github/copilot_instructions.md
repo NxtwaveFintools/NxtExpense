@@ -7,6 +7,19 @@ This project prioritizes **correctness, scalability, maintainability, and long-t
 
 ---
 
+## 🏦 Product Context (READ FIRST)
+
+**NxtExpense is a Finance Internal Tool.**
+
+- It is used exclusively by internal finance, HR, and management teams — NOT end consumers
+- Every feature must reflect the precision, audit compliance, and accountability expected in a financial system
+- Data integrity is non-negotiable: every record must be traceable, timestamped, and attributed
+- Financial figures, approval chains, and claim records must be treated with the same rigor as accounting ledgers
+- UI/UX must be optimized for finance workflows: clear tables, exportable data, accurate date/amount display
+- Always assume the user of this system is accountable for money — treat all data accordingly
+
+---
+
 ## 🔒 Locked Technology Stack (NO EXCEPTIONS)
 
 This project uses **ONLY**:
@@ -52,6 +65,68 @@ Any deviation must be **explicitly rejected**.
 No assumptions.  
 No blind coding.  
 No "it should work".
+
+---
+
+### ⚙️ MCP Server Configuration (USE EXACTLY AS DEFINED)
+
+The following MCP servers are configured for this project. Use them as the **primary source of truth** for all actions:
+
+```json
+{
+  "servers": {
+    "File System": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=acbgmixcdtfgurgbkqgh"
+    },
+    "Nextjs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"]
+    },
+    "Playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"]
+    },
+    "Git": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "Everything": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"]
+    }
+  },
+  "inputs": []
+}
+```
+
+**Each server has a designated role:**
+
+| Server        | Role                                                 |
+| ------------- | ---------------------------------------------------- |
+| `File System` | Inspect folder/file structure before any code change |
+| `supabase`    | Inspect schema, RLS, indexes, migrations, data       |
+| `Nextjs`      | Inspect routes, server actions, middleware, layouts  |
+| `Playwright`  | Browser automation, E2E test validation              |
+| `Git`         | Branch management, PRs, commit history               |
+| `memory`      | Persistent session context, cross-step reasoning     |
+| `Everything`  | Full-text and semantic workspace search              |
+
+❌ Skipping MCP calls and writing code from memory is **NOT allowed**.
 
 ---
 
@@ -131,6 +206,37 @@ You MUST:
 
 ---
 
+#### 🎭 Playwright MCP
+
+You MUST use Playwright MCP to:
+
+- **Validate UI flows** after implementing new features
+- **Test approval workflows** end-to-end
+- **Verify form validation** behaves correctly in the browser
+- **Confirm date formatting** renders correctly in the UI
+
+---
+
+#### 🐙 Git MCP
+
+You MUST use Git MCP to:
+
+- **Check existing branches** before creating new ones
+- **Review PR status** before merging
+- **Validate commit history** on feature branches
+
+---
+
+#### 🧠 Memory MCP
+
+You MUST use Memory MCP to:
+
+- **Persist investigation context** across multi-step tasks
+- **Store schema findings** discovered via Supabase MCP for reuse within the session
+- **Track in-progress decisions** to avoid re-investigation
+
+---
+
 ### ❗ MCP Enforcement Rule
 
 > **If MCP was not used, the change is invalid.**
@@ -144,6 +250,40 @@ Applies to:
 - Security changes
 - Schema changes
 - New routes or pages
+
+---
+
+## 🏗️ Production-Grade Engineering Standards (NON-NEGOTIABLE)
+
+Every piece of code in this repository MUST be written as **production-grade** from day one.
+
+### What Production-Grade Means Here
+
+- **Reusable** — Logic written once, referenced everywhere it's needed. No duplication.
+- **Scalable** — Handles growth in data volume, users, and features without rewrites.
+- **Re-architecturable** — Code is organized so any layer can be swapped or extended independently.
+- **Modifiable** — Changing one thing does not cascade breaks across unrelated features.
+- **Independent** — Feature modules are self-contained. They do not reach into each other's internals.
+- **Integrity-preserving** — Every operation that touches financial data must leave the system in a consistent, auditable state.
+
+### ❗ File Size Limit (HARD RULE)
+
+**Every file MUST be 200–300 lines maximum.**
+
+- If a file exceeds 300 lines, it MUST be split before a PR can be approved
+- Splitting must follow logical boundaries (one responsibility per file)
+- Never split arbitrarily — split along domain or responsibility seams
+- Large files are an indicator of a Single Responsibility violation
+
+Applies to:
+
+- React components (split into sub-components)
+- Server actions (split by domain operation)
+- Query files (split by entity or query type)
+- Validation schemas (split by feature domain)
+- Type definition files (split by domain boundary)
+
+❌ "It's only a few lines over" is **NOT an acceptable justification**.
 
 ---
 
@@ -310,14 +450,46 @@ Fetching full tables and filtering in JavaScript is a **performance bug**.
 
 ---
 
-## 📄 Pagination (NON-OPTIONAL)
+## 📄 Pagination (NON-OPTIONAL — CURSOR-BASED ONLY)
 
 - Pagination is **REQUIRED** for all list views (expenses, employees, approvals)
-- Use Supabase's `.range()` for offset-based pagination
-- Metadata MUST be returned:
-  - `page` / `offset`
-  - `limit`
-  - `total` (via Supabase `count` option)
+- **ONLY cursor-based pagination is allowed** — offset-based pagination is **FORBIDDEN**
+- Offset pagination degrades at scale and produces inconsistent results on real-time financial data
+
+### Cursor Pagination Rules
+
+- Use a stable, sortable cursor field — prefer `created_at` + `id` composite cursor
+- The cursor MUST be opaque to the client (base64-encoded or similar)
+- Every paginated query MUST accept: `cursor` (nullable), `limit`
+- Every paginated response MUST return:
+  - `data` — the records for this page
+  - `nextCursor` — cursor for the next page (`null` if last page)
+  - `hasNextPage` — boolean
+  - `limit` — echoed back for client reference
+
+### Implementation Pattern
+
+```typescript
+// Query pattern using cursor
+const query = supabase
+  .from('expenses')
+  .select('id, created_at, ...')
+  .order('created_at', { ascending: false })
+  .order('id', { ascending: false })
+  .limit(limit + 1) // fetch one extra to determine hasNextPage
+
+if (cursor) {
+  // decode cursor → { created_at, id }
+  query.or(
+    `created_at.lt.${cursorDate},and(created_at.eq.${cursorDate},id.lt.${cursorId})`
+  )
+}
+```
+
+- The extra record fetched (limit + 1) determines `hasNextPage` — it is NEVER returned to the client
+- Cursor encoding/decoding MUST live in `/lib/utils/pagination.ts` — not duplicated per feature
+- ❌ `.range()` offset pagination is **NOT allowed** anywhere in the codebase
+- ❌ `page` / `offset` / `total` patterns are **NOT allowed**
 
 ❌ Missing pagination on any list = ❌ invalid implementation
 
@@ -353,7 +525,34 @@ An RLS gap is a **critical security vulnerability**.
 
 ---
 
-## 📅 Date & Claim Rules (ENFORCED)
+## 📅 Date Format & Claim Rules (ENFORCED)
+
+### ⚠️ Date Format — MANDATORY STANDARD
+
+**The standard date format across the ENTIRE system is `DD/MM/YYYY`.**
+
+This applies to:
+
+- All **database `date` columns** — store as ISO `YYYY-MM-DD` internally, but ALWAYS display as `DD/MM/YYYY`
+- All **frontend displays** — every date shown to a user MUST render as `DD/MM/YYYY`
+- All **form inputs** — date pickers and text inputs MUST accept and display `DD/MM/YYYY`
+- All **export files** (CSV, PDF, Excel) — date columns MUST use `DD/MM/YYYY`
+- All **API responses** — dates returned to the client MUST be formatted as `DD/MM/YYYY` strings (not ISO strings)
+- All **filter inputs** — date range filters MUST display and accept `DD/MM/YYYY`
+
+### Date Format Rules
+
+- Database stores dates as `DATE` (PostgreSQL) in ISO format — this is the internal representation only
+- A shared formatter `formatDate(date: Date | string): string` MUST exist in `/lib/utils/date.ts`
+- This formatter is the **single source of truth** for `DD/MM/YYYY` conversion — never inline format dates
+- For `TIMESTAMP` columns (e.g. `created_at`), display as `DD/MM/YYYY HH:MM` in 24-hour format
+- Never display raw ISO strings (`2024-01-15`) to users — always pass through the formatter
+- Date validation in Zod schemas MUST parse `DD/MM/YYYY` input and convert to ISO before DB operations
+
+❌ Displaying `YYYY-MM-DD` or ISO timestamps directly in the UI is a **formatting bug**.  
+❌ Inconsistent date formats across different screens is **NOT acceptable**.
+
+### Claim Rules
 
 - Employees submit claims for a **date range** (start date → end date)
 - Each day in the range MUST be stored as an **individual database record**
@@ -450,6 +649,27 @@ This repository values:
 - **structure** over shortcuts
 - **long-term maintainability** over hacks
 - **explicit business rules** over clever abstractions
+- **financial data integrity** over convenience
+- **modular, bounded files** over monolithic "god files"
+
+---
+
+## ✅ Pre-Feature Checklist (MANDATORY BEFORE WRITING ANY CODE)
+
+Before adding **any** feature or code change, you MUST complete all of the following:
+
+- [ ] Used **Filesystem MCP** to inspect existing folder structure and locate relevant modules
+- [ ] Used **Supabase MCP** to inspect all tables, columns, RLS policies, and indexes involved
+- [ ] Used **Next.js MCP** to inspect existing routes, server actions, and layouts
+- [ ] Confirmed **no duplicate logic** already exists in the codebase
+- [ ] Confirmed the planned files will each stay **under 300 lines**
+- [ ] Confirmed date handling uses `DD/MM/YYYY` format in all display surfaces
+- [ ] Confirmed pagination uses **cursor-based** approach only
+- [ ] Confirmed all business rules are read from the database, not hardcoded
+- [ ] Confirmed RLS policies cover all new tables or queries
+- [ ] Confirmed Zod validation covers all new inputs
+
+❌ Skipping this checklist and diving straight into code is **NOT allowed**.
 
 ---
 
@@ -457,3 +677,89 @@ This repository values:
 
 This document is **law**.  
 If the code disagrees with this file, **the code is wrong**.
+
+This is a **finance internal tool**. Treat every record like money — because it is.
+
+---
+
+## 📚 Knowledge Base — Business Rules & Reference Data
+
+All domain knowledge for NxtExpense is stored under `.github/knowledge/`.  
+**Always read these files before implementing any expense logic, approval routing, or employee-related feature.**
+
+### Knowledge Files
+
+| File                                   | Purpose                                                                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `.github/knowledge/expense_rules.json` | Core business rules — date constraints, location flows, designation limits, taxi rules, approval workflow, validations |
+| `.github/knowledge/employees.json`     | Employee master data — IDs, names, emails, states, designations, approval chains (levels 1–3)                          |
+| `.github/knowledge/state_mapping.json` | State → State Business Head (SBH) and Zonal Business Head (ZBH) email mapping                                          |
+
+---
+
+### Key Rules Quick Reference
+
+#### Work Location Options
+
+- `Office / WFH` · `Field – Base Location` · `Field – Outstation` · `Leave` · `Week-off`
+
+#### Field – Base Location
+
+| Vehicle      | Food/day | Fuel/day | Total/day |
+| ------------ | -------- | -------- | --------- |
+| Two Wheeler  | ₹120     | ₹180     | ₹300      |
+| Four Wheeler | ₹120     | ₹300     | ₹420      |
+
+> Four Wheeler only allowed for: **State Business Head**, **Zonal Business Head**, **Program Manager**
+
+#### Field – Outstation
+
+| Scenario                       | Food/day | Fuel  | Total             |
+| ------------------------------ | -------- | ----- | ----------------- |
+| Own vehicle = No               | ₹350     | ❌    | ₹350 + taxi bills |
+| Own vehicle = Yes (2W, 100 km) | ₹350     | ₹5/km | ₹850              |
+| Own vehicle = Yes (4W, 100 km) | ₹350     | ₹8/km | ₹1,150            |
+
+#### KM Limits (Own Vehicle, Outstation)
+
+- Two Wheeler: max **150 km** round trip
+- Four Wheeler: max **300 km** round trip
+
+#### Accommodation Limits
+
+- SRO / BOA / ABH → ₹1,000/night
+- SBH / ZBH / PM → ₹2,000/night
+
+#### Taxi Rule
+
+- Multiple taxi bills per day: ✅ allowed
+- Fuel on same day as taxi: ❌ blocked
+- Only 1 fuel entry per day
+
+#### Date Rules
+
+- Future dates: ❌ not allowed
+- Max range: **7 days**
+- Storage: **1 record per day**
+
+#### Approval Routing
+
+| Designation     | Level 1             | Final   |
+| --------------- | ------------------- | ------- |
+| SRO / BOA / ABH | State Business Head | Mansoor |
+| SBH / ZBH / PM  | —                   | Mansoor |
+
+---
+
+### Designations (Exhaustive List)
+
+1. Student Relationship Officer
+2. Business Operation Associate
+3. Area Business Head
+4. State Business Head
+5. Zonal Business Head
+6. Program Manager
+
+---
+
+> ❗ **Rule:** Any feature that computes expense amounts, routes approvals, or filters by designation MUST reference the knowledge files above — not hardcoded values in application code.
