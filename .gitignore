@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /.vscode
+# Ignore sensitive knowledge files
+.github/knowledge/employees.json
+.github/knowledge/state_mapping.json

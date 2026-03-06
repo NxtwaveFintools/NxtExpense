@@ -1,0 +1,299 @@
+{
+  "system": {
+    "name": "NxtExpense",
+    "purpose": "A system for field employees to submit daily work status and claim eligible expenses such as food, fuel, intercity travel, taxi bills, accommodation, and other allowed reimbursements based on designation rules."
+  },
+
+  "date_rules": {
+    "input_type": ["from_date", "to_date"],
+    "constraints": {
+      "future_dates_allowed": false,
+      "maximum_range_days": 7,
+      "storage_format": "Each date between from_date and to_date must be stored as an individual record."
+    }
+  },
+
+  "work_location_options": [
+    "Office / WFH",
+    "Field – Base Location",
+    "Field – Outstation",
+    "Leave",
+    "Week-off"
+  ],
+
+  "base_location_flow": {
+    "trigger_condition": "work_location == 'Field – Base Location'",
+    "required_fields": ["vehicle_type"],
+    "vehicle_type_options": ["Two Wheeler", "Four Wheeler"],
+    "designation_vehicle_restrictions": {
+      "Student Relationship Officer": ["Two Wheeler"],
+      "Business Operation Associate": ["Two Wheeler"],
+      "Area Business Head": ["Two Wheeler"],
+      "State Business Head": ["Two Wheeler", "Four Wheeler"],
+      "Zonal Business Head": ["Two Wheeler", "Four Wheeler"],
+      "Program Manager": ["Two Wheeler", "Four Wheeler"]
+    },
+    "calculation": {
+      "food_base_location_per_day": 120,
+      "fuel_base_location_per_day": {
+        "two_wheeler": 180,
+        "four_wheeler": 300
+      },
+      "formula": "total = food_base_location + fuel_base_location_based_on_vehicle"
+    },
+    "example_totals": {
+      "two_wheeler": 300,
+      "four_wheeler": 420
+    }
+  },
+
+  "outstation_flow": {
+    "trigger_condition": "work_location == 'Field – Outstation'",
+    "fields": {
+      "own_vehicle_used": ["Yes", "No"]
+    },
+    "food_outstation_per_day": 350,
+
+    "if_own_vehicle_used_false": {
+      "description": "Employee travelled using taxi / rental / bus / train / MMT service",
+      "fuel_allowed": false,
+      "taxi_bills": {
+        "allowed": true,
+        "multiple_per_day": true
+      },
+      "calculation": {
+        "formula": "total = food_outstation",
+        "example_total": 350
+      }
+    },
+
+    "if_own_vehicle_used_true": {
+      "required_fields": [
+        "vehicle_type",
+        "from_city",
+        "to_city",
+        "km_travelled"
+      ],
+      "vehicle_type_options": ["Two Wheeler", "Four Wheeler"],
+      "km_limits": {
+        "two_wheeler_round_trip_max_km": 150,
+        "four_wheeler_round_trip_max_km": 300
+      },
+      "intercity_travel_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "fuel_per_day_base": {
+        "two_wheeler": 180,
+        "four_wheeler": 300
+      },
+      "calculation": {
+        "formula": "total = food_outstation + (km_travelled * rate_per_km_based_on_vehicle)"
+      },
+      "example": {
+        "km": 100,
+        "two_wheeler_total": 850,
+        "four_wheeler_total": 1150
+      }
+    }
+  },
+
+  "taxi_rules": {
+    "multiple_bills_per_day_allowed": true,
+    "fuel_allowed_if_taxi_used": false,
+    "rule": "If any taxi bill exists for a day, fuel reimbursement must not be applied for that day.",
+    "daily_fuel_limit": "Only one fuel entry allowed per day"
+  },
+
+  "designation_limits": {
+    "Student Relationship Officer": {
+      "food_base": 120,
+      "food_outstation": 350,
+      "fuel_base": {
+        "two_wheeler": 180,
+        "four_wheeler": "Not allowed"
+      },
+      "intercity_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "accommodation_limit": 1000,
+      "travel_bus_train": {
+        "within_state": 2000,
+        "inter_state": 3000
+      },
+      "food_with_principals": "Not allowed"
+    },
+
+    "Business Operation Associate": {
+      "food_base": 120,
+      "food_outstation": 350,
+      "fuel_base": {
+        "two_wheeler": 180,
+        "four_wheeler": "Not allowed"
+      },
+      "intercity_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "accommodation_limit": 1000,
+      "travel_bus_train": {
+        "within_state": 2000,
+        "inter_state": 3000
+      },
+      "food_with_principals": "Not allowed"
+    },
+
+    "Area Business Head": {
+      "food_base": 120,
+      "food_outstation": 350,
+      "fuel_base": {
+        "two_wheeler": 180,
+        "four_wheeler": "Not allowed"
+      },
+      "intercity_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "accommodation_limit": 1000,
+      "travel_bus_train": {
+        "within_state": 2000,
+        "inter_state": 3000
+      },
+      "food_with_principals": {
+        "max_per_person": 500,
+        "max_times_per_month": 5
+      }
+    },
+
+    "State Business Head": {
+      "food_base": 120,
+      "food_outstation": 350,
+      "fuel_base": {
+        "two_wheeler": 180,
+        "four_wheeler": 300
+      },
+      "intercity_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "accommodation_limit": 2000,
+      "travel_bus_train": {
+        "within_state": 2000,
+        "inter_state": 3000
+      },
+      "food_with_principals": {
+        "max_per_person": 500,
+        "max_times_per_month": 5
+      }
+    },
+
+    "Zonal Business Head": {
+      "food_base": 120,
+      "food_outstation": 350,
+      "fuel_base": {
+        "two_wheeler": 180,
+        "four_wheeler": 300
+      },
+      "intercity_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "accommodation_limit": 2000,
+      "travel_bus_train": {
+        "within_state": 2000,
+        "inter_state": 3000
+      },
+      "food_with_principals": {
+        "max_per_person": 500,
+        "max_times_per_month": 5
+      }
+    },
+
+    "Program Manager": {
+      "food_base": 120,
+      "food_outstation": 350,
+      "fuel_base": {
+        "two_wheeler": 180,
+        "four_wheeler": 300
+      },
+      "intercity_rate": {
+        "two_wheeler": 5,
+        "four_wheeler": 8
+      },
+      "accommodation_limit": 2000,
+      "travel_bus_train": {
+        "within_state": 2000,
+        "inter_state": 3000
+      },
+      "food_with_principals": {
+        "max_per_person": 500,
+        "max_times_per_month": 5
+      }
+    }
+  },
+
+  "approval_workflow": {
+    "designation_based_routing": {
+      "Student Relationship Officer": {
+        "approval_level_1": "State Business Head",
+        "final_approval": "Mansoor"
+      },
+      "Business Operation Associate": {
+        "approval_level_1": "State Business Head",
+        "final_approval": "Mansoor"
+      },
+      "Area Business Head": {
+        "approval_level_1": "State Business Head",
+        "final_approval": "Mansoor"
+      },
+      "State Business Head": {
+        "approval_level_1": null,
+        "final_approval": "Mansoor"
+      },
+      "Zonal Business Head": {
+        "approval_level_1": null,
+        "final_approval": "Mansoor"
+      },
+      "Program Manager": {
+        "approval_level_1": null,
+        "final_approval": "Mansoor"
+      }
+    }
+  },
+
+  "employee_master_data": {
+    "fields": [
+      "employee_id",
+      "employee_name",
+      "employee_email",
+      "state",
+      "designation",
+      "approval_mail_id_level_1",
+      "approval_mail_id_level_2",
+      "approval_mail_id_level_3"
+    ],
+    "purpose": "Defines designation, state, and approval hierarchy for each employee.",
+    "reference_file": ".github/knowledge/employees.json"
+  },
+
+  "system_validations": [
+    "Future dates must not be selectable.",
+    "Maximum selectable date range is 7 days.",
+    "Records must be stored as individual daily entries.",
+    "Vehicle type options must be restricted based on designation.",
+    "Taxi bills disable fuel reimbursement for that day.",
+    "Only one fuel reimbursement allowed per day.",
+    "KM travelled must respect maximum limits depending on vehicle type.",
+    "Outstation location must be selected from dropdowns instead of plain text."
+  ],
+
+  "designations": [
+    "Student Relationship Officer",
+    "Business Operation Associate",
+    "Area Business Head",
+    "State Business Head",
+    "Zonal Business Head",
+    "Program Manager"
+  ]
+}
