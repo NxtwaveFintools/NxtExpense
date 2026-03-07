@@ -3,16 +3,20 @@
     "name": "NxtExpense",
     "purpose": "A system for field employees to submit daily work status and claim eligible expenses such as food, fuel, intercity travel, taxi bills, accommodation, and other allowed reimbursements based on designation rules."
   },
-
   "date_rules": {
-    "input_type": ["from_date", "to_date"],
+    "input_type": ["date"],
     "constraints": {
       "future_dates_allowed": false,
-      "maximum_range_days": 7,
-      "storage_format": "Each date between from_date and to_date must be stored as an individual record."
+      "one_entry_per_day_per_employee": true,
+      "duplicate_claims_not_allowed": true,
+      "storage_format": "Each submission represents exactly one specific date.",
+      "notes": [
+        "Employees must submit claims day-wise instead of selecting a date range.",
+        "Each record corresponds to one calendar date.",
+        "Multiple records can be submitted across different days, but only one record per employee per date is allowed."
+      ]
     }
   },
-
   "work_location_options": [
     "Office / WFH",
     "Field – Base Location",
@@ -20,7 +24,7 @@
     "Leave",
     "Week-off"
   ],
-
+  "vehicle_types": ["Two Wheeler", "Four Wheeler"],
   "base_location_flow": {
     "trigger_condition": "work_location == 'Field – Base Location'",
     "required_fields": ["vehicle_type"],
@@ -46,14 +50,16 @@
       "four_wheeler": 420
     }
   },
-
   "outstation_flow": {
     "trigger_condition": "work_location == 'Field – Outstation'",
     "fields": {
-      "own_vehicle_used": ["Yes", "No"]
+      "own_vehicle_used": ["Yes", "No"],
+      "outstation_location": {
+        "input_type": "dropdown",
+        "description": "Select the outstation city where the employee worked that day."
+      }
     },
     "food_outstation_per_day": 350,
-
     "if_own_vehicle_used_false": {
       "description": "Employee travelled using taxi / rental / bus / train / MMT service",
       "fuel_allowed": false,
@@ -66,7 +72,6 @@
         "example_total": 350
       }
     },
-
     "if_own_vehicle_used_true": {
       "required_fields": [
         "vehicle_type",
@@ -97,14 +102,13 @@
       }
     }
   },
-
   "taxi_rules": {
     "multiple_bills_per_day_allowed": true,
     "fuel_allowed_if_taxi_used": false,
     "rule": "If any taxi bill exists for a day, fuel reimbursement must not be applied for that day.",
+    "taxi_vehicle_mutual_exclusion": "Taxi bills cannot be submitted when own vehicle is used for the same day.",
     "daily_fuel_limit": "Only one fuel entry allowed per day"
   },
-
   "designation_limits": {
     "Student Relationship Officer": {
       "food_base": 120,
@@ -124,7 +128,6 @@
       },
       "food_with_principals": "Not allowed"
     },
-
     "Business Operation Associate": {
       "food_base": 120,
       "food_outstation": 350,
@@ -143,7 +146,6 @@
       },
       "food_with_principals": "Not allowed"
     },
-
     "Area Business Head": {
       "food_base": 120,
       "food_outstation": 350,
@@ -165,7 +167,6 @@
         "max_times_per_month": 5
       }
     },
-
     "State Business Head": {
       "food_base": 120,
       "food_outstation": 350,
@@ -187,7 +188,6 @@
         "max_times_per_month": 5
       }
     },
-
     "Zonal Business Head": {
       "food_base": 120,
       "food_outstation": 350,
@@ -209,7 +209,6 @@
         "max_times_per_month": 5
       }
     },
-
     "Program Manager": {
       "food_base": 120,
       "food_outstation": 350,
@@ -232,7 +231,6 @@
       }
     }
   },
-
   "approval_workflow": {
     "designation_based_routing": {
       "Student Relationship Officer": {
@@ -261,7 +259,6 @@
       }
     }
   },
-
   "employee_master_data": {
     "fields": [
       "employee_id",
@@ -276,10 +273,9 @@
     "purpose": "Defines designation, state, and approval hierarchy for each employee.",
     "reference_file": ".github/knowledge/employees.json"
   },
-
   "system_validations": [
     "Future dates must not be selectable.",
-    "Maximum selectable date range is 7 days.",
+    "Only one entry per employee per date is allowed.",
     "Records must be stored as individual daily entries.",
     "Vehicle type options must be restricted based on designation.",
     "Taxi bills disable fuel reimbursement for that day.",
@@ -287,7 +283,6 @@
     "KM travelled must respect maximum limits depending on vehicle type.",
     "Outstation location must be selected from dropdowns instead of plain text."
   ],
-
   "designations": [
     "Student Relationship Officer",
     "Business Operation Associate",

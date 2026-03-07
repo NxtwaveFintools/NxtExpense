@@ -66,11 +66,11 @@ export async function signInWithPasswordAction(
     return { error: errorMessage }
   }
 
-  redirect('/dashboard')
+  redirect('/dashboard?message=signed_in')
 }
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createSupabaseServerClient()
   await signOutMutation(supabase)
-  redirect('/login')
+  redirect('/login?message=signed_out')
 }

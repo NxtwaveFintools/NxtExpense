@@ -1,4 +1,4 @@
-import { signInWithMicrosoftAction } from '@/features/auth/actions'
+import { MicrosoftLoginButton } from '@/features/auth/components/microsoft-login-button'
 import { PasswordLoginForm } from '@/features/auth/components/password-login-form'
 
 type LoginCardProps = {
@@ -27,14 +27,7 @@ export function LoginCard({
           </p>
         ) : null}
 
-        <form action={signInWithMicrosoftAction} className="w-full">
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90"
-          >
-            Continue with Microsoft
-          </button>
-        </form>
+        <MicrosoftLoginButton />
 
         {showDevelopmentForm ? (
           <>

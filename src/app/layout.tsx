@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 
+import { SonnerToaster } from '@/components/ui/sonner-toaster'
 import { ThemeProvider } from '@/components/ui/theme-provider'
 
 import './globals.css'
@@ -40,6 +41,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <SonnerToaster />
         </ThemeProvider>
       </body>
     </html>

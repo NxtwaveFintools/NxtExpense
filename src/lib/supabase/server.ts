@@ -17,10 +17,10 @@ export async function createSupabaseServerClient() {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options)
           })
-        } catch (error) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(error)
-          }
+        } catch {
+          // Intentionally suppressed: setAll() will throw when called from a
+          // Server Component (read-only cookie context). This is expected — the
+          // session will be refreshed on the next request via the middleware.
         }
       },
     },

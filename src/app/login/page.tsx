@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 
+import { AuthMessageToast } from '@/features/auth/components/auth-message-toast'
 import { LoginCard } from '@/features/auth/components/login-card'
 import { getCurrentUser } from '@/features/auth/queries'
 import {
@@ -24,11 +25,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const errorValue = queryParams.error
   const errorCode = Array.isArray(errorValue) ? errorValue[0] : errorValue
+  const messageValue = queryParams.message
+  const messageCode = Array.isArray(messageValue)
+    ? messageValue[0]
+    : messageValue
   const errorMessage = getLoginErrorMessage(errorCode)
   const showDevelopmentForm = isDevelopmentAuthEnabled()
 
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <AuthMessageToast message={messageCode ?? null} />
       <div className="absolute right-4 top-4 md:right-8 md:top-8">
         <ThemeToggle />
       </div>
