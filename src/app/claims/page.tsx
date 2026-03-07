@@ -1,15 +1,21 @@
 import { ClaimList } from '@/features/claims/components/claim-list'
 import { getMyClaimsAction } from '@/features/claims/actions'
+import { getClaimStatusCatalog } from '@/features/claims/queries'
 import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import { getEmployeeByEmail } from '@/features/employees/queries'
+import {
+  buildCursorNavigationLinks,
+  decodeCursorTrail,
+} from '@/lib/utils/pagination'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 type ClaimsPageProps = {
   searchParams?: Promise<{
     cursor?: string
+    trail?: string
   }>
 }
 
@@ -24,8 +30,22 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
 
   const resolvedSearch = await searchParams
   const cursor = resolvedSearch?.cursor ?? null
+  const trail = decodeCursorTrail(resolvedSearch?.trail ?? null)
 
-  const claims = await getMyClaimsAction(cursor)
+  const [claims, statusCatalog] = await Promise.all([
+    getMyClaimsAction(cursor),
+    getClaimStatusCatalog(supabase),
+  ])
+
+  const claimsPagination = buildCursorNavigationLinks({
+    pathname: '/claims',
+    query: resolvedSearch,
+    cursorKey: 'cursor',
+    trailKey: 'trail',
+    currentCursor: cursor,
+    currentTrail: trail,
+    nextCursor: claims.nextCursor,
+  })
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -38,7 +58,11 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
             Back to Dashboard
           </Link>
         </div>
-        <ClaimList claims={claims} />
+        <ClaimList
+          claims={claims}
+          statusCatalog={statusCatalog}
+          pagination={claimsPagination}
+        />
       </div>
     </main>
   )

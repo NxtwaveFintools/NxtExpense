@@ -1,45 +1,10 @@
 import type { PaginatedResult } from '@/lib/utils/pagination'
 
-export const WORK_LOCATION_OPTIONS = [
-  'Office / WFH',
-  'Field - Base Location',
-  'Field - Outstation',
-  'Leave',
-  'Week-off',
-] as const
-
-export const VEHICLE_TYPE_OPTIONS = ['Two Wheeler', 'Four Wheeler'] as const
-
-export const TRANSPORT_TYPE_OPTIONS = [
-  'Rental Vehicle',
-  'Rapido/Uber/Ola',
-] as const
-
-export const CLAIM_STATUS_OPTIONS = [
-  'draft',
-  'submitted',
-  'pending_approval',
-  'approved',
-  'rejected',
-  'finance_review',
-  'issued',
-  'finance_rejected',
-] as const
-
-export const EXPENSE_ITEM_TYPE_OPTIONS = [
-  'food',
-  'fuel',
-  'taxi_bill',
-  'intercity_travel',
-  'accommodation',
-  'travel_bus_train',
-] as const
-
-export type WorkLocation = (typeof WORK_LOCATION_OPTIONS)[number]
-export type VehicleType = (typeof VEHICLE_TYPE_OPTIONS)[number]
-export type TransportType = (typeof TRANSPORT_TYPE_OPTIONS)[number]
-export type ClaimStatus = (typeof CLAIM_STATUS_OPTIONS)[number]
-export type ExpenseItemType = (typeof EXPENSE_ITEM_TYPE_OPTIONS)[number]
+export type WorkLocation = string
+export type VehicleType = string
+export type TransportType = string
+export type ClaimStatus = string
+export type ExpenseItemType = string
 
 export type Claim = {
   id: string
@@ -59,6 +24,11 @@ export type Claim = {
   submitted_at: string | null
   created_at: string
   updated_at: string
+  tenant_id: string
+  resubmission_count: number
+  last_rejection_notes: string | null
+  last_rejected_by_email: string | null
+  last_rejected_at: string | null
 }
 
 export type ClaimItem = {
@@ -86,6 +56,51 @@ export type ClaimFormValues = {
   toCity?: string
   kmTravelled?: number
   taxiAmount?: number
+}
+
+export type ClaimFormInitialValues = {
+  claimDateIso: string
+  workLocation: WorkLocation
+  vehicleType?: VehicleType | null
+  ownVehicleUsed?: boolean | null
+  transportType?: TransportType | null
+  outstationLocation?: string | null
+  fromCity?: string | null
+  toCity?: string | null
+  kmTravelled?: number | null
+  taxiAmount?: number | null
+}
+
+export type ClaimStatusCatalogItem = {
+  status: ClaimStatus
+  display_label: string
+  is_terminal: boolean
+  sort_order: number
+  color_token: string
+  description: string | null
+}
+
+export type ClaimAvailableAction = {
+  action: string
+  display_label: string
+  require_notes: boolean
+  supports_allow_resubmit: boolean
+  actor_scope: 'employee' | 'approver' | 'finance' | 'admin'
+}
+
+export type ClaimHistoryEntry = {
+  id: string
+  claim_id: string
+  approver_email: string
+  approval_level: number | null
+  action: string
+  notes: string | null
+  rejection_notes: string | null
+  allow_resubmit: boolean | null
+  bypass_reason: string | null
+  skipped_levels: number[] | null
+  reason: string | null
+  acted_at: string
 }
 
 export type PaginatedClaims = PaginatedResult<Claim>

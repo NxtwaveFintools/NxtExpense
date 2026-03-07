@@ -12,6 +12,7 @@ type OutstationFieldsProps = {
   kmTravelled: string
   taxiAmount: string
   allowedVehicleTypes: readonly VehicleType[]
+  transportTypeOptions: readonly TransportType[]
   onOwnVehicleUsedChange: (value: boolean) => void
   onVehicleTypeChange: (value: VehicleType) => void
   onTransportTypeChange: (value: TransportType) => void
@@ -152,28 +153,20 @@ export function OutstationFields(props: OutstationFieldsProps) {
               Transport Type
             </legend>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => props.onTransportTypeChange('Rental Vehicle')}
-                className={`rounded-lg border px-3 py-2 text-sm ${
-                  props.transportType === 'Rental Vehicle'
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-border bg-background'
-                }`}
-              >
-                Rental Vehicle
-              </button>
-              <button
-                type="button"
-                onClick={() => props.onTransportTypeChange('Rapido/Uber/Ola')}
-                className={`rounded-lg border px-3 py-2 text-sm ${
-                  props.transportType === 'Rapido/Uber/Ola'
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-border bg-background'
-                }`}
-              >
-                Rapido/Uber/Ola
-              </button>
+              {props.transportTypeOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => props.onTransportTypeChange(option)}
+                  className={`rounded-lg border px-3 py-2 text-sm ${
+                    props.transportType === option
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-border bg-background'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
             </div>
           </fieldset>
 

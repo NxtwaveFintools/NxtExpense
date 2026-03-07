@@ -4,12 +4,17 @@ import Link from 'next/link'
 import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-import { getClaimById } from '@/features/claims/queries'
+import {
+  getClaimAvailableActions,
+  getClaimById,
+} from '@/features/claims/queries'
 import { getEmployeeById } from '@/features/employees/queries'
 import { getClaimApprovalHistory } from '@/features/approvals/queries'
 import { ApprovalDetail } from '@/features/approvals/components/approval-detail'
 import { ApprovalActions } from '@/features/approvals/components/approval-actions'
 import { ApprovalHistoryTimeline } from '@/features/approvals/components/approval-history-timeline'
+
+export const dynamic = 'force-dynamic'
 
 type ApprovalDetailsPageProps = {
   params: Promise<{
@@ -38,7 +43,10 @@ export default async function ApprovalDetailsPage({
     notFound()
   }
 
-  const history = await getClaimApprovalHistory(supabase, id)
+  const [history, availableActions] = await Promise.all([
+    getClaimApprovalHistory(supabase, id),
+    getClaimAvailableActions(supabase, id),
+  ])
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -59,7 +67,10 @@ export default async function ApprovalDetailsPage({
             owner={owner}
           />
           <div className="space-y-6">
-            <ApprovalActions claimId={claimWithItems.claim.id} />
+            <ApprovalActions
+              claimId={claimWithItems.claim.id}
+              availableActions={availableActions}
+            />
             <ApprovalHistoryTimeline history={history} />
           </div>
         </div>

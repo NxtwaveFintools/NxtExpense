@@ -1,25 +1,33 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
+import type { ClaimAvailableAction } from '@/features/claims/types'
 import {
   bulkFinanceClaimsAction,
   submitFinanceAction,
 } from '@/features/finance/actions'
+import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
 import { FinanceClaimRow } from '@/features/finance/components/finance-claim-row'
 import { FinanceQueueToolbar } from '@/features/finance/components/finance-queue-toolbar'
 import type { PaginatedFinanceQueue } from '@/features/finance/types'
 
 type FinanceQueueProps = {
   queue: PaginatedFinanceQueue
+  pagination: {
+    backHref: string | null
+    nextHref: string | null
+    pageNumber: number
+  }
 }
 
-export function FinanceQueue({ queue }: FinanceQueueProps) {
+export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [notes, setNotes] = useState('')
+  const [allowResubmit, setAllowResubmit] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [processingClaimId, setProcessingClaimId] = useState<string | null>(
     null
@@ -27,12 +35,42 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
   const [error, setError] = useState<string | null>(null)
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
-  const allClaimIds = useMemo(
-    () => queue.data.map((item) => item.claim.id),
+  const selectableClaimIds = useMemo(
+    () =>
+      queue.data
+        .filter((item) =>
+          item.availableActions.some(
+            (action) =>
+              action.action === 'issued' || action.action === 'finance_rejected'
+          )
+        )
+        .map((item) => item.claim.id),
     [queue.data]
   )
+
+  const bulkActions = useMemo(() => {
+    const actions = new Map<'issued' | 'finance_rejected', string>()
+
+    queue.data.forEach((item) => {
+      item.availableActions.forEach((action) => {
+        if (
+          action.action === 'issued' ||
+          action.action === 'finance_rejected'
+        ) {
+          actions.set(action.action, `${action.display_label} Selected`)
+        }
+      })
+    })
+
+    return Array.from(actions.entries()).map(([action, label]) => ({
+      action,
+      label,
+    }))
+  }, [queue.data])
+
   const allSelected =
-    allClaimIds.length > 0 && selectedIds.length === allClaimIds.length
+    selectableClaimIds.length > 0 &&
+    selectedIds.length === selectableClaimIds.length
   const partiallySelected = selectedIds.length > 0 && !allSelected
 
   function toggleClaim(claimId: string, checked: boolean) {
@@ -45,11 +83,14 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
   }
 
   function toggleSelectAll(checked: boolean) {
-    setSelectedIds(checked ? allClaimIds : [])
+    setSelectedIds(checked ? selectableClaimIds : [])
   }
 
   async function handleBulkAction(action: 'issued' | 'finance_rejected') {
-    if (selectedIds.length === 0) return
+    if (selectedIds.length === 0) {
+      return
+    }
+
     setIsSubmitting(true)
     setProcessingClaimId(null)
     setError(null)
@@ -58,6 +99,8 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
       const result = await bulkFinanceClaimsAction({
         claimIds: selectedIds,
         action,
+        notes,
+        allowResubmit: action === 'finance_rejected' ? allowResubmit : false,
       })
 
       if (!result.ok) {
@@ -66,11 +109,7 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
         return
       }
 
-      toast.success(
-        action === 'issued'
-          ? 'Selected claims issued.'
-          : 'Selected claims rejected by finance.'
-      )
+      toast.success('Bulk finance action completed.')
       setSelectedIds([])
       router.refresh()
     } catch {
@@ -84,14 +123,28 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
 
   async function handleSingleAction(
     claimId: string,
-    action: 'issued' | 'finance_rejected'
+    availableAction: ClaimAvailableAction
   ) {
+    if (
+      availableAction.action !== 'issued' &&
+      availableAction.action !== 'finance_rejected'
+    ) {
+      setError('Unsupported finance action from workflow configuration.')
+      return
+    }
+
     setIsSubmitting(true)
     setProcessingClaimId(claimId)
     setError(null)
 
     try {
-      const result = await submitFinanceAction({ claimId, action })
+      const result = await submitFinanceAction({
+        claimId,
+        action: availableAction.action,
+        notes,
+        allowResubmit:
+          availableAction.action === 'finance_rejected' ? allowResubmit : false,
+      })
 
       if (!result.ok) {
         setError(result.error)
@@ -99,11 +152,7 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
         return
       }
 
-      toast.success(
-        action === 'issued'
-          ? 'Claim issued successfully.'
-          : 'Claim rejected by finance.'
-      )
+      toast.success(`${availableAction.display_label} completed successfully.`)
       router.refresh()
     } catch {
       const message = 'Unexpected error while processing finance action.'
@@ -129,25 +178,52 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <h2 className="text-lg font-semibold">Finance Queue</h2>
+
+      <CursorPaginationControls
+        className="mt-3"
+        backHref={pagination.backHref}
+        nextHref={pagination.nextHref}
+        pageNumber={pagination.pageNumber}
+      />
+
       {error ? (
         <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
           {error}
         </p>
       ) : null}
 
+      <label className="mt-3 block space-y-2 text-sm">
+        <span className="text-foreground/80">Notes</span>
+        <textarea
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          className="min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2"
+        />
+      </label>
+
+      <label className="mt-3 inline-flex items-center gap-2 text-sm text-foreground/80">
+        <input
+          type="checkbox"
+          checked={allowResubmit}
+          onChange={(event) => setAllowResubmit(event.target.checked)}
+        />
+        For rejection, return claim to employee for modification
+      </label>
+
       <div className="mt-4">
         <FinanceQueueToolbar
           selectedCount={selectedIds.length}
           allSelected={allSelected}
           partiallySelected={partiallySelected}
-          totalCount={allClaimIds.length}
+          totalCount={selectableClaimIds.length}
+          bulkActions={bulkActions}
           onToggleSelectAll={toggleSelectAll}
           onBulkAction={handleBulkAction}
           disabled={isSubmitting}
         />
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+          <table className="w-full min-w-215 border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-foreground/70">
                 <th className="px-3 py-2 font-medium">Select</th>
@@ -166,29 +242,14 @@ export function FinanceQueue({ queue }: FinanceQueueProps) {
                   item={item}
                   checked={selectedSet.has(item.claim.id)}
                   disabled={isSubmitting}
+                  selectable={selectableClaimIds.includes(item.claim.id)}
                   isProcessingRow={processingClaimId === item.claim.id}
                   onToggle={toggleClaim}
-                  onIssue={(claimId) => handleSingleAction(claimId, 'issued')}
-                  onReject={(claimId) =>
-                    handleSingleAction(claimId, 'finance_rejected')
-                  }
+                  onRunAction={handleSingleAction}
                 />
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="mt-4 flex items-center justify-end">
-          {queue.nextCursor ? (
-            <Link
-              href={`/finance?queueCursor=${encodeURIComponent(queue.nextCursor)}`}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium"
-            >
-              Next Page
-            </Link>
-          ) : (
-            <span className="text-xs text-foreground/60">No more records</span>
-          )}
         </div>
       </div>
     </section>

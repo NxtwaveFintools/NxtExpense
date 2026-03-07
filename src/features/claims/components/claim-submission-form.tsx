@@ -10,8 +10,13 @@ import { submitClaimAction } from '@/features/claims/actions'
 import { BaseLocationFields } from '@/features/claims/components/base-location-fields'
 import { OutstationFields } from '@/features/claims/components/outstation-fields'
 import { ClaimSummaryCard } from '@/features/claims/components/claim-summary-card'
+import {
+  getClaimSummaryPreview,
+  type ClaimRateSnapshot,
+} from '@/features/claims/components/claim-summary-preview'
 import { formatDate } from '@/lib/utils/date'
 import type {
+  ClaimFormInitialValues,
   ClaimFormValues,
   TransportType,
   VehicleType,
@@ -20,79 +25,76 @@ import type {
 
 type ClaimSubmissionFormProps = {
   allowedVehicleTypes: readonly VehicleType[]
+  workLocationOptions: readonly WorkLocation[]
+  transportTypeOptions: readonly TransportType[]
+  claimRateSnapshot: ClaimRateSnapshot
+  initialValues?: ClaimFormInitialValues | null
 }
 
 export function ClaimSubmissionForm({
   allowedVehicleTypes,
+  workLocationOptions,
+  transportTypeOptions,
+  claimRateSnapshot,
+  initialValues,
 }: ClaimSubmissionFormProps) {
+  const isEditingReturnedClaim = Boolean(initialValues)
+  const initialWorkLocation =
+    initialValues?.workLocation ?? workLocationOptions[0] ?? 'Office / WFH'
+  const initialVehicleType =
+    initialValues?.vehicleType &&
+    allowedVehicleTypes.includes(initialValues.vehicleType)
+      ? initialValues.vehicleType
+      : allowedVehicleTypes[0]
+
   const router = useRouter()
-  const [workLocation, setWorkLocation] = useState<WorkLocation>('Office / WFH')
-  const [claimDate, setClaimDate] = useState(dayjs().format('YYYY-MM-DD'))
-  const [vehicleType, setVehicleType] = useState<VehicleType>(
-    allowedVehicleTypes[0]
+  const [workLocation, setWorkLocation] =
+    useState<WorkLocation>(initialWorkLocation)
+  const [claimDate, setClaimDate] = useState(
+    initialValues?.claimDateIso ?? dayjs().format('YYYY-MM-DD')
   )
-  const [ownVehicleUsed, setOwnVehicleUsed] = useState(true)
-  const [transportType, setTransportType] =
-    useState<TransportType>('Rental Vehicle')
-  const [outstationLocation, setOutstationLocation] = useState('')
-  const [fromCity, setFromCity] = useState('')
-  const [toCity, setToCity] = useState('')
-  const [kmTravelled, setKmTravelled] = useState('')
-  const [taxiAmount, setTaxiAmount] = useState('')
+  const [vehicleType, setVehicleType] =
+    useState<VehicleType>(initialVehicleType)
+  const [ownVehicleUsed, setOwnVehicleUsed] = useState(
+    initialValues?.ownVehicleUsed ?? true
+  )
+  const [transportType, setTransportType] = useState<TransportType>(
+    initialValues?.transportType ?? transportTypeOptions[0] ?? 'Rental Vehicle'
+  )
+  const [outstationLocation, setOutstationLocation] = useState(
+    initialValues?.outstationLocation ?? ''
+  )
+  const [fromCity, setFromCity] = useState(initialValues?.fromCity ?? '')
+  const [toCity, setToCity] = useState(initialValues?.toCity ?? '')
+  const [kmTravelled, setKmTravelled] = useState(
+    initialValues?.kmTravelled ? String(initialValues.kmTravelled) : ''
+  )
+  const [taxiAmount, setTaxiAmount] = useState(
+    initialValues?.taxiAmount ? String(initialValues.taxiAmount) : ''
+  )
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const todayIso = dayjs().format('YYYY-MM-DD')
 
   const summary = useMemo(() => {
-    const kmValue = Number.parseFloat(kmTravelled)
-    const taxiValue = Number.parseFloat(taxiAmount)
-    const parsedKm = Number.isFinite(kmValue) ? kmValue : 0
-    const parsedTaxiAmount = Number.isFinite(taxiValue) ? taxiValue : 0
-
-    if (workLocation === 'Field - Base Location') {
-      const fuel = vehicleType === 'Two Wheeler' ? 180 : 300
-      return {
-        items: [
-          { label: 'Food allowance', amount: 120 },
-          { label: 'Fuel allowance', amount: fuel },
-        ],
-        total: 120 + fuel,
-      }
-    }
-
-    if (workLocation === 'Field - Outstation') {
-      if (!ownVehicleUsed) {
-        return {
-          items: [
-            { label: 'Food allowance', amount: 350 },
-            { label: `${transportType} bills`, amount: parsedTaxiAmount },
-          ],
-          total: 350 + parsedTaxiAmount,
-        }
-      }
-
-      const rate = vehicleType === 'Two Wheeler' ? 5 : 8
-      return {
-        items: [
-          { label: 'Food allowance', amount: 350 },
-          { label: 'Intercity travel', amount: parsedKm * rate },
-        ],
-        total: 350 + parsedKm * rate,
-      }
-    }
-
-    return {
-      items: [],
-      total: 0,
-    }
+    return getClaimSummaryPreview({
+      workLocation,
+      ownVehicleUsed,
+      transportType,
+      vehicleType,
+      kmTravelled,
+      taxiAmount,
+      claimRateSnapshot,
+    })
   }, [
     workLocation,
     ownVehicleUsed,
-    vehicleType,
+    transportType,
     kmTravelled,
     taxiAmount,
-    transportType,
+    vehicleType,
+    claimRateSnapshot,
   ])
 
   function handleOwnVehicleUsedChange(value: boolean) {
@@ -172,9 +174,15 @@ export function ClaimSubmissionForm({
     >
       <section className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <header className="space-y-1">
-          <h1 className="text-xl font-semibold">Submit Daily Expense Claim</h1>
+          <h1 className="text-xl font-semibold">
+            {isEditingReturnedClaim
+              ? 'Modify And Resubmit Claim'
+              : 'Submit Daily Expense Claim'}
+          </h1>
           <p className="text-sm text-foreground/70">
-            One claim must be submitted per calendar date.
+            {isEditingReturnedClaim
+              ? 'Update this returned claim and submit it again for approval.'
+              : 'One claim must be submitted per calendar date.'}
           </p>
         </header>
 
@@ -195,6 +203,7 @@ export function ClaimSubmissionForm({
             value={claimDate}
             onChange={(event) => setClaimDate(event.target.value)}
             max={todayIso}
+            disabled={isEditingReturnedClaim}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
             required
           />
@@ -213,11 +222,11 @@ export function ClaimSubmissionForm({
             }
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="Office / WFH">Office / WFH</option>
-            <option value="Field - Base Location">Field - Base Location</option>
-            <option value="Field - Outstation">Field - Outstation</option>
-            <option value="Leave">Leave</option>
-            <option value="Week-off">Week-off</option>
+            {workLocationOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -240,6 +249,7 @@ export function ClaimSubmissionForm({
             kmTravelled={kmTravelled}
             taxiAmount={taxiAmount}
             allowedVehicleTypes={allowedVehicleTypes}
+            transportTypeOptions={transportTypeOptions}
             onOwnVehicleUsedChange={handleOwnVehicleUsedChange}
             onVehicleTypeChange={setVehicleType}
             onTransportTypeChange={setTransportType}
@@ -262,6 +272,8 @@ export function ClaimSubmissionForm({
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                 Submitting...
               </>
+            ) : isEditingReturnedClaim ? (
+              'Resubmit Claim'
             ) : (
               'Submit Claim'
             )}

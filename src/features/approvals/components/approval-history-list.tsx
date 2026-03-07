@@ -1,9 +1,11 @@
 import Link from 'next/link'
 
 import { formatDate, formatDatetime } from '@/lib/utils/date'
+import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
 
 import { getApprovalHistoryAction } from '@/features/approvals/actions'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
+import type { ClaimStatusCatalogItem } from '@/features/claims/types'
 
 type ApprovalHistoryPayload = Awaited<
   ReturnType<typeof getApprovalHistoryAction>
@@ -11,9 +13,19 @@ type ApprovalHistoryPayload = Awaited<
 
 type ApprovalHistoryListProps = {
   history: ApprovalHistoryPayload
+  statusCatalog: ClaimStatusCatalogItem[]
+  pagination: {
+    backHref: string | null
+    nextHref: string | null
+    pageNumber: number
+  }
 }
 
-export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
+export function ApprovalHistoryList({
+  history,
+  statusCatalog,
+  pagination,
+}: ApprovalHistoryListProps) {
   if (history.data.length === 0) {
     return (
       <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -28,8 +40,15 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <h2 className="mb-4 text-lg font-semibold">Approval History</h2>
+
+      <CursorPaginationControls
+        backHref={pagination.backHref}
+        nextHref={pagination.nextHref}
+        pageNumber={pagination.pageNumber}
+      />
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] border-collapse text-sm">
+        <table className="w-full min-w-230 border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-foreground/70">
               <th className="px-3 py-2 font-medium">Claim ID</th>
@@ -37,43 +56,46 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
               <th className="px-3 py-2 font-medium">Claim Date</th>
               <th className="px-3 py-2 font-medium">Action</th>
               <th className="px-3 py-2 font-medium">Action Date</th>
+              <th className="px-3 py-2 font-medium">HOD Approved Date</th>
+              <th className="px-3 py-2 font-medium">Finance Approved Date</th>
               <th className="px-3 py-2 font-medium">Current Status</th>
             </tr>
           </thead>
           <tbody>
             {history.data.map((row) => (
-              <tr key={row.action.id} className="border-b border-border/70">
+              <tr key={row.actionId} className="border-b border-border/70">
                 <td className="px-3 py-3 font-medium">
-                  {row.claim.claim_number}
+                  <Link
+                    href={`/claims/${row.claimId}`}
+                    className="underline decoration-border underline-offset-4 hover:decoration-foreground"
+                  >
+                    {row.claimNumber}
+                  </Link>
                 </td>
-                <td className="px-3 py-3">{row.owner.employee_name}</td>
-                <td className="px-3 py-3">
-                  {formatDate(row.claim.claim_date)}
+                <td className="px-3 py-3">{row.ownerName}</td>
+                <td className="px-3 py-3">{formatDate(row.claimDate)}</td>
+                <td className="px-3 py-3 capitalize">
+                  {row.action.replaceAll('_', ' ')}
                 </td>
-                <td className="px-3 py-3 capitalize">{row.action.action}</td>
+                <td className="px-3 py-3">{formatDatetime(row.actedAt)}</td>
                 <td className="px-3 py-3">
-                  {formatDatetime(row.action.acted_at)}
+                  {row.hodApprovedAt ? formatDatetime(row.hodApprovedAt) : '-'}
                 </td>
                 <td className="px-3 py-3">
-                  <ClaimStatusBadge status={row.claim.status} />
+                  {row.financeApprovedAt
+                    ? formatDatetime(row.financeApprovedAt)
+                    : '-'}
+                </td>
+                <td className="px-3 py-3">
+                  <ClaimStatusBadge
+                    status={row.claimStatus}
+                    statusCatalog={statusCatalog}
+                  />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="mt-4 flex items-center justify-end">
-        {history.nextCursor ? (
-          <Link
-            href={`/approvals?historyCursor=${encodeURIComponent(history.nextCursor)}`}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium"
-          >
-            Next Page
-          </Link>
-        ) : (
-          <span className="text-xs text-foreground/60">No more records</span>
-        )}
       </div>
     </section>
   )

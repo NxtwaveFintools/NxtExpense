@@ -1,22 +1,61 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Claim } from '@/features/claims/types'
+import { getClaimAvailableActions } from '@/features/claims/queries'
 import type { Employee } from '@/features/employees/types'
 import type {
+  FinanceFilters,
   FinanceHistoryItem,
   PaginatedFinanceHistory,
   PaginatedFinanceQueue,
 } from '@/features/finance/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
+import {
+  getFilteredClaimIdsForFinance,
+  getFinanceFilterOptions,
+} from '@/features/finance/queries/filters'
+import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
 const CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at'
+  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
+
+const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
+  employeeName: null,
+  claimNumber: null,
+  ownerDesignation: null,
+  hodApproverEmail: null,
+  actionFilter: 'all',
+  claimDateFrom: null,
+  claimDateTo: null,
+  actionDateFrom: null,
+  actionDateTo: null,
+}
+
+export { getFinanceFilterOptions }
 
 export async function getFinanceQueuePaginated(
   supabase: SupabaseClient,
   cursor: string | null,
-  limit = 10
+  limit = 10,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
 ): Promise<PaginatedFinanceQueue> {
+  const filteredClaimIds = await getFilteredClaimIdsForFinance(
+    supabase,
+    filters,
+    {
+      requiredStatus: 'finance_review',
+    }
+  )
+
+  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
+    return {
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit,
+    }
+  }
+
   let query = supabase
     .from('expense_claims')
     .select(`${CLAIM_COLUMNS}, employees!inner(*)`)
@@ -24,6 +63,10 @@ export async function getFinanceQueuePaginated(
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1)
+
+  if (Array.isArray(filteredClaimIds)) {
+    query = query.in('id', filteredClaimIds)
+  }
 
   if (cursor) {
     const decoded = decodeCursor(cursor)
@@ -44,6 +87,26 @@ export async function getFinanceQueuePaginated(
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
 
+  const mappedData = await Promise.all(
+    pageData.map(async (row) => {
+      const owner = Array.isArray(row.employees)
+        ? row.employees[0]
+        : row.employees
+
+      if (!owner) {
+        throw new Error('Claim owner mapping not found.')
+      }
+
+      const availableActions = await getClaimAvailableActions(supabase, row.id)
+
+      return {
+        claim: row,
+        owner,
+        availableActions,
+      }
+    })
+  )
+
   const lastRecord = pageData.at(-1)
   const nextCursor =
     hasNextPage && lastRecord
@@ -54,20 +117,7 @@ export async function getFinanceQueuePaginated(
       : null
 
   return {
-    data: pageData.map((row) => {
-      const owner = Array.isArray(row.employees)
-        ? row.employees[0]
-        : row.employees
-
-      if (!owner) {
-        throw new Error('Claim owner mapping not found.')
-      }
-
-      return {
-        claim: row,
-        owner,
-      }
-    }),
+    data: mappedData,
     hasNextPage,
     nextCursor,
     limit,
@@ -78,17 +128,51 @@ export async function getFinanceHistoryPaginated(
   supabase: SupabaseClient,
   actorEmail: string,
   cursor: string | null,
-  limit = 10
+  limit = 10,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
 ): Promise<PaginatedFinanceHistory> {
   const lowerEmail = actorEmail.toLowerCase()
+
+  const filteredClaimIds = await getFilteredClaimIdsForFinance(
+    supabase,
+    filters
+  )
+
+  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
+    return {
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit,
+    }
+  }
 
   let query = supabase
     .from('finance_actions')
     .select('id, claim_id, actor_email, action, notes, acted_at')
     .eq('actor_email', lowerEmail)
+    .in('action', ['issued', 'finance_rejected'])
     .order('acted_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1)
+
+  if (filters.actionFilter !== 'all') {
+    query = query.eq('action', filters.actionFilter)
+  }
+
+  const actionDateFrom = toIstDayStart(filters.actionDateFrom)
+  if (actionDateFrom) {
+    query = query.gte('acted_at', actionDateFrom)
+  }
+
+  const actionDateTo = toIstDayEnd(filters.actionDateTo)
+  if (actionDateTo) {
+    query = query.lte('acted_at', actionDateTo)
+  }
+
+  if (Array.isArray(filteredClaimIds)) {
+    query = query.in('claim_id', filteredClaimIds)
+  }
 
   if (cursor) {
     const decoded = decodeCursor(cursor)

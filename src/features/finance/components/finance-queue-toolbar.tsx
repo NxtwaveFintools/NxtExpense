@@ -2,13 +2,19 @@
 
 import { useEffect, useRef } from 'react'
 
+type BulkAction = {
+  action: 'issued' | 'finance_rejected'
+  label: string
+}
+
 type FinanceQueueToolbarProps = {
   selectedCount: number
   allSelected: boolean
   partiallySelected: boolean
   totalCount: number
+  bulkActions: BulkAction[]
   onToggleSelectAll: (checked: boolean) => void
-  onBulkAction: (action: 'issued' | 'finance_rejected') => void
+  onBulkAction: (action: BulkAction['action']) => void
   disabled: boolean
 }
 
@@ -17,6 +23,7 @@ export function FinanceQueueToolbar({
   allSelected,
   partiallySelected,
   totalCount,
+  bulkActions,
   onToggleSelectAll,
   onBulkAction,
   disabled,
@@ -24,7 +31,10 @@ export function FinanceQueueToolbar({
   const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    if (!selectAllRef.current) return
+    if (!selectAllRef.current) {
+      return
+    }
+
     selectAllRef.current.indeterminate = partiallySelected
   }, [partiallySelected])
 
@@ -42,22 +52,17 @@ export function FinanceQueueToolbar({
       </label>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onBulkAction('issued')}
-          disabled={disabled || selectedCount === 0}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-        >
-          {disabled ? 'Processing...' : 'Issue Selected'}
-        </button>
-        <button
-          type="button"
-          onClick={() => onBulkAction('finance_rejected')}
-          disabled={disabled || selectedCount === 0}
-          className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-        >
-          {disabled ? 'Processing...' : 'Reject Selected'}
-        </button>
+        {bulkActions.map((bulkAction) => (
+          <button
+            key={bulkAction.action}
+            type="button"
+            onClick={() => onBulkAction(bulkAction.action)}
+            disabled={disabled || selectedCount === 0}
+            className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
+          >
+            {disabled ? 'Processing...' : bulkAction.label}
+          </button>
+        ))}
       </div>
     </div>
   )

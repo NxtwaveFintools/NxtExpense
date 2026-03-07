@@ -2,14 +2,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
   Claim,
+  ClaimAvailableAction,
+  ClaimHistoryEntry,
   ClaimItem,
+  ClaimStatusCatalogItem,
   ClaimWithItems,
   PaginatedClaims,
 } from '@/features/claims/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 
 const CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at'
+  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
 
 export async function getMyClaimsPaginated(
   supabase: SupabaseClient,
@@ -90,4 +93,55 @@ export async function getClaimById(
     claim: claimData as Claim,
     items: (itemData ?? []) as ClaimItem[],
   }
+}
+
+export async function getClaimStatusCatalog(
+  supabase: SupabaseClient
+): Promise<ClaimStatusCatalogItem[]> {
+  const { data, error } = await supabase
+    .from('claim_status_catalog')
+    .select(
+      'status, display_label, is_terminal, sort_order, color_token, description'
+    )
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as ClaimStatusCatalogItem[]
+}
+
+export async function getClaimAvailableActions(
+  supabase: SupabaseClient,
+  claimId: string
+): Promise<ClaimAvailableAction[]> {
+  const { data, error } = await supabase.rpc('get_claim_available_actions', {
+    p_claim_id: claimId,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as ClaimAvailableAction[]
+}
+
+export async function getClaimHistory(
+  supabase: SupabaseClient,
+  claimId: string
+): Promise<ClaimHistoryEntry[]> {
+  const { data, error } = await supabase
+    .from('approval_history')
+    .select(
+      'id, claim_id, approver_email, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
+    )
+    .eq('claim_id', claimId)
+    .order('acted_at', { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as ClaimHistoryEntry[]
 }

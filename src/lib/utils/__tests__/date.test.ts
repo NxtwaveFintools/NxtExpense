@@ -16,7 +16,9 @@ describe('date utils', () => {
 
   it('formats date and datetime correctly', () => {
     expect(formatDate('2026-03-06')).toBe('06/03/2026')
-    expect(formatDatetime('2026-03-06T14:30:00.000Z')).toBe('06/03/2026 14:30')
+    expect(formatDatetime('2026-03-06T14:30:00.000Z')).toBe(
+      '06/03/2026 08:00 PM'
+    )
   })
 
   it('rejects invalid calendar dates', () => {

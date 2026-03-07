@@ -4,7 +4,7 @@ import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
 import { copyResponseCookies } from '@/lib/utils/session-utils'
 import { refreshAuthSession } from '@/lib/supabase/middleware'
 
-const protectedRoutes = ['/dashboard']
+const protectedRoutes = ['/dashboard', '/claims', '/approvals', '/finance']
 const publicAuthRoutes = ['/login']
 
 function matchesRoute(pathname: string, route: string): boolean {
@@ -47,5 +47,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: [
+    '/dashboard/:path*',
+    '/claims/:path*',
+    '/approvals/:path*',
+    '/finance/:path*',
+    '/login',
+  ],
 }

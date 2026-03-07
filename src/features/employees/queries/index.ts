@@ -5,21 +5,52 @@ import type { ApprovalChain, Employee } from '@/features/employees/types'
 const EMPLOYEE_COLUMNS =
   'id, employee_id, employee_name, employee_email, state, designation, approval_email_level_1, approval_email_level_2, approval_email_level_3, created_at'
 
+const EMPLOYEE_FETCH_MAX_RETRIES = 1
+
+function isTransientFetchError(message: string): boolean {
+  const normalized = message.toLowerCase()
+
+  return (
+    normalized.includes('fetch failed') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network') ||
+    normalized.includes('timeout') ||
+    normalized.includes('terminated')
+  )
+}
+
+async function waitBeforeRetry(delayMs: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, delayMs))
+}
+
 export async function getEmployeeByEmail(
   supabase: SupabaseClient,
   email: string
 ): Promise<Employee | null> {
-  const { data, error } = await supabase
-    .from('employees')
-    .select(EMPLOYEE_COLUMNS)
-    .eq('employee_email', email.toLowerCase())
-    .maybeSingle()
+  for (let attempt = 0; attempt <= EMPLOYEE_FETCH_MAX_RETRIES; attempt += 1) {
+    const { data, error } = await supabase
+      .from('employees')
+      .select(EMPLOYEE_COLUMNS)
+      .eq('employee_email', email.toLowerCase())
+      .maybeSingle()
 
-  if (error) {
+    if (!error) {
+      return data as Employee | null
+    }
+
+    const shouldRetry =
+      attempt < EMPLOYEE_FETCH_MAX_RETRIES &&
+      isTransientFetchError(error.message)
+
+    if (shouldRetry) {
+      await waitBeforeRetry(200)
+      continue
+    }
+
     throw new Error(error.message)
   }
 
-  return data as Employee | null
+  throw new Error('Employee lookup failed unexpectedly.')
 }
 
 export async function getEmployeeById(

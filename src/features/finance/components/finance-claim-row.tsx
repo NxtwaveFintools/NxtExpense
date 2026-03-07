@@ -1,15 +1,16 @@
 import { formatDate } from '@/lib/utils/date'
 
+import type { ClaimAvailableAction } from '@/features/claims/types'
 import type { FinanceQueueItem } from '@/features/finance/types'
 
 type FinanceClaimRowProps = {
   item: FinanceQueueItem
   checked: boolean
   disabled: boolean
+  selectable: boolean
   isProcessingRow: boolean
   onToggle: (claimId: string, checked: boolean) => void
-  onIssue: (claimId: string) => void
-  onReject: (claimId: string) => void
+  onRunAction: (claimId: string, action: ClaimAvailableAction) => void
 }
 
 export function FinanceClaimRow({
@@ -17,9 +18,9 @@ export function FinanceClaimRow({
   checked,
   disabled,
   isProcessingRow,
+  selectable,
   onToggle,
-  onIssue,
-  onReject,
+  onRunAction,
 }: FinanceClaimRowProps) {
   return (
     <tr className="border-b border-border/70">
@@ -27,7 +28,7 @@ export function FinanceClaimRow({
         <input
           type="checkbox"
           checked={checked}
-          disabled={disabled}
+          disabled={disabled || !selectable}
           onChange={(event) => onToggle(item.claim.id, event.target.checked)}
         />
       </td>
@@ -39,23 +40,24 @@ export function FinanceClaimRow({
         Rs. {Number(item.claim.total_amount).toFixed(2)}
       </td>
       <td className="px-3 py-3">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onIssue(item.claim.id)}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-          >
-            {isProcessingRow ? 'Processing...' : 'Issue'}
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onReject(item.claim.id)}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-          >
-            {isProcessingRow ? 'Processing...' : 'Reject'}
-          </button>
+        <div className="flex flex-wrap gap-2">
+          {item.availableActions
+            .filter(
+              (action) =>
+                action.action === 'issued' ||
+                action.action === 'finance_rejected'
+            )
+            .map((action) => (
+              <button
+                key={`${item.claim.id}-${action.action}-${action.display_label}`}
+                type="button"
+                disabled={disabled}
+                onClick={() => onRunAction(item.claim.id, action)}
+                className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
+              >
+                {isProcessingRow ? 'Processing...' : action.display_label}
+              </button>
+            ))}
         </div>
       </td>
     </tr>

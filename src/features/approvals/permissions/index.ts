@@ -30,8 +30,6 @@ export function canApproveAtLevel(
   const approverLevel = getApproverCurrentLevel(approverEmail, ownerEmployee)
 
   return (
-    approverLevel !== null &&
-    claim.status === 'pending_approval' &&
-    claim.current_approval_level === approverLevel
+    approverLevel !== null && claim.current_approval_level === approverLevel
   )
 }

@@ -13,6 +13,9 @@ import { getDashboardAccess } from '@/features/employees/permissions'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type DashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
@@ -25,7 +28,13 @@ export default async function DashboardPage({
     searchParams,
   ])
   const supabase = await createSupabaseServerClient()
-  const employee = await getEmployeeByEmail(supabase, user.email ?? '')
+
+  let employee = null
+  try {
+    employee = await getEmployeeByEmail(supabase, user.email ?? '')
+  } catch {
+    redirect('/login?message=session_refresh_required')
+  }
 
   if (!employee) {
     redirect('/login')

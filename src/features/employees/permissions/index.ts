@@ -73,7 +73,7 @@ export function getDashboardAccess(
 }
 
 export function canAccessEmployeeClaims(employee: Employee): boolean {
-  return employee.designation !== 'Finance'
+  return employee.designation !== 'Finance' && employee.designation !== 'Admin'
 }
 
 export function canAccessApprovals(hasApproverAccess: boolean): boolean {

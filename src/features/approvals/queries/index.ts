@@ -1,24 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Claim, ClaimItem } from '@/features/claims/types'
+import { getClaimAvailableActions } from '@/features/claims/queries'
 import { getEmployeeById } from '@/features/employees/queries'
 import type { Employee } from '@/features/employees/types'
 import type {
   ApprovalAction,
   ApprovalHistoryItem,
+  PendingApprovalsFilters,
   PaginatedApprovalHistory,
   PendingApproval,
 } from '@/features/approvals/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 
 const CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at'
+  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
 
 export async function getPendingApprovalsPaginated(
   supabase: SupabaseClient,
   approverEmail: string,
   cursor: string | null,
-  limit = 10
+  limit = 10,
+  filters: PendingApprovalsFilters = {
+    employeeName: null,
+    actorFilter: 'all',
+  }
 ) {
   const lowerEmail = approverEmail.toLowerCase()
 
@@ -103,6 +109,27 @@ export async function getPendingApprovalsPaginated(
     )
   }
 
+  const normalizedName = filters.employeeName?.trim() ?? ''
+  if (normalizedName) {
+    const escapedName = normalizedName
+      .replaceAll('%', '\\%')
+      .replaceAll('_', '\\_')
+
+    query = query.ilike('employees.employee_name', `%${escapedName}%`)
+  }
+
+  if (filters.actorFilter === 'sbh') {
+    query = query.eq('employees.designation', 'State Business Head')
+  }
+
+  if (filters.actorFilter === 'finance') {
+    query = query.eq('employees.designation', 'Finance')
+  }
+
+  if (filters.actorFilter === 'hod') {
+    query = query.not('employees.approval_email_level_3', 'is', null)
+  }
+
   const { data, error } = await query
 
   if (error) {
@@ -125,10 +152,14 @@ export async function getPendingApprovalsPaginated(
         throw new Error('Claim owner mapping not found.')
       }
 
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('expense_claim_items')
-        .select('id, claim_id, item_type, description, amount, created_at')
-        .eq('claim_id', row.id)
+      const [{ data: itemsData, error: itemsError }, actions] =
+        await Promise.all([
+          supabase
+            .from('expense_claim_items')
+            .select('id, claim_id, item_type, description, amount, created_at')
+            .eq('claim_id', row.id),
+          getClaimAvailableActions(supabase, row.id),
+        ])
 
       if (itemsError) {
         throw new Error(itemsError.message)
@@ -138,6 +169,7 @@ export async function getPendingApprovalsPaginated(
         claim: row,
         owner,
         items: (itemsData ?? []) as ClaimItem[],
+        availableActions: actions,
       }
     })
   )
@@ -166,7 +198,7 @@ export async function getClaimApprovalHistory(
   const { data, error } = await supabase
     .from('approval_history')
     .select(
-      'id, claim_id, approver_email, approval_level, action, notes, acted_at'
+      'id, claim_id, approver_email, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
     )
     .eq('claim_id', claimId)
     .order('acted_at', { ascending: true })
@@ -192,7 +224,9 @@ export async function getClaimWithOwner(
     throw new Error(error.message)
   }
 
-  if (!data) return null
+  if (!data) {
+    return null
+  }
 
   const owner = await getEmployeeById(supabase, data.employee_id)
   if (!owner) {
@@ -213,7 +247,7 @@ export async function getMyApprovalHistoryPaginated(
   let query = supabase
     .from('approval_history')
     .select(
-      'id, claim_id, approver_email, approval_level, action, notes, acted_at'
+      'id, claim_id, approver_email, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
     )
     .eq('approver_email', lowerEmail)
     .order('acted_at', { ascending: false })

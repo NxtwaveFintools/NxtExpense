@@ -1,14 +1,30 @@
 import Link from 'next/link'
 
-import type { PaginatedClaims } from '@/features/claims/types'
+import type {
+  ClaimStatusCatalogItem,
+  PaginatedClaims,
+} from '@/features/claims/types'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
-import { formatDate } from '@/lib/utils/date'
+import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
+import { formatDate, formatDatetime } from '@/lib/utils/date'
+
+type ClaimListPagination = {
+  backHref: string | null
+  nextHref: string | null
+  pageNumber: number
+}
 
 type ClaimListProps = {
   claims: PaginatedClaims
+  statusCatalog: ClaimStatusCatalogItem[]
+  pagination: ClaimListPagination
 }
 
-export function ClaimList({ claims }: ClaimListProps) {
+export function ClaimList({
+  claims,
+  statusCatalog,
+  pagination,
+}: ClaimListProps) {
   if (claims.data.length === 0) {
     return (
       <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -32,8 +48,14 @@ export function ClaimList({ claims }: ClaimListProps) {
         </Link>
       </div>
 
+      <CursorPaginationControls
+        backHref={pagination.backHref}
+        nextHref={pagination.nextHref}
+        pageNumber={pagination.pageNumber}
+      />
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[780px] border-collapse text-sm">
+        <table className="w-full min-w-230 border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-foreground/70">
               <th className="px-3 py-2 font-medium">Claim ID</th>
@@ -42,40 +64,49 @@ export function ClaimList({ claims }: ClaimListProps) {
               <th className="px-3 py-2 font-medium">Amount</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Submitted At</th>
+              <th className="px-3 py-2 font-medium">Rework</th>
             </tr>
           </thead>
           <tbody>
             {claims.data.map((claim) => (
               <tr key={claim.id} className="border-b border-border/70">
-                <td className="px-3 py-3 font-medium">{claim.claim_number}</td>
+                <td className="px-3 py-3 font-medium">
+                  <Link
+                    href={`/claims/${claim.id}`}
+                    className="underline decoration-border underline-offset-4 hover:decoration-foreground"
+                  >
+                    {claim.claim_number}
+                  </Link>
+                </td>
                 <td className="px-3 py-3">{formatDate(claim.claim_date)}</td>
                 <td className="px-3 py-3">{claim.work_location}</td>
                 <td className="px-3 py-3">
                   Rs. {Number(claim.total_amount).toFixed(2)}
                 </td>
                 <td className="px-3 py-3">
-                  <ClaimStatusBadge status={claim.status} />
+                  <ClaimStatusBadge
+                    status={claim.status}
+                    statusCatalog={statusCatalog}
+                  />
                 </td>
                 <td className="px-3 py-3">
-                  {claim.submitted_at ? formatDate(claim.submitted_at) : '-'}
+                  {claim.submitted_at
+                    ? formatDatetime(claim.submitted_at)
+                    : '-'}
+                </td>
+                <td className="px-3 py-3">
+                  {claim.resubmission_count > 0 ? (
+                    <span className="rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Resubmitted ({claim.resubmission_count})
+                    </span>
+                  ) : (
+                    <span className="text-xs text-foreground/60">-</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="mt-4 flex items-center justify-end">
-        {claims.nextCursor ? (
-          <Link
-            href={`/claims?cursor=${encodeURIComponent(claims.nextCursor)}`}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium"
-          >
-            Next Page
-          </Link>
-        ) : (
-          <span className="text-xs text-foreground/60">No more records</span>
-        )}
       </div>
     </section>
   )

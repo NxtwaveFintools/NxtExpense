@@ -2,24 +2,18 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-import {
-  getEmployeeApprovalChain,
-  getEmployeeByEmail,
-} from '@/features/employees/queries'
-import {
-  canAccessEmployeeClaims,
-  canSubmitFourWheelerClaim,
-  getNextApprovalLevel,
-} from '@/features/employees/permissions'
+import { getEmployeeByEmail } from '@/features/employees/queries'
+import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 
 import type { ClaimFormValues, ExpenseItemType } from '@/features/claims/types'
 import { claimSubmissionSchema } from '@/features/claims/validations'
 import {
-  claimExistsForDate,
+  getClaimForDate,
   getRateAmount,
   insertClaim,
   insertClaimItems,
-  updateClaimStatus,
+  replaceClaimItems,
+  updateClaimDraftData,
 } from '@/features/claims/mutations'
 import { getMyClaimsPaginated } from '@/features/claims/queries'
 
@@ -74,19 +68,27 @@ function buildClaimItemsAndTotal(
         amount: intercityAmount,
         description: `${input.kmTravelled} KM @ ${rates.intercityRate}/KM`,
       })
-    } else {
-      if (typeof input.taxiAmount === 'number' && input.taxiAmount > 0) {
-        items.push({
-          itemType: 'taxi_bill',
-          amount: input.taxiAmount,
-          description: `${input.transportType} bill submitted for outstation travel`,
-        })
-      }
+    } else if (typeof input.taxiAmount === 'number' && input.taxiAmount > 0) {
+      items.push({
+        itemType: 'taxi_bill',
+        amount: input.taxiAmount,
+        description: `${input.transportType} bill submitted for outstation travel`,
+      })
     }
   }
 
   const total = items.reduce((sum, item) => sum + item.amount, 0)
   return { items, total }
+}
+
+async function moveClaimIntoWorkflow(
+  claimId: string,
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+) {
+  return supabase.rpc('resubmit_claim_after_rejection_atomic', {
+    p_claim_id: claimId,
+    p_notes: null,
+  })
 }
 
 export async function submitClaimAction(
@@ -120,46 +122,30 @@ export async function submitClaimAction(
 
   const input = parsed.data
 
-  if (
-    input.workLocation === 'Field - Base Location' &&
-    input.vehicleType === 'Four Wheeler' &&
-    !canSubmitFourWheelerClaim(employee.designation)
-  ) {
-    return {
-      ok: false,
-      error:
-        'Four wheeler reimbursements are not allowed for your designation.',
-    }
-  }
-
-  if (
-    input.workLocation === 'Field - Outstation' &&
-    input.ownVehicleUsed &&
-    input.vehicleType === 'Four Wheeler' &&
-    !canSubmitFourWheelerClaim(employee.designation)
-  ) {
-    return {
-      ok: false,
-      error:
-        'Four wheeler reimbursements are not allowed for your designation.',
-    }
-  }
-
-  const duplicateExists = await claimExistsForDate(
+  const existingClaim = await getClaimForDate(
     supabase,
     employee.id,
     input.claimDate.iso
   )
 
-  if (duplicateExists) {
+  if (existingClaim && existingClaim.status !== 'returned_for_modification') {
+    if (
+      existingClaim.status === 'rejected' ||
+      existingClaim.status === 'finance_rejected'
+    ) {
+      return {
+        ok: false,
+        error:
+          'This claim was finally rejected and cannot be resubmitted. Please contact admin for correction.',
+      }
+    }
+
     return {
       ok: false,
-      error: 'You already submitted a claim for this date.',
+      error:
+        'You already have a pending claim for this date. Please wait for approval or modify your existing claim.',
     }
   }
-
-  const approvalChain = getEmployeeApprovalChain(employee)
-  const firstApprovalLevel = getNextApprovalLevel(approvalChain, null)
 
   const rates: {
     foodBase?: number
@@ -201,6 +187,69 @@ export async function submitClaimAction(
 
   const draft = buildClaimItemsAndTotal(input, rates)
 
+  if (existingClaim) {
+    await updateClaimDraftData(supabase, existingClaim.id, {
+      claimDateIso: input.claimDate.iso,
+      workLocation: input.workLocation,
+      ownVehicleUsed:
+        input.workLocation === 'Field - Outstation'
+          ? input.ownVehicleUsed
+          : null,
+      vehicleType:
+        input.workLocation === 'Field - Base Location' ||
+        (input.workLocation === 'Field - Outstation' && input.ownVehicleUsed)
+          ? input.vehicleType
+          : null,
+      outstationLocation:
+        input.workLocation === 'Field - Outstation'
+          ? input.outstationLocation
+          : null,
+      fromCity:
+        input.workLocation === 'Field - Outstation' && input.ownVehicleUsed
+          ? input.fromCity
+          : null,
+      toCity:
+        input.workLocation === 'Field - Outstation' && input.ownVehicleUsed
+          ? input.toCity
+          : null,
+      kmTravelled:
+        input.workLocation === 'Field - Outstation' && input.ownVehicleUsed
+          ? input.kmTravelled
+          : null,
+      totalAmount: draft.total,
+      status: 'returned_for_modification',
+      currentApprovalLevel: null,
+      submittedAt: null,
+    })
+
+    await replaceClaimItems(
+      supabase,
+      existingClaim.id,
+      draft.items.map((item) => ({
+        claimId: existingClaim.id,
+        itemType: item.itemType,
+        amount: item.amount,
+        description: item.description,
+      }))
+    )
+
+    const { error: resubmitError } = await moveClaimIntoWorkflow(
+      existingClaim.id,
+      supabase
+    )
+
+    if (resubmitError) {
+      return { ok: false, error: resubmitError.message }
+    }
+
+    return {
+      ok: true,
+      error: null,
+      claimId: existingClaim.id,
+      claimNumber: existingClaim.claim_number,
+    }
+  }
+
   const claim = await insertClaim(supabase, {
     employeeId: employee.id,
     claimDateIso: input.claimDate.iso,
@@ -229,8 +278,8 @@ export async function submitClaimAction(
         ? input.kmTravelled
         : null,
     totalAmount: draft.total,
-    status: firstApprovalLevel ? 'pending_approval' : 'finance_review',
-    currentApprovalLevel: firstApprovalLevel,
+    status: 'submitted',
+    currentApprovalLevel: null,
     submittedAt: new Date().toISOString(),
   })
 
@@ -244,8 +293,12 @@ export async function submitClaimAction(
     }))
   )
 
-  if (!firstApprovalLevel) {
-    await updateClaimStatus(supabase, claim.id, 'finance_review', null)
+  const { error: workflowError } = await moveClaimIntoWorkflow(
+    claim.id,
+    supabase
+  )
+  if (workflowError) {
+    return { ok: false, error: workflowError.message }
   }
 
   return {

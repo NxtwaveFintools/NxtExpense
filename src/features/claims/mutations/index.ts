@@ -7,7 +7,7 @@ import type {
   WorkLocation,
 } from '@/features/claims/types'
 
-type InsertClaimInput = {
+type ClaimPayload = {
   employeeId: string
   claimDateIso: string
   workLocation: WorkLocation
@@ -32,7 +32,7 @@ type InsertClaimItemInput = {
 
 export async function insertClaim(
   supabase: SupabaseClient,
-  input: InsertClaimInput
+  input: ClaimPayload
 ): Promise<{ id: string; claim_number: string }> {
   const { data, error } = await supabase
     .from('expense_claims')
@@ -61,11 +61,41 @@ export async function insertClaim(
   return data as { id: string; claim_number: string }
 }
 
+export async function updateClaimDraftData(
+  supabase: SupabaseClient,
+  claimId: string,
+  input: Omit<ClaimPayload, 'employeeId'>
+): Promise<void> {
+  const { error } = await supabase
+    .from('expense_claims')
+    .update({
+      claim_date: input.claimDateIso,
+      work_location: input.workLocation,
+      own_vehicle_used: input.ownVehicleUsed,
+      vehicle_type: input.vehicleType,
+      outstation_location: input.outstationLocation,
+      from_city: input.fromCity,
+      to_city: input.toCity,
+      km_travelled: input.kmTravelled,
+      total_amount: input.totalAmount,
+      status: input.status,
+      current_approval_level: input.currentApprovalLevel,
+      submitted_at: input.submittedAt,
+    })
+    .eq('id', claimId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+}
+
 export async function insertClaimItems(
   supabase: SupabaseClient,
   items: InsertClaimItemInput[]
 ): Promise<void> {
-  if (items.length === 0) return
+  if (items.length === 0) {
+    return
+  }
 
   const { error } = await supabase.from('expense_claim_items').insert(
     items.map((item) => ({
@@ -81,35 +111,35 @@ export async function insertClaimItems(
   }
 }
 
-export async function updateClaimStatus(
+export async function replaceClaimItems(
   supabase: SupabaseClient,
   claimId: string,
-  status: ClaimStatus,
-  currentApprovalLevel: number | null
+  items: InsertClaimItemInput[]
 ): Promise<void> {
-  const { error } = await supabase
-    .from('expense_claims')
-    .update({
-      status,
-      current_approval_level: currentApprovalLevel,
-      submitted_at:
-        status === 'pending_approval' ? new Date().toISOString() : null,
-    })
-    .eq('id', claimId)
+  const { error: deleteError } = await supabase
+    .from('expense_claim_items')
+    .delete()
+    .eq('claim_id', claimId)
 
-  if (error) {
-    throw new Error(error.message)
+  if (deleteError) {
+    throw new Error(deleteError.message)
   }
+
+  await insertClaimItems(supabase, items)
 }
 
-export async function claimExistsForDate(
+export async function getClaimForDate(
   supabase: SupabaseClient,
   employeeId: string,
   claimDateIso: string
-): Promise<boolean> {
+): Promise<{
+  id: string
+  claim_number: string
+  status: ClaimStatus
+} | null> {
   const { data, error } = await supabase
     .from('expense_claims')
-    .select('id')
+    .select('id, claim_number, status')
     .eq('employee_id', employeeId)
     .eq('claim_date', claimDateIso)
     .maybeSingle()
@@ -118,7 +148,11 @@ export async function claimExistsForDate(
     throw new Error(error.message)
   }
 
-  return Boolean(data)
+  if (!data) {
+    return null
+  }
+
+  return data as { id: string; claim_number: string; status: ClaimStatus }
 }
 
 export async function getRateAmount(

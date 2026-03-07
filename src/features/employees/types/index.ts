@@ -6,6 +6,7 @@ export const DESIGNATION_VALUES = [
   'Zonal Business Head',
   'Program Manager',
   'Finance',
+  'Admin',
 ] as const
 
 export type Designation = (typeof DESIGNATION_VALUES)[number]

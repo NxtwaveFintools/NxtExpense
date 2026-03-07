@@ -4,10 +4,12 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { getEmployeeByEmail } from '@/features/employees/queries'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
+import type { FinanceFilters } from '@/features/finance/types'
 import {
   bulkFinanceActionSchema,
   financeActionSchema,
 } from '@/features/finance/validations'
+import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import {
   getFinanceHistoryPaginated,
   getFinanceQueuePaginated,
@@ -17,6 +19,8 @@ type FinanceActionResult = {
   ok: boolean
   error: string | null
 }
+
+type RawFinanceFilters = Partial<Record<keyof FinanceFilters, string>>
 
 async function getFinanceEmployeeContext() {
   const supabase = await createSupabaseServerClient()
@@ -40,6 +44,7 @@ export async function submitFinanceAction(payload: {
   claimId: string
   action: 'issued' | 'finance_rejected'
   notes?: string
+  allowResubmit?: boolean
 }): Promise<FinanceActionResult> {
   const parsed = financeActionSchema.safeParse(payload)
   if (!parsed.success) {
@@ -56,6 +61,10 @@ export async function submitFinanceAction(payload: {
       p_claim_id: parsed.data.claimId,
       p_action: parsed.data.action,
       p_notes: parsed.data.notes ?? null,
+      p_allow_resubmit:
+        parsed.data.action === 'finance_rejected'
+          ? Boolean(parsed.data.allowResubmit)
+          : false,
     })
 
     if (error) {
@@ -78,6 +87,7 @@ export async function bulkFinanceClaimsAction(payload: {
   claimIds: string[]
   action: 'issued' | 'finance_rejected'
   notes?: string
+  allowResubmit?: boolean
 }): Promise<FinanceActionResult> {
   const parsed = bulkFinanceActionSchema.safeParse(payload)
 
@@ -95,6 +105,10 @@ export async function bulkFinanceClaimsAction(payload: {
       p_claim_ids: parsed.data.claimIds,
       p_action: parsed.data.action,
       p_notes: parsed.data.notes ?? null,
+      p_allow_resubmit:
+        parsed.data.action === 'finance_rejected'
+          ? Boolean(parsed.data.allowResubmit)
+          : false,
     })
 
     if (error) {
@@ -113,15 +127,28 @@ export async function bulkFinanceClaimsAction(payload: {
   }
 }
 
-export async function getFinanceQueueAction(cursor: string | null, limit = 10) {
+export async function getFinanceQueueAction(
+  cursor: string | null,
+  limit = 10,
+  rawFilters: RawFinanceFilters = {}
+) {
+  const normalizedFilters = normalizeFinanceFilters(rawFilters)
   const { supabase } = await getFinanceEmployeeContext()
-  return getFinanceQueuePaginated(supabase, cursor, limit)
+  return getFinanceQueuePaginated(supabase, cursor, limit, normalizedFilters)
 }
 
 export async function getFinanceHistoryAction(
   cursor: string | null,
-  limit = 10
+  limit = 10,
+  rawFilters: RawFinanceFilters = {}
 ) {
+  const normalizedFilters = normalizeFinanceFilters(rawFilters)
   const { supabase, user } = await getFinanceEmployeeContext()
-  return getFinanceHistoryPaginated(supabase, user.email ?? '', cursor, limit)
+  return getFinanceHistoryPaginated(
+    supabase,
+    user.email ?? '',
+    cursor,
+    limit,
+    normalizedFilters
+  )
 }

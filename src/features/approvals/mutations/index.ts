@@ -8,14 +8,15 @@ export async function recordApprovalAction(
     approvalLevel: number
     action: 'approved' | 'rejected'
     notes?: string
+    allowResubmit?: boolean
   }
 ) {
-  const { error } = await supabase.from('approval_history').insert({
-    claim_id: input.claimId,
-    approver_email: input.approverEmail,
-    approval_level: input.approvalLevel,
-    action: input.action,
-    notes: input.notes ?? null,
+  const { error } = await supabase.rpc('submit_approval_action_atomic', {
+    p_claim_id: input.claimId,
+    p_action: input.action,
+    p_notes: input.notes ?? null,
+    p_allow_resubmit:
+      input.action === 'rejected' ? Boolean(input.allowResubmit) : false,
   })
 
   if (error) {
@@ -23,37 +24,14 @@ export async function recordApprovalAction(
   }
 }
 
-export async function advanceClaimStatus(
-  supabase: SupabaseClient,
-  claimId: string,
-  nextLevel: number | null
-) {
-  const { error } = await supabase
-    .from('expense_claims')
-    .update({
-      status: nextLevel ? 'pending_approval' : 'finance_review',
-      current_approval_level: nextLevel,
-    })
-    .eq('id', claimId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+export async function advanceClaimStatus(): Promise<void> {
+  throw new Error(
+    'advanceClaimStatus is not supported. Use transition graph RPC functions instead.'
+  )
 }
 
-export async function rejectClaim(
-  supabase: SupabaseClient,
-  claimId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from('expense_claims')
-    .update({
-      status: 'rejected',
-      current_approval_level: null,
-    })
-    .eq('id', claimId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+export async function rejectClaim(): Promise<void> {
+  throw new Error(
+    'rejectClaim is not supported. Use transition graph RPC functions instead.'
+  )
 }

@@ -2,20 +2,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceActionType } from '@/features/finance/types'
 
-async function writeFinanceAction(
+export async function recordFinanceAction(
   supabase: SupabaseClient,
   payload: {
     claimId: string
-    actorEmail: string
     action: FinanceActionType
     notes?: string
+    allowResubmit?: boolean
   }
 ) {
-  const { error } = await supabase.from('finance_actions').insert({
-    claim_id: payload.claimId,
-    actor_email: payload.actorEmail,
-    action: payload.action,
-    notes: payload.notes ?? null,
+  const { error } = await supabase.rpc('submit_finance_action_atomic', {
+    p_claim_id: payload.claimId,
+    p_action: payload.action,
+    p_notes: payload.notes ?? null,
+    p_allow_resubmit:
+      payload.action === 'finance_rejected'
+        ? Boolean(payload.allowResubmit)
+        : false,
   })
 
   if (error) {
@@ -23,66 +26,30 @@ async function writeFinanceAction(
   }
 }
 
-async function updateClaimFinanceStatus(
-  supabase: SupabaseClient,
-  claimId: string,
-  status: 'issued' | 'finance_rejected'
-) {
-  const { error } = await supabase
-    .from('expense_claims')
-    .update({ status, current_approval_level: null })
-    .eq('id', claimId)
-    .eq('status', 'finance_review')
-
-  if (error) {
-    throw new Error(error.message)
-  }
-}
-
-export async function recordFinanceAction(
-  supabase: SupabaseClient,
-  payload: {
-    claimId: string
-    actorEmail: string
-    action: FinanceActionType
-    notes?: string
-  }
-) {
-  await writeFinanceAction(supabase, payload)
-  await updateClaimFinanceStatus(supabase, payload.claimId, payload.action)
-}
-
 export async function bulkRecordFinanceActions(
   supabase: SupabaseClient,
   payload: {
     claimIds: string[]
-    actorEmail: string
-    action: Extract<FinanceActionType, 'issued'>
+    action: Extract<FinanceActionType, 'issued' | 'finance_rejected'>
     notes?: string
+    allowResubmit?: boolean
   }
 ) {
-  if (payload.claimIds.length === 0) return
-
-  const { error: insertError } = await supabase.from('finance_actions').insert(
-    payload.claimIds.map((claimId) => ({
-      claim_id: claimId,
-      actor_email: payload.actorEmail,
-      action: payload.action,
-      notes: payload.notes ?? null,
-    }))
-  )
-
-  if (insertError) {
-    throw new Error(insertError.message)
+  if (payload.claimIds.length === 0) {
+    return
   }
 
-  const { error: updateError } = await supabase
-    .from('expense_claims')
-    .update({ status: 'issued', current_approval_level: null })
-    .in('id', payload.claimIds)
-    .eq('status', 'finance_review')
+  const { error } = await supabase.rpc('bulk_finance_actions_atomic', {
+    p_claim_ids: payload.claimIds,
+    p_action: payload.action,
+    p_notes: payload.notes ?? null,
+    p_allow_resubmit:
+      payload.action === 'finance_rejected'
+        ? Boolean(payload.allowResubmit)
+        : false,
+  })
 
-  if (updateError) {
-    throw new Error(updateError.message)
+  if (error) {
+    throw new Error(error.message)
   }
 }

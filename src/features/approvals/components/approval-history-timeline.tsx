@@ -5,6 +5,10 @@ type ApprovalHistoryTimelineProps = {
   history: ApprovalAction[]
 }
 
+function formatActionLabel(action: string) {
+  return action.replaceAll('_', ' ')
+}
+
 export function ApprovalHistoryTimeline({
   history,
 }: ApprovalHistoryTimelineProps) {
@@ -22,12 +26,32 @@ export function ApprovalHistoryTimeline({
               key={entry.id}
               className="rounded-lg border border-border bg-background p-3 text-sm"
             >
-              <p className="font-medium capitalize">{entry.action}</p>
-              <p className="text-foreground/70">Level {entry.approval_level}</p>
+              <p className="font-medium capitalize">
+                {formatActionLabel(entry.action)}
+              </p>
+              {entry.approval_level ? (
+                <p className="text-foreground/70">
+                  Level {entry.approval_level}
+                </p>
+              ) : null}
               <p className="text-foreground/70">{entry.approver_email}</p>
               <p className="text-foreground/70">
                 {formatDatetime(entry.acted_at)}
               </p>
+              {entry.rejection_notes ? (
+                <p className="mt-1">Rejection notes: {entry.rejection_notes}</p>
+              ) : null}
+              {entry.allow_resubmit !== null ? (
+                <p className="text-foreground/70">
+                  Allow resubmit: {entry.allow_resubmit ? 'Yes' : 'No'}
+                </p>
+              ) : null}
+              {entry.bypass_reason ? (
+                <p className="mt-1">Bypass reason: {entry.bypass_reason}</p>
+              ) : null}
+              {entry.reason ? (
+                <p className="mt-1">Reason: {entry.reason}</p>
+              ) : null}
               {entry.notes ? <p className="mt-1">{entry.notes}</p> : null}
             </li>
           ))}
