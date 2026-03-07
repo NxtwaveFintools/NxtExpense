@@ -57,6 +57,7 @@ export function ApprovalHistoryList({
             <tr className="border-b border-border text-left text-foreground/70">
               <th className="px-3 py-2 font-medium">Claim ID</th>
               <th className="px-3 py-2 font-medium">Employee</th>
+              <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Claim Date</th>
               <th className="px-3 py-2 font-medium">Actor</th>
               <th className="px-3 py-2 font-medium">Action</th>
@@ -78,6 +79,9 @@ export function ApprovalHistoryList({
                   </Link>
                 </td>
                 <td className="px-3 py-3">{row.ownerName}</td>
+                <td className="px-3 py-3 text-xs text-foreground/70">
+                  {row.ownerDesignation}
+                </td>
                 <td className="px-3 py-3">{formatDate(row.claimDate)}</td>
                 <td className="px-3 py-3">
                   <p>{row.actorEmail}</p>

@@ -32,24 +32,19 @@ export function getAllowedVehicleTypes(designation: Employee['designation']) {
   return ['Two Wheeler'] as const
 }
 
+// L2 (Zonal Business Head) is org hierarchy only — it is intentionally skipped
+// in expense claim approval routing. Only L1 (SBH) and L3 (Mansoor) are stops.
 export function getNextApprovalLevel(
   chain: ApprovalChain,
   currentLevel: 1 | 2 | 3 | null
-): 1 | 2 | 3 | null {
+): 1 | 3 | null {
   if (currentLevel === null) {
     if (chain.level1) return 1
-    if (chain.level2) return 2
     if (chain.level3) return 3
     return null
   }
 
   if (currentLevel === 1) {
-    if (chain.level2) return 2
-    if (chain.level3) return 3
-    return null
-  }
-
-  if (currentLevel === 2) {
     if (chain.level3) return 3
     return null
   }

@@ -173,5 +173,38 @@ export async function getClaimHistory(
     throw new Error(error.message)
   }
 
-  return (data ?? []) as ClaimHistoryEntry[]
+  const rows = (data ?? []) as ClaimHistoryEntry[]
+
+  // Resolve display names for all unique actor emails in one batch query.
+  // Emails like system@nxt-expense.internal won't match any employee row,
+  // so approver_name stays null and the email falls back in the UI.
+  const uniqueEmails = [
+    ...new Set(
+      rows
+        .map((r) => r.approver_email?.toLowerCase())
+        .filter((e): e is string => Boolean(e))
+    ),
+  ]
+
+  if (uniqueEmails.length === 0) {
+    return rows
+  }
+
+  const { data: empData } = await supabase
+    .from('employees')
+    .select('employee_email, employee_name')
+    .in('employee_email', uniqueEmails)
+
+  const nameByEmail = new Map<string, string>(
+    (empData ?? []).map((e) => [
+      e.employee_email.toLowerCase(),
+      e.employee_name,
+    ])
+  )
+
+  return rows.map((r) => ({
+    ...r,
+    approver_name:
+      nameByEmail.get(r.approver_email?.toLowerCase() ?? '') ?? null,
+  }))
 }

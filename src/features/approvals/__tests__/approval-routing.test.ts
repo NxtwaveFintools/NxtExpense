@@ -55,12 +55,25 @@ describe('approval routing permissions', () => {
     ).toBe(false)
   })
 
-  it('moves from level 1 directly to level 3 when level 2 missing', () => {
+  it('moves from level 1 directly to level 3 — L2 always skipped', () => {
+    // L2 absent
     expect(
       getNextApprovalLevel(
         {
           level1: owner.approval_email_level_1,
           level2: owner.approval_email_level_2,
+          level3: owner.approval_email_level_3,
+        },
+        1
+      )
+    ).toBe(3)
+
+    // L2 present — must still be skipped per business rules
+    expect(
+      getNextApprovalLevel(
+        {
+          level1: owner.approval_email_level_1,
+          level2: 'zbh@nxtwave.co.in',
           level3: owner.approval_email_level_3,
         },
         1

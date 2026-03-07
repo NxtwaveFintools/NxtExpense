@@ -28,29 +28,21 @@ export async function getPendingApprovalsPaginated(
 ) {
   const lowerEmail = approverEmail.toLowerCase()
 
-  const [level1Employees, level2Employees, level3Employees] = await Promise.all(
-    [
-      supabase
-        .from('employees')
-        .select('id')
-        .eq('approval_email_level_1', lowerEmail),
-      supabase
-        .from('employees')
-        .select('id')
-        .eq('approval_email_level_2', lowerEmail),
-      supabase
-        .from('employees')
-        .select('id')
-        .eq('approval_email_level_3', lowerEmail),
-    ]
-  )
+  // Only L1 (SBH for SRO/BOA/ABH) and L3 (Mansoor, final for all) are actual
+  // approval stops. L2 is org-hierarchy only and is never a pending-approval stop.
+  const [level1Employees, level3Employees] = await Promise.all([
+    supabase
+      .from('employees')
+      .select('id')
+      .eq('approval_email_level_1', lowerEmail),
+    supabase
+      .from('employees')
+      .select('id')
+      .eq('approval_email_level_3', lowerEmail),
+  ])
 
   if (level1Employees.error) {
     throw new Error(level1Employees.error.message)
-  }
-
-  if (level2Employees.error) {
-    throw new Error(level2Employees.error.message)
   }
 
   if (level3Employees.error) {
@@ -58,7 +50,6 @@ export async function getPendingApprovalsPaginated(
   }
 
   const level1Ids = (level1Employees.data ?? []).map((row) => row.id)
-  const level2Ids = (level2Employees.data ?? []).map((row) => row.id)
   const level3Ids = (level3Employees.data ?? []).map((row) => row.id)
 
   const toInList = (ids: string[]) =>
@@ -69,12 +60,6 @@ export async function getPendingApprovalsPaginated(
   if (level1Ids.length > 0) {
     approvalFilters.push(
       `and(current_approval_level.eq.1,employee_id.in.(${toInList(level1Ids)}))`
-    )
-  }
-
-  if (level2Ids.length > 0) {
-    approvalFilters.push(
-      `and(current_approval_level.eq.2,employee_id.in.(${toInList(level2Ids)}))`
     )
   }
 

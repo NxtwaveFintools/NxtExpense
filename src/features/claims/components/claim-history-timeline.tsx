@@ -33,7 +33,9 @@ export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
                   Level {entry.approval_level}
                 </p>
               ) : null}
-              <p className="text-foreground/70">{entry.approver_email}</p>
+              <p className="text-foreground/70">
+                {entry.approver_name ?? entry.approver_email}
+              </p>
               <p className="text-foreground/70">
                 {formatDatetime(entry.acted_at)}
               </p>

@@ -94,6 +94,7 @@ export function FinanceHistoryList({
               <th className="px-3 py-2 font-medium">Location</th>
               <th className="px-3 py-2 font-medium">Amount</th>
               <th className="px-3 py-2 font-medium">Action</th>
+              <th className="px-3 py-2 font-medium">Action By</th>
               <th className="px-3 py-2 font-medium">Action Date</th>
               <th className="px-3 py-2 font-medium">Current Status</th>
             </tr>
@@ -119,6 +120,9 @@ export function FinanceHistoryList({
                 </td>
                 <td className="px-3 py-3 capitalize">
                   {row.action.action.replaceAll('_', ' ')}
+                </td>
+                <td className="px-3 py-3 text-foreground/70">
+                  {row.action.actor_name ?? row.action.actor_email}
                 </td>
                 <td className="px-3 py-3">
                   {formatDatetime(row.action.acted_at)}

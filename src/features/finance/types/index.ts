@@ -10,6 +10,7 @@ export type FinanceAction = {
   id: string
   claim_id: string
   actor_email: string
+  actor_name: string | null
   action: FinanceActionType
   notes: string | null
   acted_at: string

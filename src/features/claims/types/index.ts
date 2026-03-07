@@ -102,6 +102,7 @@ export type ClaimHistoryEntry = {
   id: string
   claim_id: string
   approver_email: string
+  approver_name: string | null
   approval_level: number | null
   action: string
   notes: string | null
