@@ -28,8 +28,11 @@ describe('date utils', () => {
   })
 
   it('rejects future claim dates', () => {
-    const tomorrow = new Date()
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
-    expect(isValidClaimDate(tomorrow)).toBe(false)
+    // Build from IST-formatted "today" so the assertion is stable across UTC/IST boundaries.
+    const todayIst = parseDateDDMMYYYY(formatDate(new Date()))
+    const futureIstDate = new Date(todayIst)
+    futureIstDate.setUTCDate(futureIstDate.getUTCDate() + 2)
+
+    expect(isValidClaimDate(futureIstDate)).toBe(false)
   })
 })

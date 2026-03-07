@@ -9,6 +9,7 @@ import { isFinanceTeamMember } from '@/features/finance/permissions'
 import {
   buildCursorNavigationLinks,
   decodeCursorTrail,
+  encodeCursorTrail,
 } from '@/lib/utils/pagination'
 import {
   getFinanceHistoryAction,
@@ -16,10 +17,18 @@ import {
 } from '@/features/finance/actions'
 import { getClaimStatusCatalog } from '@/features/claims/queries'
 import { getFinanceFilterOptions } from '@/features/finance/queries'
-import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
+import {
+  addFinanceFiltersToParams,
+  normalizeFinanceFilters,
+} from '@/features/finance/utils/filters'
 import { FinanceFiltersBar } from '@/features/finance/components/finance-filters-bar'
 import { FinanceQueue } from '@/features/finance/components/finance-queue'
 import { FinanceHistoryList } from '@/features/finance/components/finance-history-list'
+import {
+  buildPathWithSearchParams,
+  createNonEmptySearchParams,
+  toSortedQueryString,
+} from '@/lib/utils/search-params'
 
 type FinancePageProps = {
   searchParams?: Promise<{
@@ -31,6 +40,9 @@ type FinancePageProps = {
     claimNumber?: string
     ownerDesignation?: string
     hodApproverEmail?: string
+    claimStatus?: string
+    workLocation?: string
+    resubmittedOnly?: string
     actionFilter?: string
     claimDateFrom?: string
     claimDateTo?: string
@@ -54,6 +66,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     claimNumber: resolvedSearch?.claimNumber,
     ownerDesignation: resolvedSearch?.ownerDesignation,
     hodApproverEmail: resolvedSearch?.hodApproverEmail,
+    claimStatus: resolvedSearch?.claimStatus,
+    workLocation: resolvedSearch?.workLocation,
+    resubmittedOnly: resolvedSearch?.resubmittedOnly,
     actionFilter: resolvedSearch?.actionFilter,
     claimDateFrom: resolvedSearch?.claimDateFrom,
     claimDateTo: resolvedSearch?.claimDateTo,
@@ -74,6 +89,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     claimNumber: normalizedFilters.claimNumber ?? undefined,
     ownerDesignation: normalizedFilters.ownerDesignation ?? undefined,
     hodApproverEmail: normalizedFilters.hodApproverEmail ?? undefined,
+    claimStatus: normalizedFilters.claimStatus ?? undefined,
+    workLocation: normalizedFilters.workLocation ?? undefined,
+    resubmittedOnly: normalizedFilters.resubmittedOnly ? 'true' : undefined,
     actionFilter: normalizedFilters.actionFilter,
     claimDateFrom: normalizedFilters.claimDateFrom ?? undefined,
     claimDateTo: normalizedFilters.claimDateTo ?? undefined,
@@ -86,6 +104,33 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   const historyCursor = resolvedSearch?.historyCursor ?? null
   const historyTrail = decodeCursorTrail(resolvedSearch?.historyTrail ?? null)
 
+  const canonicalParams = addFinanceFiltersToParams(
+    new URLSearchParams(),
+    normalizedFilters
+  )
+
+  if (queueCursor) {
+    canonicalParams.set('queueCursor', queueCursor)
+  }
+  if (queueTrail.length > 0) {
+    canonicalParams.set('queueTrail', encodeCursorTrail(queueTrail))
+  }
+  if (historyCursor) {
+    canonicalParams.set('historyCursor', historyCursor)
+  }
+  if (historyTrail.length > 0) {
+    canonicalParams.set('historyTrail', encodeCursorTrail(historyTrail))
+  }
+
+  const currentParams = createNonEmptySearchParams(resolvedSearch)
+  if (
+    toSortedQueryString(currentParams) !== toSortedQueryString(canonicalParams)
+  ) {
+    redirect(buildPathWithSearchParams('/finance', canonicalParams))
+  }
+
+  const paginationQuery = Object.fromEntries(canonicalParams.entries())
+
   const [queue, history, statusCatalog, filterOptions] = await Promise.all([
     getFinanceQueueAction(queueCursor, 10, normalizedFilterParams),
     getFinanceHistoryAction(historyCursor, 10, normalizedFilterParams),
@@ -95,7 +140,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const queuePagination = buildCursorNavigationLinks({
     pathname: '/finance',
-    query: resolvedSearch,
+    query: paginationQuery,
     cursorKey: 'queueCursor',
     trailKey: 'queueTrail',
     currentCursor: queueCursor,
@@ -105,7 +150,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const historyPagination = buildCursorNavigationLinks({
     pathname: '/finance',
-    query: resolvedSearch,
+    query: paginationQuery,
     cursorKey: 'historyCursor',
     trailKey: 'historyTrail',
     currentCursor: historyCursor,

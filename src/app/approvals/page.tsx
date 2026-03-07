@@ -10,11 +10,17 @@ import {
 import {
   buildCursorNavigationLinks,
   decodeCursorTrail,
+  encodeCursorTrail,
 } from '@/lib/utils/pagination'
 import {
   addApprovalFiltersToParams,
   normalizeApprovalHistoryFilters,
 } from '@/features/approvals/utils/history-filters'
+import {
+  buildPathWithSearchParams,
+  createNonEmptySearchParams,
+  toSortedQueryString,
+} from '@/lib/utils/search-params'
 
 import {
   getApprovalHistoryAction,
@@ -64,6 +70,8 @@ export default async function ApprovalsPage({
   const resolvedSearch = await searchParams
   const rawFilters = {
     employeeName: resolvedSearch?.employeeName,
+    // No designation-based default: always start from 'all' and let the user
+    // choose. RLS policies enforce data visibility — no URL param needed.
     actorFilter: resolvedSearch?.actorFilter,
     claimDateFrom: resolvedSearch?.claimDateFrom,
     claimDateTo: resolvedSearch?.claimDateTo,
@@ -105,6 +113,32 @@ export default async function ApprovalsPage({
   const historyCursor = resolvedSearch?.historyCursor ?? null
   const historyTrail = decodeCursorTrail(resolvedSearch?.historyTrail ?? null)
 
+  const canonicalParams = addApprovalFiltersToParams(
+    new URLSearchParams(),
+    normalizedFilters
+  )
+  if (pendingCursor) {
+    canonicalParams.set('pendingCursor', pendingCursor)
+  }
+  if (pendingTrail.length > 0) {
+    canonicalParams.set('pendingTrail', encodeCursorTrail(pendingTrail))
+  }
+  if (historyCursor) {
+    canonicalParams.set('historyCursor', historyCursor)
+  }
+  if (historyTrail.length > 0) {
+    canonicalParams.set('historyTrail', encodeCursorTrail(historyTrail))
+  }
+
+  const currentParams = createNonEmptySearchParams(resolvedSearch)
+  if (
+    toSortedQueryString(currentParams) !== toSortedQueryString(canonicalParams)
+  ) {
+    redirect(buildPathWithSearchParams('/approvals', canonicalParams))
+  }
+
+  const paginationQuery = Object.fromEntries(canonicalParams.entries())
+
   const [approvals, history, statusCatalog] = await Promise.all([
     getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
     getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
@@ -113,7 +147,7 @@ export default async function ApprovalsPage({
 
   const pendingPagination = buildCursorNavigationLinks({
     pathname: '/approvals',
-    query: resolvedSearch,
+    query: paginationQuery,
     cursorKey: 'pendingCursor',
     trailKey: 'pendingTrail',
     currentCursor: pendingCursor,
@@ -123,7 +157,7 @@ export default async function ApprovalsPage({
 
   const historyPagination = buildCursorNavigationLinks({
     pathname: '/approvals',
-    query: resolvedSearch,
+    query: paginationQuery,
     cursorKey: 'historyCursor',
     trailKey: 'historyTrail',
     currentCursor: historyCursor,

@@ -14,6 +14,9 @@ describe('finance filter utilities', () => {
       claimNumber: ' CLM-001 ',
       ownerDesignation: 'Program Manager',
       hodApproverEmail: 'Mansoor@Nxtwave.Co.In',
+      claimStatus: 'finance_review',
+      workLocation: 'Field - Base Location',
+      resubmittedOnly: 'true',
       actionFilter: 'finance_rejected',
       claimDateFrom: '2026-03-01',
       claimDateTo: '2026-03-10',
@@ -26,6 +29,9 @@ describe('finance filter utilities', () => {
       claimNumber: 'CLM-001',
       ownerDesignation: 'Program Manager',
       hodApproverEmail: 'Mansoor@Nxtwave.Co.In',
+      claimStatus: 'finance_review',
+      workLocation: 'Field - Base Location',
+      resubmittedOnly: true,
       actionFilter: 'finance_rejected',
       claimDateFrom: '2026-03-01',
       claimDateTo: '2026-03-10',
@@ -46,7 +52,15 @@ describe('finance filter utilities', () => {
     expect(
       hasFinanceClaimFilters(
         normalizeFinanceFilters({
-          ownerDesignation: 'State Business Head',
+          workLocation: 'Field - Outstation',
+        })
+      )
+    ).toBe(true)
+
+    expect(
+      hasFinanceClaimFilters(
+        normalizeFinanceFilters({
+          resubmittedOnly: 'true',
         })
       )
     ).toBe(true)
@@ -64,5 +78,71 @@ describe('finance filter utilities', () => {
         actionDateTo: '2026-03-08',
       })
     ).toThrowError('Action date to must be on or after action date from.')
+  })
+
+  // ─── FINANCE-001/002/003 Regression: empty hodApproverEmail must NOT block filters ─
+
+  it('does NOT throw when hodApproverEmail is empty string (FINANCE regression)', () => {
+    // Before fix: '' fails z.string().trim().email() because empty string is
+    // not a valid email, causing the entire schema parse to fail and ALL
+    // filters (including employeeName, claimNumber) to be reset.
+    expect(() =>
+      normalizeFinanceFilters({
+        employeeName: 'Yohan',
+        hodApproverEmail: '',
+      })
+    ).not.toThrow()
+  })
+
+  it('preserves employeeName when hodApproverEmail is empty string (FINANCE-002 regression)', () => {
+    // Exact scenario: user types name and submits, HOD dropdown is blank
+    const result = normalizeFinanceFilters({
+      employeeName: 'Yohan',
+      claimNumber: '',
+      ownerDesignation: '',
+      hodApproverEmail: '',
+      claimStatus: '',
+      workLocation: '',
+    })
+    expect(result.employeeName).toBe('Yohan')
+    expect(result.hodApproverEmail).toBeNull()
+    expect(result.claimNumber).toBeNull()
+  })
+
+  it('preserves claimNumber when hodApproverEmail is empty string (FINANCE-001 regression)', () => {
+    // User searches by claim number, HOD dropdown is blank
+    const result = normalizeFinanceFilters({
+      claimNumber: 'CLM-NW0000282-260305-0001',
+      hodApproverEmail: '',
+    })
+    expect(result.claimNumber).toBe('CLM-NW0000282-260305-0001')
+    expect(result.hodApproverEmail).toBeNull()
+  })
+
+  it('treats empty hodApproverEmail as null (no filter)', () => {
+    const result = normalizeFinanceFilters({ hodApproverEmail: '' })
+    expect(result.hodApproverEmail).toBeNull()
+  })
+
+  it('does NOT throw when all Finance form fields are empty strings', () => {
+    expect(() =>
+      normalizeFinanceFilters({
+        employeeName: '',
+        claimNumber: '',
+        ownerDesignation: '',
+        hodApproverEmail: '',
+        claimStatus: '',
+        workLocation: '',
+        actionFilter: 'all',
+        claimDateFrom: '',
+        claimDateTo: '',
+        actionDateFrom: '',
+        actionDateTo: '',
+      })
+    ).not.toThrow()
+  })
+
+  it('does NOT throw when actionFilter is empty string (converted to default "all")', () => {
+    expect(() => normalizeFinanceFilters({ actionFilter: '' })).not.toThrow()
   })
 })

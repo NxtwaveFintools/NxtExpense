@@ -76,6 +76,38 @@ export function FinanceFiltersBar({
         </label>
 
         <label className="space-y-1 text-sm">
+          <span className="text-foreground/80">Claim Status</span>
+          <select
+            name="claimStatus"
+            defaultValue={filters.claimStatus ?? ''}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2"
+          >
+            <option value="">All Statuses</option>
+            {options.claimStatuses.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="text-foreground/80">Location</span>
+          <select
+            name="workLocation"
+            defaultValue={filters.workLocation ?? ''}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2"
+          >
+            <option value="">All Locations</option>
+            {options.workLocations.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
           <span className="text-foreground/80">Claim Date From</span>
           <input
             name="claimDateFrom"
@@ -126,6 +158,16 @@ export function FinanceFiltersBar({
             defaultValue={filters.actionDateTo ?? ''}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           />
+        </label>
+
+        <label className="md:col-span-4 inline-flex items-center gap-2 text-sm text-foreground/80">
+          <input
+            name="resubmittedOnly"
+            type="checkbox"
+            value="true"
+            defaultChecked={filters.resubmittedOnly}
+          />
+          Show resubmitted claims only
         </label>
 
         <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-1">

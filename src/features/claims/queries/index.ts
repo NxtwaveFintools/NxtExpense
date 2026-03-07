@@ -4,6 +4,7 @@ import type {
   Claim,
   ClaimAvailableAction,
   ClaimHistoryEntry,
+  MyClaimsFilters,
   ClaimItem,
   ClaimStatusCatalogItem,
   ClaimWithItems,
@@ -14,11 +15,20 @@ import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 const CLAIM_COLUMNS =
   'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
 
+const DEFAULT_MY_CLAIMS_FILTERS: MyClaimsFilters = {
+  claimStatus: null,
+  workLocation: null,
+  claimDateFrom: null,
+  claimDateTo: null,
+  resubmittedOnly: false,
+}
+
 export async function getMyClaimsPaginated(
   supabase: SupabaseClient,
   employeeId: string,
   cursor: string | null,
-  limit = 10
+  limit = 10,
+  filters: MyClaimsFilters = DEFAULT_MY_CLAIMS_FILTERS
 ): Promise<PaginatedClaims> {
   let query = supabase
     .from('expense_claims')
@@ -33,6 +43,26 @@ export async function getMyClaimsPaginated(
     query = query.or(
       `created_at.lt.${decoded.created_at},and(created_at.eq.${decoded.created_at},id.lt.${decoded.id})`
     )
+  }
+
+  if (filters.claimStatus) {
+    query = query.eq('status', filters.claimStatus)
+  }
+
+  if (filters.workLocation) {
+    query = query.eq('work_location', filters.workLocation)
+  }
+
+  if (filters.claimDateFrom) {
+    query = query.gte('claim_date', filters.claimDateFrom)
+  }
+
+  if (filters.claimDateTo) {
+    query = query.lte('claim_date', filters.claimDateTo)
+  }
+
+  if (filters.resubmittedOnly) {
+    query = query.gt('resubmission_count', 0)
   }
 
   const { data, error } = await query

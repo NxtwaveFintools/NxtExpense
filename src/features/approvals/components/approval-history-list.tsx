@@ -40,6 +40,10 @@ export function ApprovalHistoryList({
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <h2 className="mb-4 text-lg font-semibold">Approval History</h2>
+      <p className="mb-4 text-xs text-foreground/60">
+        Each row is a workflow event. A single claim can appear multiple times
+        as it moves through different approval levels and finance actions.
+      </p>
 
       <CursorPaginationControls
         backHref={pagination.backHref}
@@ -48,12 +52,13 @@ export function ApprovalHistoryList({
       />
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-230 border-collapse text-sm">
+        <table className="w-full min-w-280 border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-foreground/70">
               <th className="px-3 py-2 font-medium">Claim ID</th>
               <th className="px-3 py-2 font-medium">Employee</th>
               <th className="px-3 py-2 font-medium">Claim Date</th>
+              <th className="px-3 py-2 font-medium">Actor</th>
               <th className="px-3 py-2 font-medium">Action</th>
               <th className="px-3 py-2 font-medium">Action Date</th>
               <th className="px-3 py-2 font-medium">HOD Approved Date</th>
@@ -74,6 +79,12 @@ export function ApprovalHistoryList({
                 </td>
                 <td className="px-3 py-3">{row.ownerName}</td>
                 <td className="px-3 py-3">{formatDate(row.claimDate)}</td>
+                <td className="px-3 py-3">
+                  <p>{row.actorEmail}</p>
+                  <p className="text-xs text-foreground/60">
+                    {row.actorDesignation ?? 'Unknown Role'}
+                  </p>
+                </td>
                 <td className="px-3 py-3 capitalize">
                   {row.action.replaceAll('_', ' ')}
                 </td>
