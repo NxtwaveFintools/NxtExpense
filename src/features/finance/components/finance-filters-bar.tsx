@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import type {
+  FinanceActionFilter,
   FinanceFilterOptions,
   FinanceFilters,
 } from '@/features/finance/types'
@@ -11,6 +12,10 @@ import type {
 type FinanceFiltersBarProps = {
   filters: FinanceFilters
   options: FinanceFilterOptions
+}
+
+function isFinanceActionFilter(value: string): value is FinanceActionFilter {
+  return value === 'all' || value === 'issued' || value === 'finance_rejected'
 }
 
 export function FinanceFiltersBar({
@@ -202,7 +207,11 @@ export function FinanceFiltersBar({
           <select
             name="actionFilter"
             value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
+            onChange={(e) => {
+              if (isFinanceActionFilter(e.target.value)) {
+                setActionFilter(e.target.value)
+              }
+            }}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           >
             <option value="all">All Actions</option>
