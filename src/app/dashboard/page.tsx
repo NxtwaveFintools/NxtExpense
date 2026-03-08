@@ -1,6 +1,5 @@
 import { Banknote, Clock3, FileText, UserCircle } from 'lucide-react'
 
-import { AuthMessageToast } from '@/features/auth/components/auth-message-toast'
 import { LogoutButton } from '@/features/auth/components/logout-button'
 import { requireCurrentUser } from '@/features/auth/queries'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
@@ -16,17 +15,8 @@ import { redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-type DashboardPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>
-}
-
-export default async function DashboardPage({
-  searchParams,
-}: DashboardPageProps) {
-  const [user, queryParams] = await Promise.all([
-    requireCurrentUser('/login'),
-    searchParams,
-  ])
+export default async function DashboardPage() {
+  const user = await requireCurrentUser('/login')
   const supabase = await createSupabaseServerClient()
 
   let employee = null
@@ -45,12 +35,9 @@ export default async function DashboardPage({
     employee.employee_email
   )
   const dashboardAccess = getDashboardAccess(employee, approverAccess)
-  const messageValue = queryParams.message
-  const message = Array.isArray(messageValue) ? messageValue[0] : messageValue
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
-      <AuthMessageToast message={message ?? null} />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-5 shadow-sm">
           <div>
@@ -59,7 +46,7 @@ export default async function DashboardPage({
             </p>
             <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
             <p className="text-sm text-foreground/70">
-              Your role-based workspace for claims and approvals.
+              Claim submission, approvals, and finance processing in one place.
             </p>
           </div>
           <div className="flex items-center gap-2">

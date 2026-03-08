@@ -6,6 +6,16 @@ export type TransportType = string
 export type ClaimStatus = string
 export type ExpenseItemType = string
 
+export const WORK_LOCATION_FILTER_VALUES = [
+  'Office / WFH',
+  'Field - Base Location',
+  'Field - Outstation',
+  'Leave',
+  'Week-off',
+] as const
+
+export type WorkLocationFilter = (typeof WORK_LOCATION_FILTER_VALUES)[number]
+
 export type Claim = {
   id: string
   claim_number: string
@@ -92,6 +102,7 @@ export type ClaimHistoryEntry = {
   id: string
   claim_id: string
   approver_email: string
+  approver_name: string | null
   approval_level: number | null
   action: string
   notes: string | null
@@ -104,3 +115,11 @@ export type ClaimHistoryEntry = {
 }
 
 export type PaginatedClaims = PaginatedResult<Claim>
+
+export type MyClaimsFilters = {
+  claimStatus: ClaimStatus | null
+  workLocation: WorkLocationFilter | null
+  claimDateFrom: string | null
+  claimDateTo: string | null
+  resubmittedOnly: boolean
+}

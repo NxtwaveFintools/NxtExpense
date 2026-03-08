@@ -69,7 +69,7 @@ export async function signInWithPasswordAction(
     return { error: errorMessage }
   }
 
-  redirect('/dashboard?message=signed_in')
+  redirect('/dashboard')
 }
 
 export async function signOutAction(): Promise<void> {

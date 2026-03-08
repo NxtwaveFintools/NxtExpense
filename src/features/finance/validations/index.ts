@@ -78,8 +78,20 @@ export const financeFiltersSchema = z
     employeeName: z.string().trim().max(100).optional(),
     claimNumber: z.string().trim().max(50).optional(),
     ownerDesignation: z.string().trim().max(100).optional(),
-    hodApproverEmail: z.string().trim().email().optional(),
-    actionFilter: z.enum(['all', 'issued', 'finance_rejected']).default('all'),
+    // HTML GET forms submit empty string for the blank <option value="">.
+    // Preprocess '' → undefined so the email validator accepts it as "no filter".
+    hodApproverEmail: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().trim().email().optional()
+    ),
+    claimStatus: z.string().trim().max(100).optional(),
+    workLocation: z.string().trim().max(100).optional(),
+    resubmittedOnly: z.enum(['true', '1', 'on']).optional(),
+    // Defensive: treat empty string as the default 'all' value.
+    actionFilter: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.enum(['all', 'issued', 'finance_rejected']).default('all')
+    ),
     claimDateFrom: optionalDateField('Claim date from'),
     claimDateTo: optionalDateField('Claim date to'),
     actionDateFrom: optionalDateField('Action date from'),

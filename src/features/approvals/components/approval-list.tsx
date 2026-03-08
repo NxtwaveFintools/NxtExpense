@@ -185,6 +185,7 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
               <th className="px-3 py-2 font-medium">Select</th>
               <th className="px-3 py-2 font-medium">Claim ID</th>
               <th className="px-3 py-2 font-medium">Employee</th>
+              <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Date</th>
               <th className="px-3 py-2 font-medium">Location</th>
               <th className="px-3 py-2 font-medium">Amount</th>
@@ -210,6 +211,9 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
                   {row.claim.claim_number}
                 </td>
                 <td className="px-3 py-3">{row.owner.employee_name}</td>
+                <td className="px-3 py-3 text-xs text-foreground/70">
+                  {row.owner.designation}
+                </td>
                 <td className="px-3 py-3">
                   {formatDate(row.claim.claim_date)}
                 </td>

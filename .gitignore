@@ -43,3 +43,9 @@ next-env.d.ts
 # Ignore sensitive knowledge files
 .github/knowledge/employees.json
 .github/knowledge/state_mapping.json
+
+# Test documentation (local artifacts)
+test-plan.md
+test-execution-report.md
+edge-case-catalog.md
+senior-dev-qa-responses.md

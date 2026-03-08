@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getEmployeeByEmail } from '@/features/employees/queries'
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 
-import type { ClaimFormValues, ExpenseItemType } from '@/features/claims/types'
+import type { ClaimFormValues } from '@/features/claims/types'
 import { claimSubmissionSchema } from '@/features/claims/validations'
 import {
   getClaimForDate,
@@ -16,69 +16,13 @@ import {
   updateClaimDraftData,
 } from '@/features/claims/mutations'
 import { getMyClaimsPaginated } from '@/features/claims/queries'
+import { buildClaimItemsAndTotal } from '@/features/claims/utils/calculations'
 
 type ClaimActionResult = {
   ok: boolean
   error: string | null
   claimId?: string
   claimNumber?: string
-}
-
-type ClaimItemDraft = {
-  itemType: ExpenseItemType
-  amount: number
-  description: string | null
-}
-
-function buildClaimItemsAndTotal(
-  input: ReturnType<typeof claimSubmissionSchema.parse>,
-  rates: {
-    foodBase?: number
-    foodOutstation?: number
-    fuelBase?: number
-    intercityRate?: number
-  }
-): { items: ClaimItemDraft[]; total: number } {
-  const items: ClaimItemDraft[] = []
-
-  if (input.workLocation === 'Field - Base Location') {
-    items.push({
-      itemType: 'food',
-      amount: rates.foodBase ?? 0,
-      description: 'Base location food allowance',
-    })
-    items.push({
-      itemType: 'fuel',
-      amount: rates.fuelBase ?? 0,
-      description: `${input.vehicleType} base location fuel allowance`,
-    })
-  }
-
-  if (input.workLocation === 'Field - Outstation') {
-    items.push({
-      itemType: 'food',
-      amount: rates.foodOutstation ?? 0,
-      description: 'Outstation food allowance',
-    })
-
-    if (input.ownVehicleUsed) {
-      const intercityAmount = (rates.intercityRate ?? 0) * input.kmTravelled
-      items.push({
-        itemType: 'intercity_travel',
-        amount: intercityAmount,
-        description: `${input.kmTravelled} KM @ ${rates.intercityRate}/KM`,
-      })
-    } else if (typeof input.taxiAmount === 'number' && input.taxiAmount > 0) {
-      items.push({
-        itemType: 'taxi_bill',
-        amount: input.taxiAmount,
-        description: `${input.transportType} bill submitted for outstation travel`,
-      })
-    }
-  }
-
-  const total = items.reduce((sum, item) => sum + item.amount, 0)
-  return { items, total }
 }
 
 async function moveClaimIntoWorkflow(

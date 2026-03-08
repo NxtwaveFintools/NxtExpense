@@ -1,5 +1,6 @@
 import { formatDate, formatDatetime } from '@/lib/utils/date'
 import type {
+  ApprovalActorFilter,
   ApprovalHistoryFilters,
   ApprovalHistoryRecord,
 } from '@/features/approvals/types'
@@ -46,6 +47,27 @@ export function normalizeApprovalHistoryFilters(
     financeApprovedFrom: normalizeText(value.financeApprovedFrom),
     financeApprovedTo: normalizeText(value.financeApprovedTo),
   }
+}
+
+export function getDefaultApprovalActorFilter(
+  designation: string | null | undefined
+): ApprovalActorFilter {
+  if (designation === 'State Business Head') {
+    return 'sbh'
+  }
+
+  if (
+    designation === 'Program Manager' ||
+    designation === 'Zonal Business Head'
+  ) {
+    return 'hod'
+  }
+
+  if (designation === 'Finance') {
+    return 'finance'
+  }
+
+  return 'all'
 }
 
 export function addApprovalFiltersToParams(

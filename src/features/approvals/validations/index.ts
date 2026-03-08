@@ -56,7 +56,12 @@ export type ApprovalActionInput = z.infer<typeof approvalActionSchema>
 export const approvalHistoryFiltersSchema = z
   .object({
     employeeName: z.string().trim().max(100).optional(),
-    actorFilter: z.enum(['all', 'sbh', 'hod', 'finance']).default('all'),
+    // Defensive: treat empty string (e.g., manual ?actorFilter= in URL) as
+    // undefined so the enum default ('all') is applied without throwing.
+    actorFilter: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.enum(['all', 'sbh', 'hod', 'finance']).default('all')
+    ),
     claimDateFrom: optionalDateField('Claim date from'),
     claimDateTo: optionalDateField('Claim date to'),
     hodApprovedFrom: optionalDateField('HOD approval from'),

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addApprovalFiltersToParams,
   buildApprovalHistoryCsv,
+  getDefaultApprovalActorFilter,
   normalizeApprovalHistoryFilters,
 } from '@/features/approvals/utils/history-filters'
 
@@ -99,5 +100,42 @@ describe('approval history filter utilities', () => {
     expect(csv).toContain('"CLM-001"')
     expect(csv).toContain('"07/03/2026"')
     expect(csv).toContain('"finance issued"')
+  })
+
+  it('uses role-aware default actor bucket for approvals page UX', () => {
+    expect(getDefaultApprovalActorFilter('State Business Head')).toBe('sbh')
+    expect(getDefaultApprovalActorFilter('Program Manager')).toBe('hod')
+    expect(getDefaultApprovalActorFilter('Zonal Business Head')).toBe('hod')
+    expect(getDefaultApprovalActorFilter('Finance')).toBe('finance')
+    expect(getDefaultApprovalActorFilter('Area Business Head')).toBe('all')
+  })
+
+  // ─── Defensive edge cases for actorFilter ─────────────────────────────────
+
+  it('does NOT throw when actorFilter is empty string (converted to default "all")', () => {
+    // Defensive: if someone manually sets ?actorFilter= in the URL,
+    // the schema should not explode — it converts '' to undefined then defaults to 'all'.
+    expect(() =>
+      normalizeApprovalHistoryFilters({ actorFilter: '' })
+    ).not.toThrow()
+  })
+
+  it('defaults actorFilter to "all" when absent', () => {
+    const result = normalizeApprovalHistoryFilters({})
+    expect(result.actorFilter).toBe('all')
+  })
+
+  it('preserves employeeName when actorFilter is empty string', () => {
+    const result = normalizeApprovalHistoryFilters({
+      employeeName: 'John',
+      actorFilter: '',
+    })
+    expect(result.employeeName).toBe('John')
+    expect(result.actorFilter).toBe('all')
+  })
+
+  it('normalizes actorFilter=sbh correctly', () => {
+    const result = normalizeApprovalHistoryFilters({ actorFilter: 'sbh' })
+    expect(result.actorFilter).toBe('sbh')
   })
 })

@@ -1,14 +1,35 @@
 import { formatDate } from '@/lib/utils/date'
 
 import type { ClaimWithItems } from '@/features/claims/types'
+import type { Employee } from '@/features/employees/types'
+
+function resolveNextApprover(
+  claim: ClaimWithItems['claim'],
+  owner: Employee | null
+): string | null {
+  if (!owner || claim.status !== 'pending_approval') return null
+  const level = claim.current_approval_level
+  if (level === 1) return owner.approval_email_level_1
+  if (level === 2) return owner.approval_email_level_2
+  if (level === 3) return owner.approval_email_level_3
+  return null
+}
 
 type ClaimDetailProps = {
   claim: ClaimWithItems['claim']
   items: ClaimWithItems['items']
   employeeName: string
+  owner?: Employee | null
 }
 
-export function ClaimDetail({ claim, items, employeeName }: ClaimDetailProps) {
+export function ClaimDetail({
+  claim,
+  items,
+  employeeName,
+  owner = null,
+}: ClaimDetailProps) {
+  const nextApprover = resolveNextApprover(claim, owner)
+
   return (
     <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold">Claim Details</h2>
@@ -33,6 +54,12 @@ export function ClaimDetail({ claim, items, employeeName }: ClaimDetailProps) {
           <dt className="text-foreground/60">Total</dt>
           <dd>Rs. {Number(claim.total_amount).toFixed(2)}</dd>
         </div>
+        {nextApprover ? (
+          <div className="rounded-lg border border-border bg-background p-3">
+            <dt className="text-foreground/60">Pending Approval From</dt>
+            <dd className="font-medium text-amber-500">{nextApprover}</dd>
+          </div>
+        ) : null}
       </dl>
 
       <h3 className="mt-5 text-sm font-semibold uppercase tracking-[0.12em] text-foreground/70">

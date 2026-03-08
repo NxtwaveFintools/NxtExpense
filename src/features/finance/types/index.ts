@@ -10,6 +10,7 @@ export type FinanceAction = {
   id: string
   claim_id: string
   actor_email: string
+  actor_name: string | null
   action: FinanceActionType
   notes: string | null
   acted_at: string
@@ -36,6 +37,9 @@ export type FinanceFilters = {
   claimNumber: string | null
   ownerDesignation: string | null
   hodApproverEmail: string | null
+  claimStatus: string | null
+  workLocation: string | null
+  resubmittedOnly: boolean
   actionFilter: FinanceActionFilter
   claimDateFrom: string | null
   claimDateTo: string | null
@@ -51,4 +55,6 @@ export type FinanceFilterOption = {
 export type FinanceFilterOptions = {
   ownerDesignations: FinanceFilterOption[]
   hodApprovers: FinanceFilterOption[]
+  claimStatuses: FinanceFilterOption[]
+  workLocations: FinanceFilterOption[]
 }

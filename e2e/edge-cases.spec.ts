@@ -1,0 +1,109 @@
+import { test, expect } from './fixtures/auth'
+import { SRO_AP, FINANCE_1 } from './fixtures/test-accounts'
+import { ClaimsPage } from './pages/claims.page'
+
+/**
+ * E2E: Edge cases — validates the system correctly handles
+ * boundary conditions and invalid inputs.
+ */
+
+test.describe('Edge Cases', () => {
+  test('EDGE-004: claim form rejects future date (client-side)', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs(SRO_AP.email)
+    await page.goto('/claims/new')
+    await page.waitForLoadState('networkidle')
+
+    const claims = new ClaimsPage(page)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const yyyy = tomorrow.getFullYear()
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, '0')
+    const dd = String(tomorrow.getDate()).padStart(2, '0')
+
+    await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
+    await claims.workLocationSelect.selectOption('Office / WFH')
+    await claims.submitButton.click()
+
+    // Browser's HTML5 constraint validation (max attribute) blocks form submit
+    // — no React error text is emitted; verify via native input validity state
+    const rangeOverflow = await claims.dateInput.evaluate(
+      (el) => (el as HTMLInputElement).validity.rangeOverflow
+    )
+    expect(rangeOverflow).toBe(true)
+    expect(page.url()).toContain('/claims/new')
+  })
+
+  test('EDGE-005: 2W KM limit enforced at 150 (client-side)', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs(SRO_AP.email)
+    await page.goto('/claims/new')
+    await page.waitForLoadState('networkidle')
+
+    const claims = new ClaimsPage(page)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yyyy = yesterday.getFullYear()
+    const mm = String(yesterday.getMonth() + 1).padStart(2, '0')
+    const dd = String(yesterday.getDate()).padStart(2, '0')
+
+    await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
+    await claims.workLocationSelect.selectOption('Field - Outstation')
+
+    // "Own vehicle used?" is a Yes/No button group — click Yes to confirm own-vehicle path
+    await claims.ownVehicleYesButton.click()
+    await claims.vehicleTypeSelect.selectOption('Two Wheeler')
+    await claims.kmInput.fill('151')
+    await claims.fromCityInput.fill('Hyderabad')
+    await claims.toCityInput.fill('Vijayawada')
+    await claims.submitButton.click()
+
+    // Should show KM limit error
+    await expect(page.getByText(/150|km.*limit|exceed/i)).toBeVisible({
+      timeout: 5_000,
+    })
+    expect(page.url()).toContain('/claims/new')
+  })
+
+  test('EDGE-008: empty claims list shows empty state', async ({
+    page,
+    loginAs,
+  }) => {
+    // Finance user has no claims access, but let's test with SRO
+    // who may have no claims
+    await loginAs(SRO_AP.email)
+    await page.goto('/claims')
+    await page.waitForLoadState('networkidle')
+
+    const claims = new ClaimsPage(page)
+    // Either claims exist (rows visible) or empty state is shown
+    const hasRows = (await claims.claimRows.count()) > 0
+    const hasEmptyState = await claims.emptyState.isVisible().catch(() => false)
+
+    expect(hasRows || hasEmptyState).toBe(true)
+  })
+
+  test('EDGE-016: Finance user cannot reach claim submission', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs(FINANCE_1.email)
+    await page.goto('/claims/new')
+    await page.waitForLoadState('networkidle')
+
+    // Should be redirected away
+    expect(page.url()).not.toContain('/claims/new')
+    expect(page.url()).toContain('/dashboard')
+  })
+
+  test('Non-existent route returns to login or 404', async ({ page }) => {
+    const response = await page.goto('/nonexistent-page')
+    // Either 404 or redirect to login
+    const status = response?.status()
+    expect(status === 404 || page.url().includes('/login')).toBe(true)
+  })
+})

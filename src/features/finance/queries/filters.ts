@@ -6,6 +6,7 @@ import type {
   FinanceFilters,
 } from '@/features/finance/types'
 import { hasFinanceClaimFilters } from '@/features/finance/utils/filters'
+import { WORK_LOCATION_FILTER_VALUES } from '@/features/claims/types'
 
 type ClaimFilterScope = {
   requiredStatus?: string
@@ -45,6 +46,14 @@ export async function getFilteredClaimIdsForFinance(
     .from('expense_claims')
     .select('id, employees!inner(employee_name, designation)')
 
+  if (
+    scope.requiredStatus &&
+    filters.claimStatus &&
+    filters.claimStatus !== scope.requiredStatus
+  ) {
+    return []
+  }
+
   if (scope.requiredStatus) {
     query = query.eq('status', scope.requiredStatus)
   }
@@ -57,7 +66,7 @@ export async function getFilteredClaimIdsForFinance(
   }
 
   if (filters.claimNumber) {
-    query = query.ilike('claim_number', toLikePattern(filters.claimNumber))
+    query = query.eq('claim_number', filters.claimNumber)
   }
 
   if (filters.ownerDesignation) {
@@ -70,6 +79,18 @@ export async function getFilteredClaimIdsForFinance(
 
   if (filters.claimDateTo) {
     query = query.lte('claim_date', filters.claimDateTo)
+  }
+
+  if (filters.claimStatus) {
+    query = query.eq('status', filters.claimStatus)
+  }
+
+  if (filters.workLocation) {
+    query = query.eq('work_location', filters.workLocation)
+  }
+
+  if (filters.resubmittedOnly) {
+    query = query.gt('resubmission_count', 0)
   }
 
   if (filters.hodApproverEmail) {
@@ -106,7 +127,7 @@ export async function getFilteredClaimIdsForFinance(
 export async function getFinanceFilterOptions(
   supabase: SupabaseClient
 ): Promise<FinanceFilterOptions> {
-  const [designationResult, hodAuditResult] = await Promise.all([
+  const [designationResult, hodAuditResult, statusResult] = await Promise.all([
     supabase.from('employees').select('designation'),
     supabase
       .from('claim_status_audit')
@@ -114,6 +135,10 @@ export async function getFinanceFilterOptions(
       .eq('actor_scope', 'approver')
       .eq('trigger_action', 'approved')
       .eq('to_status', 'finance_review'),
+    supabase
+      .from('claim_status_catalog')
+      .select('status, display_label')
+      .order('sort_order', { ascending: true }),
   ])
 
   if (designationResult.error) {
@@ -122,6 +147,10 @@ export async function getFinanceFilterOptions(
 
   if (hodAuditResult.error) {
     throw new Error(hodAuditResult.error.message)
+  }
+
+  if (statusResult.error) {
+    throw new Error(statusResult.error.message)
   }
 
   const designationOptions: FinanceFilterOption[] = [
@@ -145,10 +174,26 @@ export async function getFinanceFilterOptions(
     ),
   ]
 
+  const claimStatuses: FinanceFilterOption[] = (statusResult.data ?? []).map(
+    (status) => ({
+      value: status.status,
+      label: status.display_label,
+    })
+  )
+
+  const workLocations: FinanceFilterOption[] = WORK_LOCATION_FILTER_VALUES.map(
+    (workLocation) => ({
+      value: workLocation,
+      label: workLocation,
+    })
+  )
+
   if (hodEmails.length === 0) {
     return {
       ownerDesignations: designationOptions,
       hodApprovers: [],
+      claimStatuses,
+      workLocations,
     }
   }
 
@@ -189,5 +234,7 @@ export async function getFinanceFilterOptions(
   return {
     ownerDesignations: designationOptions,
     hodApprovers: hodApproverOptions,
+    claimStatuses,
+    workLocations,
   }
 }

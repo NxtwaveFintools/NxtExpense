@@ -76,16 +76,14 @@ export async function hasApproverAssignments(
 ): Promise<boolean> {
   const normalizedEmail = approverEmail.toLowerCase()
 
-  const [level1, level2, level3] = await Promise.all([
+  // Only L1 (SBH for SRO/BOA/ABH) and L3 (Mansoor, final for all) are actual
+  // approval stops in the expense claim workflow. L2 is org-hierarchy only and
+  // is intentionally excluded from approval routing.
+  const [level1, level3] = await Promise.all([
     supabase
       .from('employees')
       .select('id')
       .eq('approval_email_level_1', normalizedEmail)
-      .limit(1),
-    supabase
-      .from('employees')
-      .select('id')
-      .eq('approval_email_level_2', normalizedEmail)
       .limit(1),
     supabase
       .from('employees')
@@ -98,19 +96,11 @@ export async function hasApproverAssignments(
     throw new Error(level1.error.message)
   }
 
-  if (level2.error) {
-    throw new Error(level2.error.message)
-  }
-
   if (level3.error) {
     throw new Error(level3.error.message)
   }
 
-  return (
-    (level1.data?.length ?? 0) > 0 ||
-    (level2.data?.length ?? 0) > 0 ||
-    (level3.data?.length ?? 0) > 0
-  )
+  return (level1.data?.length ?? 0) > 0 || (level3.data?.length ?? 0) > 0
 }
 
 export function getEmployeeApprovalChain(employee: Employee): ApprovalChain {

@@ -89,6 +89,7 @@ export default async function ClaimDetailPage({
             claim={claimWithItems.claim}
             items={claimWithItems.items}
             employeeName={owner.employee_name}
+            owner={owner}
           />
           <div className="space-y-6">
             <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">

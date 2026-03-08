@@ -143,12 +143,6 @@ export async function getFinanceHistoryAction(
   rawFilters: RawFinanceFilters = {}
 ) {
   const normalizedFilters = normalizeFinanceFilters(rawFilters)
-  const { supabase, user } = await getFinanceEmployeeContext()
-  return getFinanceHistoryPaginated(
-    supabase,
-    user.email ?? '',
-    cursor,
-    limit,
-    normalizedFilters
-  )
+  const { supabase } = await getFinanceEmployeeContext()
+  return getFinanceHistoryPaginated(supabase, cursor, limit, normalizedFilters)
 }
