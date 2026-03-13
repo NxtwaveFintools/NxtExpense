@@ -24,7 +24,7 @@ Set these in `.env.local`:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_AUTH_CALLBACK_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `ALLOW_PASSWORD_LOGIN_IN_PROD` (set to `true` or `1` to enable email/password login in production)
+- `ALLOW_PASSWORD_LOGIN_IN_PROD` (set to `true` or `1` to enable email/password login in production.)
 
 ## Run Locally
 
