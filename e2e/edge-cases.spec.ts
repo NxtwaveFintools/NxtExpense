@@ -53,19 +53,59 @@ test.describe('Edge Cases', () => {
 
     await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
     await claims.workLocationSelect.selectOption('Field - Outstation')
+    await claims.outstationLocationInput.selectOption({ label: 'Hyderabad' })
 
     // "Own vehicle used?" is a Yes/No button group — click Yes to confirm own-vehicle path
     await claims.ownVehicleYesButton.click()
     await claims.vehicleTypeSelect.selectOption('Two Wheeler')
-    await claims.kmInput.fill('151')
-    await claims.fromCityInput.fill('Hyderabad')
-    await claims.toCityInput.fill('Vijayawada')
-    await claims.submitButton.click()
+    await claims.fromCityInput.selectOption({ label: 'Hyderabad' })
+    await claims.toCityInput.selectOption({ label: 'Vijayawada' })
 
-    // Should show KM limit error
-    await expect(page.getByText(/150|km.*limit|exceed/i)).toBeVisible({
-      timeout: 5_000,
-    })
+    let kmLimitErrorVisible = false
+    for (let daysBack = 1; daysBack <= 3650; daysBack++) {
+      const candidateDate = new Date()
+      candidateDate.setDate(candidateDate.getDate() - daysBack)
+      const yyyy = candidateDate.getFullYear()
+      const mm = String(candidateDate.getMonth() + 1).padStart(2, '0')
+      const dd = String(candidateDate.getDate()).padStart(2, '0')
+
+      await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
+      await claims.kmInput.fill('151')
+      await claims.submitButton.click()
+
+      try {
+        await page.waitForURL((url) => new URL(url).pathname === '/claims', {
+          timeout: 3_000,
+        })
+      } catch {
+        await expect(claims.submitButton).toBeEnabled({ timeout: 15_000 })
+      }
+
+      if (new URL(page.url()).pathname === '/claims') {
+        throw new Error(
+          'Claim submission unexpectedly succeeded for KM > max limit.'
+        )
+      }
+
+      const duplicateDateError =
+        (await page
+          .getByText(/already have a pending or approved claim for this date/i)
+          .count()) > 0
+
+      if (duplicateDateError) {
+        continue
+      }
+
+      await expect(page.getByText(/150|km.*limit|exceed/i).first()).toBeVisible(
+        {
+          timeout: 5_000,
+        }
+      )
+      kmLimitErrorVisible = true
+      break
+    }
+
+    expect(kmLimitErrorVisible).toBe(true)
     expect(page.url()).toContain('/claims/new')
   })
 

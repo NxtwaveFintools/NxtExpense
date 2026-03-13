@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -18,12 +18,11 @@ export function ApprovalActions({
 }: ApprovalActionsProps) {
   const router = useRouter()
   const [notes, setNotes] = useState('')
-  const [allowResubmit, setAllowResubmit] = useState(false)
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false)
+  const [allowResubmit, setAllowResubmit] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
-  const [isRefreshing, startRefreshTransition] = useTransition()
 
   const actions = useMemo(
     () =>
@@ -43,7 +42,7 @@ export function ApprovalActions({
         claimId,
         action,
         notes,
-        allowResubmit: action === 'rejected' ? allowResubmit : undefined,
+        allowResubmit: action === 'rejected' ? allowResubmit : false,
       })
 
       if (!result.ok) {
@@ -53,10 +52,7 @@ export function ApprovalActions({
       }
 
       toast.success('Approval action submitted successfully.')
-      setNotes('')
-      startRefreshTransition(() => {
-        router.refresh()
-      })
+      router.push('/approvals')
     } catch {
       const message = 'Unexpected error while submitting approval action.'
       setError(message)
@@ -92,17 +88,6 @@ export function ApprovalActions({
               className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2"
             />
           </label>
-
-          {showRejectConfirmation && rejectedAction?.supports_allow_resubmit ? (
-            <label className="mt-3 inline-flex items-center gap-2 text-sm text-foreground/80">
-              <input
-                type="checkbox"
-                checked={allowResubmit}
-                onChange={(event) => setAllowResubmit(event.target.checked)}
-              />
-              Allow employee modifications and resubmission
-            </label>
-          ) : null}
         </>
       )}
 
@@ -117,7 +102,7 @@ export function ApprovalActions({
           <button
             key={`${approvedAction.action}-${approvedAction.display_label}`}
             type="button"
-            disabled={isSubmitting || isRefreshing}
+            disabled={isSubmitting}
             onClick={() => handleAction('approved')}
             className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
           >
@@ -130,7 +115,7 @@ export function ApprovalActions({
         {rejectedAction && !showRejectConfirmation ? (
           <button
             type="button"
-            disabled={isSubmitting || isRefreshing}
+            disabled={isSubmitting}
             onClick={() => setShowRejectConfirmation(true)}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-60"
           >
@@ -140,36 +125,43 @@ export function ApprovalActions({
 
         {rejectedAction && showRejectConfirmation ? (
           <>
-            <button
-              type="button"
-              disabled={isSubmitting || isRefreshing}
-              onClick={() => handleAction('rejected')}
-              className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
-            >
-              {isSubmitting && pendingAction === rejectedAction.action
-                ? 'Submitting...'
-                : 'Confirm Reject'}
-            </button>
-            <button
-              type="button"
-              disabled={isSubmitting || isRefreshing}
-              onClick={() => {
-                setShowRejectConfirmation(false)
-                setAllowResubmit(false)
-              }}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-60"
-            >
-              Cancel
-            </button>
+            <label className="mt-4 flex cursor-pointer items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowResubmit}
+                onChange={(e) => setAllowResubmit(e.target.checked)}
+                className="h-4 w-4 rounded"
+              />
+              <span className="text-amber-700 dark:text-amber-400">
+                Allow employee to raise a new claim for this date
+              </span>
+            </label>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleAction('rejected')}
+                className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
+              >
+                {isSubmitting && pendingAction === rejectedAction.action
+                  ? 'Submitting...'
+                  : 'Confirm Reject'}
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setShowRejectConfirmation(false)
+                  setAllowResubmit(false)
+                }}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
           </>
         ) : null}
       </div>
-
-      {isRefreshing ? (
-        <p className="mt-3 text-xs text-foreground/70">
-          Updating latest workflow state...
-        </p>
-      ) : null}
     </section>
   )
 }

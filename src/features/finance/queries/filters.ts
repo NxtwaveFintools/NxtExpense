@@ -5,11 +5,23 @@ import type {
   FinanceFilterOptions,
   FinanceFilters,
 } from '@/features/finance/types'
-import { hasFinanceClaimFilters } from '@/features/finance/utils/filters'
-import { WORK_LOCATION_FILTER_VALUES } from '@/features/claims/types'
+import {
+  hasFinanceClaimFilters,
+  toIstDayEnd,
+  toIstDayStart,
+} from '@/features/finance/utils/filters'
+import {
+  getAllDesignations,
+  getAllWorkLocations,
+} from '@/lib/services/config-service'
+import {
+  getClaimStatusDisplayLabel,
+  VISIBLE_CLAIM_STATUS_CODES,
+} from '@/lib/utils/claim-status'
 
 type ClaimFilterScope = {
-  requiredStatus?: string
+  /** Pre-fetched UUID of the status that results must be constrained to. */
+  requiredStatusId?: string
 }
 
 function toLikePattern(value: string): string {
@@ -17,20 +29,8 @@ function toLikePattern(value: string): string {
   return `%${escaped}%`
 }
 
-function addAcronymSuffix(designation: string): string {
-  if (designation === 'State Business Head') {
-    return 'State Business Head (SBH)'
-  }
-
-  if (designation === 'Zonal Business Head') {
-    return 'Zonal Business Head (ZBH)'
-  }
-
-  if (designation === 'Program Manager') {
-    return 'Program Manager (PM)'
-  }
-
-  return designation
+function formatDesignationLabel(name: string, abbreviation: string): string {
+  return abbreviation ? `${name} (${abbreviation})` : name
 }
 
 export async function getFilteredClaimIdsForFinance(
@@ -42,20 +42,41 @@ export async function getFilteredClaimIdsForFinance(
     return null
   }
 
-  let query = supabase
-    .from('expense_claims')
-    .select('id, employees!inner(employee_name, designation)')
-
-  if (
-    scope.requiredStatus &&
-    filters.claimStatus &&
-    filters.claimStatus !== scope.requiredStatus
-  ) {
-    return []
+  if (scope.requiredStatusId && filters.claimStatus) {
+    // If the caller requires a specific status UUID, check whether the user's
+    // selected status filter resolves to that same UUID.
+    const { data: sRow } = await supabase
+      .from('claim_statuses')
+      .select('id')
+      .eq('status_code', filters.claimStatus)
+      .maybeSingle()
+    if (!sRow || sRow.id !== scope.requiredStatusId) {
+      return []
+    }
   }
 
-  if (scope.requiredStatus) {
-    query = query.eq('status', scope.requiredStatus)
+  // Determine effective status UUID to filter by.
+  // scope.requiredStatusId (pre-fetched) takes precedence over user's claimStatus.
+  let statusId: string | null = scope.requiredStatusId ?? null
+  if (!statusId && filters.claimStatus) {
+    const { data: sRow } = await supabase
+      .from('claim_statuses')
+      .select('id')
+      .eq('status_code', filters.claimStatus)
+      .maybeSingle()
+    if (sRow) {
+      statusId = sRow.id
+    } else {
+      return []
+    }
+  }
+
+  let query = supabase
+    .from('expense_claims')
+    .select('id, employees!employee_id!inner(employee_name, designation_id)')
+
+  if (statusId) {
+    query = query.eq('status_id', statusId)
   }
 
   if (filters.employeeName) {
@@ -70,37 +91,80 @@ export async function getFilteredClaimIdsForFinance(
   }
 
   if (filters.ownerDesignation) {
-    query = query.eq('employees.designation', filters.ownerDesignation)
+    query = query.eq('employees.designation_id', filters.ownerDesignation)
   }
 
-  if (filters.claimDateFrom) {
-    query = query.gte('claim_date', filters.claimDateFrom)
+  if (filters.dateFilterField === 'claim_date') {
+    if (filters.dateFrom) {
+      query = query.gte('claim_date', filters.dateFrom)
+    }
+
+    if (filters.dateTo) {
+      query = query.lte('claim_date', filters.dateTo)
+    }
   }
 
-  if (filters.claimDateTo) {
-    query = query.lte('claim_date', filters.claimDateTo)
-  }
+  if (
+    filters.dateFilterField === 'finance_approved_date' &&
+    (filters.dateFrom || filters.dateTo)
+  ) {
+    let financeDateQuery = supabase
+      .from('finance_actions')
+      .select('claim_id')
+      .eq('action', 'issued')
 
-  if (filters.claimStatus) {
-    query = query.eq('status', filters.claimStatus)
+    const approvedDateFrom = toIstDayStart(filters.dateFrom)
+    const approvedDateTo = toIstDayEnd(filters.dateTo)
+
+    if (approvedDateFrom) {
+      financeDateQuery = financeDateQuery.gte('acted_at', approvedDateFrom)
+    }
+
+    if (approvedDateTo) {
+      financeDateQuery = financeDateQuery.lte('acted_at', approvedDateTo)
+    }
+
+    const { data: approvedRows, error: approvedError } = await financeDateQuery
+
+    if (approvedError) {
+      throw new Error(approvedError.message)
+    }
+
+    const approvedClaimIds = [
+      ...new Set((approvedRows ?? []).map((row) => row.claim_id)),
+    ]
+
+    if (approvedClaimIds.length === 0) {
+      return []
+    }
+
+    query = query.in('id', approvedClaimIds)
   }
 
   if (filters.workLocation) {
-    query = query.eq('work_location', filters.workLocation)
+    query = query.eq('work_location_id', filters.workLocation)
   }
 
-  if (filters.resubmittedOnly) {
-    query = query.gt('resubmission_count', 0)
-  }
+  if (filters.hodApproverEmployeeId) {
+    const { data: financeReviewStatus } = await supabase
+      .from('claim_statuses')
+      .select('id')
+      .eq('approval_level', 3)
+      .eq('is_approval', false)
+      .eq('is_rejection', false)
+      .eq('is_terminal', false)
+      .maybeSingle()
 
-  if (filters.hodApproverEmail) {
+    if (!financeReviewStatus) {
+      return []
+    }
+
     const { data: hodRows, error: hodError } = await supabase
-      .from('claim_status_audit')
+      .from('approval_history')
       .select('claim_id')
-      .eq('actor_scope', 'approver')
-      .eq('trigger_action', 'approved')
-      .eq('to_status', 'finance_review')
-      .eq('actor_email', filters.hodApproverEmail)
+      .eq('approver_employee_id', filters.hodApproverEmployeeId)
+      .eq('action', 'approved')
+      .eq('new_status_id', financeReviewStatus.id)
 
     if (hodError) {
       throw new Error(hodError.message)
@@ -127,68 +191,77 @@ export async function getFilteredClaimIdsForFinance(
 export async function getFinanceFilterOptions(
   supabase: SupabaseClient
 ): Promise<FinanceFilterOptions> {
-  const [designationResult, hodAuditResult, statusResult] = await Promise.all([
-    supabase.from('employees').select('designation'),
+  const { data: financeReviewStatus } = await supabase
+    .from('claim_statuses')
+    .select('id')
+    .eq('approval_level', 3)
+    .eq('is_approval', false)
+    .eq('is_rejection', false)
+    .eq('is_terminal', false)
+    .maybeSingle()
+
+  const [designations, workLocationRows, statusResult] = await Promise.all([
+    getAllDesignations(supabase),
+    getAllWorkLocations(supabase),
     supabase
-      .from('claim_status_audit')
-      .select('actor_email')
-      .eq('actor_scope', 'approver')
-      .eq('trigger_action', 'approved')
-      .eq('to_status', 'finance_review'),
-    supabase
-      .from('claim_status_catalog')
-      .select('status, display_label')
-      .order('sort_order', { ascending: true }),
+      .from('claim_statuses')
+      .select('status_code, status_name, display_order')
+      .eq('is_active', true)
+      .in('status_code', [...VISIBLE_CLAIM_STATUS_CODES])
+      .order('display_order', { ascending: true }),
   ])
-
-  if (designationResult.error) {
-    throw new Error(designationResult.error.message)
-  }
-
-  if (hodAuditResult.error) {
-    throw new Error(hodAuditResult.error.message)
-  }
 
   if (statusResult.error) {
     throw new Error(statusResult.error.message)
   }
 
-  const designationOptions: FinanceFilterOption[] = [
-    ...new Set(
-      (designationResult.data ?? [])
-        .map((row) => row.designation)
-        .filter((designation): designation is string => Boolean(designation))
-    ),
-  ]
-    .sort((left, right) => left.localeCompare(right))
-    .map((designation) => ({
-      value: designation,
-      label: addAcronymSuffix(designation),
+  const designationOptions: FinanceFilterOption[] = designations
+    .sort((left, right) =>
+      left.designation_name.localeCompare(right.designation_name)
+    )
+    .map((d) => ({
+      value: d.id,
+      label: formatDesignationLabel(
+        d.designation_name,
+        d.designation_abbreviation
+      ),
     }))
 
-  const hodEmails = [
-    ...new Set(
-      (hodAuditResult.data ?? [])
-        .map((row) => row.actor_email?.toLowerCase() ?? '')
-        .filter((email) => email.length > 0)
-    ),
-  ]
+  let hodEmployeeIds: string[] = []
+  if (financeReviewStatus) {
+    const { data: hodRows, error: hodError } = await supabase
+      .from('approval_history')
+      .select('approver_employee_id')
+      .eq('action', 'approved')
+      .eq('new_status_id', financeReviewStatus.id)
+      .not('approver_employee_id', 'is', null)
+
+    if (hodError) {
+      throw new Error(hodError.message)
+    }
+
+    hodEmployeeIds = [
+      ...new Set(
+        (hodRows ?? [])
+          .map((row) => row.approver_employee_id as string | null)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ]
+  }
 
   const claimStatuses: FinanceFilterOption[] = (statusResult.data ?? []).map(
     (status) => ({
-      value: status.status,
-      label: status.display_label,
+      value: status.status_code,
+      label: getClaimStatusDisplayLabel(status.status_code, status.status_name),
     })
   )
 
-  const workLocations: FinanceFilterOption[] = WORK_LOCATION_FILTER_VALUES.map(
-    (workLocation) => ({
-      value: workLocation,
-      label: workLocation,
-    })
-  )
+  const workLocations: FinanceFilterOption[] = workLocationRows.map((wl) => ({
+    value: wl.id,
+    label: wl.location_name,
+  }))
 
-  if (hodEmails.length === 0) {
+  if (hodEmployeeIds.length === 0) {
     return {
       ownerDesignations: designationOptions,
       hodApprovers: [],
@@ -199,34 +272,45 @@ export async function getFinanceFilterOptions(
 
   const { data: hodEmployeeRows, error: hodEmployeeError } = await supabase
     .from('employees')
-    .select('employee_email, employee_name, designation')
-    .in('employee_email', hodEmails)
+    .select('id, employee_name, designation_id')
+    .in('id', hodEmployeeIds)
 
   if (hodEmployeeError) {
     throw new Error(hodEmployeeError.message)
   }
 
   const employeeMap = new Map(
-    (hodEmployeeRows ?? []).map((row) => [
-      row.employee_email.toLowerCase(),
-      row,
-    ])
+    (hodEmployeeRows ?? []).map((row) => [row.id, row])
   )
 
-  const hodApproverOptions: FinanceFilterOption[] = hodEmails
-    .map((email) => {
-      const matched = employeeMap.get(email)
+  const designationMap = new Map(designations.map((d) => [d.id, d]))
+
+  const hodApproverOptions: FinanceFilterOption[] = hodEmployeeIds
+    .map((employeeId) => {
+      const matched = employeeMap.get(employeeId)
 
       if (!matched) {
         return {
-          value: email,
-          label: email,
+          value: employeeId,
+          label: employeeId,
         }
       }
 
+      const desig = matched.designation_id
+        ? designationMap.get(matched.designation_id)
+        : null
+      const designationLabel = desig
+        ? formatDesignationLabel(
+            desig.designation_name,
+            desig.designation_abbreviation
+          )
+        : ''
+
       return {
-        value: email,
-        label: `${matched.employee_name} (${addAcronymSuffix(matched.designation)})`,
+        value: employeeId,
+        label: designationLabel
+          ? `${matched.employee_name} (${designationLabel})`
+          : matched.employee_name,
       }
     })
     .sort((left, right) => left.label.localeCompare(right.label))

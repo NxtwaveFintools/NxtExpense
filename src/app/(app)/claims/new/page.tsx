@@ -6,144 +6,101 @@ import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { ClaimSubmissionForm } from '@/features/claims/components/claim-submission-form'
-import type { ClaimFormInitialValues } from '@/features/claims/types'
-import { getClaimById } from '@/features/claims/queries'
-import { getEmployeeByEmail } from '@/features/employees/queries'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
+import {
+  getAllWorkLocations,
+  getAllTransportTypes,
+  getAllCities,
+  getVehicleTypesByDesignation,
+  getExpenseRateByType,
+} from '@/lib/services/config-service'
 
-const WORK_LOCATION_OPTIONS = [
-  'Office / WFH',
-  'Field - Base Location',
-  'Field - Outstation',
-  'Leave',
-  'Week-off',
-] as const
-
-const TRANSPORT_TYPE_OPTIONS = ['Rental Vehicle', 'Rapido/Uber/Ola'] as const
-
-type NewClaimPageProps = {
-  searchParams?: Promise<{
-    editClaimId?: string
-  }>
-}
-
-export default async function NewClaimPage({
-  searchParams,
-}: NewClaimPageProps) {
+export default async function NewClaimPage() {
   const user = await requireCurrentUser('/login')
   const supabase = await createSupabaseServerClient()
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
-  if (!employee || !canAccessEmployeeClaims(employee)) {
+  if (!employee || !(await canAccessEmployeeClaims(supabase, employee))) {
     redirect('/dashboard')
   }
 
-  const resolvedSearch = await searchParams
-  const editClaimId = resolvedSearch?.editClaimId?.trim()
-
-  let initialValues: ClaimFormInitialValues | null = null
-
-  if (editClaimId) {
-    const claimWithItems = await getClaimById(supabase, editClaimId)
-    if (!claimWithItems) {
-      redirect('/claims')
-    }
-
-    if (claimWithItems.claim.employee_id !== employee.id) {
-      redirect('/claims')
-    }
-
-    if (claimWithItems.claim.status !== 'returned_for_modification') {
-      redirect(`/claims/${claimWithItems.claim.id}`)
-    }
-
-    const taxiItem = claimWithItems.items.find(
-      (item) => item.item_type === 'taxi_bill'
-    )
-
-    const transportType = taxiItem?.description?.includes('Rapido/Uber/Ola')
-      ? 'Rapido/Uber/Ola'
-      : 'Rental Vehicle'
-
-    initialValues = {
-      claimDateIso: claimWithItems.claim.claim_date,
-      workLocation: claimWithItems.claim.work_location,
-      vehicleType: claimWithItems.claim.vehicle_type,
-      ownVehicleUsed: claimWithItems.claim.own_vehicle_used,
-      transportType,
-      outstationLocation: claimWithItems.claim.outstation_location,
-      fromCity: claimWithItems.claim.from_city,
-      toCity: claimWithItems.claim.to_city,
-      kmTravelled: claimWithItems.claim.km_travelled
-        ? Number(claimWithItems.claim.km_travelled)
-        : null,
-      taxiAmount: taxiItem ? Number(taxiItem.amount) : null,
-    }
-  }
-
-  const { data: rateRows, error: rateError } = await supabase
-    .from('expense_reimbursement_rates')
-    .select('rate_type, vehicle_type, amount')
-    .eq('designation', employee.designation)
-    .in('rate_type', [
-      'food_base_daily',
-      'fuel_base_daily',
-      'food_outstation_daily',
-      'intercity_per_km',
+  // Fetch lookup data from DB
+  const [workLocations, transportTypes, allowedVehicles, cities] =
+    await Promise.all([
+      getAllWorkLocations(supabase),
+      getAllTransportTypes(supabase),
+      employee.designation_id
+        ? getVehicleTypesByDesignation(supabase, employee.designation_id)
+        : Promise.resolve([]),
+      getAllCities(supabase),
     ])
 
-  if (rateError) {
-    throw new Error(rateError.message)
-  }
+  const workLocationOptions = workLocations
+  const transportTypeOptions = transportTypes.map((tt) => ({
+    id: tt.id,
+    name: tt.transport_name,
+  }))
+  const allowedVehicleTypes = allowedVehicles.map((vt) => ({
+    id: vt.id,
+    name: vt.vehicle_name,
+  }))
+  const cityOptions = cities.map((c) => ({ id: c.id, name: c.city_name }))
 
-  const allowedVehicleTypes = Array.from(
-    new Set(
-      (rateRows ?? [])
-        .filter(
-          (row) =>
-            row.vehicle_type &&
-            (row.rate_type === 'fuel_base_daily' ||
-              row.rate_type === 'intercity_per_km')
-        )
-        .map((row) => row.vehicle_type)
-    )
-  ) as Array<'Two Wheeler' | 'Four Wheeler'>
+  // Build rate snapshot from new lookup tables
+  const baseLocationId = workLocations.find(
+    (wl) => wl.location_code === 'FIELD_BASE'
+  )?.id
+  const outstationLocationId = workLocations.find(
+    (wl) => wl.location_code === 'FIELD_OUTSTATION'
+  )?.id
 
-  if (allowedVehicleTypes.length === 0) {
-    allowedVehicleTypes.push('Two Wheeler')
-  }
+  const [foodBaseRate, foodOutstationRate, accommodationRate, fwpRate] =
+    await Promise.all([
+      baseLocationId
+        ? getExpenseRateByType(supabase, baseLocationId, 'FOOD_BASE', null)
+        : Promise.resolve(null),
+      outstationLocationId
+        ? getExpenseRateByType(
+            supabase,
+            outstationLocationId,
+            'FOOD_OUTSTATION',
+            null
+          )
+        : Promise.resolve(null),
+      outstationLocationId && employee.designation_id
+        ? getExpenseRateByType(
+            supabase,
+            outstationLocationId,
+            'ACCOMMODATION',
+            employee.designation_id
+          )
+        : Promise.resolve(null),
+      outstationLocationId && employee.designation_id
+        ? getExpenseRateByType(
+            supabase,
+            outstationLocationId,
+            'FOOD_WITH_PRINCIPALS',
+            employee.designation_id
+          )
+        : Promise.resolve(null),
+    ])
 
   const claimRateSnapshot = {
-    foodBaseDaily: null as number | null,
-    foodOutstationDaily: null as number | null,
-    fuelBaseDailyByVehicle: {} as Record<string, number>,
-    intercityPerKmByVehicle: {} as Record<string, number>,
-  }
-
-  for (const row of rateRows ?? []) {
-    const amount = Number(row.amount)
-    if (!Number.isFinite(amount)) {
-      continue
-    }
-
-    if (row.rate_type === 'food_base_daily') {
-      claimRateSnapshot.foodBaseDaily = amount
-      continue
-    }
-
-    if (row.rate_type === 'food_outstation_daily') {
-      claimRateSnapshot.foodOutstationDaily = amount
-      continue
-    }
-
-    if (row.rate_type === 'fuel_base_daily' && row.vehicle_type) {
-      claimRateSnapshot.fuelBaseDailyByVehicle[row.vehicle_type] = amount
-      continue
-    }
-
-    if (row.rate_type === 'intercity_per_km' && row.vehicle_type) {
-      claimRateSnapshot.intercityPerKmByVehicle[row.vehicle_type] = amount
-    }
+    foodBaseDaily: foodBaseRate ? Number(foodBaseRate.rate_amount) : null,
+    foodOutstationDaily: foodOutstationRate
+      ? Number(foodOutstationRate.rate_amount)
+      : null,
+    fuelBaseDailyByVehicle: Object.fromEntries(
+      allowedVehicles.map((vt) => [vt.id, Number(vt.base_fuel_rate_per_day)])
+    ) as Record<string, number>,
+    intercityPerKmByVehicle: Object.fromEntries(
+      allowedVehicles.map((vt) => [vt.id, Number(vt.intercity_rate_per_km)])
+    ) as Record<string, number>,
+    accommodationPerNight: accommodationRate
+      ? Number(accommodationRate.rate_amount)
+      : null,
+    foodWithPrincipalsMax: fwpRate ? Number(fwpRate.rate_amount) : null,
   }
 
   return (
@@ -161,10 +118,11 @@ export default async function NewClaimPage({
           </div>
           <ClaimSubmissionForm
             allowedVehicleTypes={allowedVehicleTypes}
-            workLocationOptions={WORK_LOCATION_OPTIONS}
-            transportTypeOptions={TRANSPORT_TYPE_OPTIONS}
+            workLocationOptions={workLocationOptions}
+            transportTypeOptions={transportTypeOptions}
+            cityOptions={cityOptions}
             claimRateSnapshot={claimRateSnapshot}
-            initialValues={initialValues}
+            initialValues={null}
           />
         </div>
       </main>

@@ -1,15 +1,8 @@
-export const DESIGNATION_VALUES = [
-  'Student Relationship Officer',
-  'Business Operation Associate',
-  'Area Business Head',
-  'State Business Head',
-  'Zonal Business Head',
-  'Program Manager',
-  'Finance',
-  'Admin',
-] as const
+// All employee types are now defined in @/lib/services/employee-service
+// and designation types in @/lib/services/config-service.
+// This file is kept for backward compatibility but should not be used for new code.
 
-export type Designation = (typeof DESIGNATION_VALUES)[number]
+export type Designation = string
 
 export type Employee = {
   id: string
@@ -17,10 +10,10 @@ export type Employee = {
   employee_name: string
   employee_email: string
   state: string
-  designation: Designation
-  approval_email_level_1: string | null
-  approval_email_level_2: string | null
-  approval_email_level_3: string | null
+  designation: string
+  approval_employee_id_level_1: string | null
+  approval_employee_id_level_2: string | null
+  approval_employee_id_level_3: string | null
   created_at: string
 }
 

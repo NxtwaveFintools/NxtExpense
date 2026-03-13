@@ -12,8 +12,7 @@ describe('approval history filter utilities', () => {
     const normalized = normalizeApprovalHistoryFilters({
       employeeName: '  John  ',
       actorFilter: 'finance',
-      claimDateFrom: '07/03/2026',
-      claimDateTo: '08/03/2026',
+      claimDate: '07/03/2026',
       hodApprovedFrom: '01/03/2026',
       hodApprovedTo: '02/03/2026',
       financeApprovedFrom: '03/03/2026',
@@ -23,8 +22,7 @@ describe('approval history filter utilities', () => {
     expect(normalized).toEqual({
       employeeName: 'John',
       actorFilter: 'finance',
-      claimDateFrom: '2026-03-07',
-      claimDateTo: '2026-03-08',
+      claimDate: '2026-03-07',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-02',
       financeApprovedFrom: '2026-03-03',
@@ -35,28 +33,25 @@ describe('approval history filter utilities', () => {
   it('supports ISO date input from calendar pickers', () => {
     const normalized = normalizeApprovalHistoryFilters({
       actorFilter: 'all',
-      claimDateFrom: '2026-03-07',
-      claimDateTo: '2026-03-08',
+      claimDate: '2026-03-07',
     })
 
-    expect(normalized.claimDateFrom).toBe('2026-03-07')
-    expect(normalized.claimDateTo).toBe('2026-03-08')
+    expect(normalized.claimDate).toBe('2026-03-07')
   })
 
   it('throws on invalid date format', () => {
     expect(() =>
       normalizeApprovalHistoryFilters({
-        claimDateFrom: '03-07-2026',
+        claimDate: '03-07-2026',
       })
-    ).toThrowError('Claim date from must be in DD/MM/YYYY format.')
+    ).toThrowError('Claim date must be in DD/MM/YYYY format.')
   })
 
   it('adds all filter params for finance-focused filtering', () => {
     const params = addApprovalFiltersToParams(new URLSearchParams(), {
       employeeName: 'Alex',
       actorFilter: 'finance',
-      claimDateFrom: '2026-03-01',
-      claimDateTo: '2026-03-07',
+      claimDate: '2026-03-01',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-07',
       financeApprovedFrom: '2026-03-02',
@@ -65,8 +60,7 @@ describe('approval history filter utilities', () => {
 
     expect(params.get('employeeName')).toBe('Alex')
     expect(params.get('actorFilter')).toBe('finance')
-    expect(params.get('claimDateFrom')).toBe('2026-03-01')
-    expect(params.get('claimDateTo')).toBe('2026-03-07')
+    expect(params.get('claimDate')).toBe('2026-03-01')
     expect(params.get('hodApprovedFrom')).toBe('2026-03-01')
     expect(params.get('hodApprovedTo')).toBe('2026-03-07')
     expect(params.get('financeApprovedFrom')).toBe('2026-03-02')
@@ -78,11 +72,12 @@ describe('approval history filter utilities', () => {
       {
         actionId: 'action-1',
         claimId: 'claim-1',
-        claimNumber: 'CLM-001',
+        claimNumber: 'CLAIM-001',
         claimDate: '2026-03-07',
         workLocation: 'Field - Outstation',
         totalAmount: 850,
-        claimStatus: 'issued',
+        claimStatusName: 'Issued',
+        claimStatusDisplayColor: 'green',
         ownerName: 'Alex',
         ownerDesignation: 'State Business Head',
         actorEmail: 'finance@nxtwave.co.in',
@@ -97,17 +92,27 @@ describe('approval history filter utilities', () => {
     ])
 
     expect(csv).toContain('"Claim ID"')
-    expect(csv).toContain('"CLM-001"')
+    expect(csv).toContain('"CLAIM-001"')
     expect(csv).toContain('"07/03/2026"')
     expect(csv).toContain('"finance issued"')
   })
 
   it('uses role-aware default actor bucket for approvals page UX', () => {
-    expect(getDefaultApprovalActorFilter('State Business Head')).toBe('sbh')
-    expect(getDefaultApprovalActorFilter('Program Manager')).toBe('hod')
-    expect(getDefaultApprovalActorFilter('Zonal Business Head')).toBe('hod')
-    expect(getDefaultApprovalActorFilter('Finance')).toBe('finance')
-    expect(getDefaultApprovalActorFilter('Area Business Head')).toBe('all')
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 4, isFinanceRole: false })
+    ).toBe('sbh')
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 6, isFinanceRole: false })
+    ).toBe('hod')
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 5, isFinanceRole: false })
+    ).toBe('hod')
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 7, isFinanceRole: true })
+    ).toBe('finance')
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 3, isFinanceRole: false })
+    ).toBe('all')
   })
 
   // ─── Defensive edge cases for actorFilter ─────────────────────────────────

@@ -6,18 +6,10 @@ import {
   toISODate,
 } from '@/lib/utils/date'
 
-const WORK_LOCATION_VALUES = [
-  'Office / WFH',
-  'Field - Base Location',
-  'Field - Outstation',
-  'Leave',
-  'Week-off',
-] as const
-
-const VEHICLE_TYPE_VALUES = ['Two Wheeler', 'Four Wheeler'] as const
-
-export const workLocationSchema = z.enum(WORK_LOCATION_VALUES)
-export const vehicleTypeSchema = z.enum(VEHICLE_TYPE_VALUES)
+export const workLocationSchema = z
+  .string()
+  .min(1, 'Work location is required.')
+export const vehicleTypeSchema = z.string().min(1, 'Vehicle type is required.')
 
 export const claimDateSchema = z
   .string()

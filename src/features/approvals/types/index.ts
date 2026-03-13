@@ -2,9 +2,8 @@ import type {
   Claim,
   ClaimAvailableAction,
   ClaimItem,
-  ClaimStatus,
 } from '@/features/claims/types'
-import type { Employee } from '@/features/employees/types'
+import type { EmployeeRow } from '@/lib/services/employee-service'
 import type { PaginatedResult } from '@/lib/utils/pagination'
 
 export type ApprovalAction = {
@@ -32,7 +31,7 @@ export type ApprovalAction = {
 
 export type PendingApproval = {
   claim: Claim
-  owner: Employee
+  owner: EmployeeRow
   items: ClaimItem[]
   availableActions: ClaimAvailableAction[]
 }
@@ -41,7 +40,7 @@ export type PaginatedPendingApprovals = PaginatedResult<PendingApproval>
 
 export type ApprovalHistoryItem = {
   claim: Claim
-  owner: Employee
+  owner: EmployeeRow
   action: ApprovalAction
 }
 
@@ -52,8 +51,7 @@ export type ApprovalActorFilter = 'all' | 'sbh' | 'hod' | 'finance'
 export type ApprovalHistoryFilters = {
   employeeName: string | null
   actorFilter: ApprovalActorFilter
-  claimDateFrom: string | null
-  claimDateTo: string | null
+  claimDate: string | null
   hodApprovedFrom: string | null
   hodApprovedTo: string | null
   financeApprovedFrom: string | null
@@ -72,7 +70,8 @@ export type ApprovalHistoryRecord = {
   claimDate: string
   workLocation: string
   totalAmount: number
-  claimStatus: ClaimStatus
+  claimStatusName: string
+  claimStatusDisplayColor: string
   ownerName: string
   ownerDesignation: string
   actorEmail: string

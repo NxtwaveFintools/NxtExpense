@@ -1,4 +1,5 @@
-import type { MyClaimsFilters } from '@/features/claims/types'
+import { formatDate, formatDatetime } from '@/lib/utils/date'
+import type { Claim, MyClaimsFilters } from '@/features/claims/types'
 import { myClaimsFiltersSchema } from '@/features/claims/validations'
 
 type ClaimsFilterInput = Partial<
@@ -8,6 +9,11 @@ type ClaimsFilterInput = Partial<
 function normalizeText(value: string | undefined): string | null {
   const normalized = value?.trim() ?? ''
   return normalized ? normalized : null
+}
+
+function normalizeCsvCell(value: string): string {
+  const escaped = value.replaceAll('"', '""')
+  return `"${escaped}"`
 }
 
 export function normalizeMyClaimsFilters(
@@ -26,9 +32,7 @@ export function normalizeMyClaimsFilters(
   return {
     claimStatus: normalizeText(value.claimStatus),
     workLocation: value.workLocation ?? null,
-    claimDateFrom: normalizeText(value.claimDateFrom),
-    claimDateTo: normalizeText(value.claimDateTo),
-    resubmittedOnly: value.resubmittedOnly,
+    claimDate: value.claimDate ?? null,
   }
 }
 
@@ -44,17 +48,35 @@ export function addMyClaimsFiltersToParams(
     params.set('workLocation', filters.workLocation)
   }
 
-  if (filters.claimDateFrom) {
-    params.set('claimDateFrom', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    params.set('claimDateTo', filters.claimDateTo)
-  }
-
-  if (filters.resubmittedOnly) {
-    params.set('resubmittedOnly', 'true')
+  if (filters.claimDate) {
+    params.set('claimDate', filters.claimDate)
   }
 
   return params
+}
+
+export function buildMyClaimsCsv(rows: Claim[]): string {
+  const headers = [
+    'Claim ID',
+    'Claim Date',
+    'Work Location',
+    'Amount',
+    'Status',
+    'Submitted At',
+  ]
+
+  const bodyRows = rows.map((row) => [
+    row.claim_number,
+    formatDate(row.claim_date),
+    row.work_location,
+    `Rs. ${row.total_amount.toFixed(2)}`,
+    row.statusName,
+    row.submitted_at ? formatDatetime(row.submitted_at) : '-',
+  ])
+
+  return [headers, ...bodyRows]
+    .map((cells) =>
+      cells.map((cell) => normalizeCsvCell(String(cell))).join(',')
+    )
+    .join('\n')
 }

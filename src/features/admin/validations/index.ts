@@ -29,7 +29,29 @@ export const adminReassignApproverSchema = z.object({
   confirmation: z.literal('CONFIRM', 'Secondary confirmation is required.'),
 })
 
+export const adminToggleActiveSchema = z.object({
+  id: z.string().uuid('Invalid identifier.'),
+  isActive: z.boolean(),
+})
+
+export const adminUpdateRateSchema = z.object({
+  id: z.string().uuid('Invalid rate identifier.'),
+  rateAmount: z.number().min(0, 'Rate amount must be non-negative.'),
+})
+
+export const adminUpdateVehicleRatesSchema = z.object({
+  id: z.string().uuid('Invalid vehicle type identifier.'),
+  baseFuelRatePerDay: z.number().min(0, 'Rate must be non-negative.'),
+  intercityRatePerKm: z.number().min(0, 'Rate must be non-negative.'),
+  maxKmRoundTrip: z.number().int().min(0, 'KM limit must be non-negative.'),
+})
+
 export type AdminRollbackInput = z.infer<typeof adminRollbackSchema>
 export type AdminReassignApproverInput = z.infer<
   typeof adminReassignApproverSchema
+>
+export type AdminToggleActiveInput = z.infer<typeof adminToggleActiveSchema>
+export type AdminUpdateRateInput = z.infer<typeof adminUpdateRateSchema>
+export type AdminUpdateVehicleRatesInput = z.infer<
+  typeof adminUpdateVehicleRatesSchema
 >

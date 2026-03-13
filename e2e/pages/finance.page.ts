@@ -28,7 +28,10 @@ export class FinancePage {
         .locator(`[data-claim-id="${claimId}"]`)
         .getByRole('button', { name: /issue/i })
     }
-    return this.page.getByRole('button', { name: /issue/i }).first()
+    return this.queueRows
+      .first()
+      .getByRole('button', { name: /issue/i })
+      .first()
   }
 
   getRejectButton(claimId?: string) {
@@ -37,7 +40,10 @@ export class FinancePage {
         .locator(`[data-claim-id="${claimId}"]`)
         .getByRole('button', { name: /reject/i })
     }
-    return this.page.getByRole('button', { name: /reject/i }).first()
+    return this.queueRows
+      .first()
+      .getByRole('button', { name: /reject/i })
+      .first()
   }
 
   get notesInput() {

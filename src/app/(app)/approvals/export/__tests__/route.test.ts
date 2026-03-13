@@ -15,7 +15,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }))
 
-vi.mock('@/features/employees/queries', () => ({
+vi.mock('@/lib/services/employee-service', () => ({
   getEmployeeByEmail: mocks.getEmployeeByEmail,
   hasApproverAssignments: mocks.hasApproverAssignments,
 }))
@@ -62,8 +62,7 @@ describe('approvals export route', () => {
     mocks.normalizeApprovalHistoryFilters.mockReturnValue({
       employeeName: null,
       actorFilter: 'all',
-      claimDateFrom: null,
-      claimDateTo: null,
+      claimDate: null,
       hodApprovedFrom: null,
       hodApprovedTo: null,
       financeApprovedFrom: null,

@@ -24,6 +24,21 @@ function toFriendlyStatus(value: string): string {
   return value.replaceAll('_', ' ')
 }
 
+function formatMilestoneDate(
+  milestoneAt: string | null,
+  actedAt: string
+): string {
+  if (!milestoneAt) {
+    return '-'
+  }
+
+  if (new Date(milestoneAt).getTime() === new Date(actedAt).getTime()) {
+    return '-'
+  }
+
+  return formatDate(milestoneAt)
+}
+
 export function normalizeApprovalHistoryFilters(
   rawFilters: ApprovalHistoryFilterInput
 ): ApprovalHistoryFilters {
@@ -40,31 +55,31 @@ export function normalizeApprovalHistoryFilters(
   return {
     employeeName: normalizeText(value.employeeName),
     actorFilter: value.actorFilter,
-    claimDateFrom: normalizeText(value.claimDateFrom),
-    claimDateTo: normalizeText(value.claimDateTo),
-    hodApprovedFrom: normalizeText(value.hodApprovedFrom),
-    hodApprovedTo: normalizeText(value.hodApprovedTo),
-    financeApprovedFrom: normalizeText(value.financeApprovedFrom),
-    financeApprovedTo: normalizeText(value.financeApprovedTo),
+    claimDate: value.claimDate ?? null,
+    hodApprovedFrom: value.hodApprovedFrom ?? null,
+    hodApprovedTo: value.hodApprovedTo ?? null,
+    financeApprovedFrom: value.financeApprovedFrom ?? null,
+    financeApprovedTo: value.financeApprovedTo ?? null,
   }
 }
 
-export function getDefaultApprovalActorFilter(
-  designation: string | null | undefined
-): ApprovalActorFilter {
-  if (designation === 'State Business Head') {
+export function getDefaultApprovalActorFilter({
+  hierarchyLevel,
+  isFinanceRole,
+}: {
+  hierarchyLevel: number | null
+  isFinanceRole: boolean
+}): ApprovalActorFilter {
+  if (isFinanceRole) {
+    return 'finance'
+  }
+
+  if (hierarchyLevel === 4) {
     return 'sbh'
   }
 
-  if (
-    designation === 'Program Manager' ||
-    designation === 'Zonal Business Head'
-  ) {
+  if (hierarchyLevel !== null && hierarchyLevel >= 5 && hierarchyLevel <= 6) {
     return 'hod'
-  }
-
-  if (designation === 'Finance') {
-    return 'finance'
   }
 
   return 'all'
@@ -82,12 +97,8 @@ export function addApprovalFiltersToParams(
     params.set('actorFilter', filters.actorFilter)
   }
 
-  if (filters.claimDateFrom) {
-    params.set('claimDateFrom', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    params.set('claimDateTo', filters.claimDateTo)
+  if (filters.claimDate) {
+    params.set('claimDate', filters.claimDate)
   }
 
   if (filters.hodApprovedFrom) {
@@ -137,9 +148,9 @@ export function buildApprovalHistoryCsv(rows: ApprovalHistoryRecord[]): string {
     formatDatetime(row.actedAt),
     row.actorEmail,
     row.actorDesignation ?? '-',
-    row.hodApprovedAt ? formatDatetime(row.hodApprovedAt) : '-',
-    row.financeApprovedAt ? formatDatetime(row.financeApprovedAt) : '-',
-    toFriendlyStatus(row.claimStatus),
+    formatMilestoneDate(row.hodApprovedAt, row.actedAt),
+    formatMilestoneDate(row.financeApprovedAt, row.actedAt),
+    row.claimStatusName,
   ])
 
   return [headers, ...bodyRows]

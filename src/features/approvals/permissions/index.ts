@@ -1,21 +1,19 @@
 import type { Claim } from '@/features/claims/types'
-import type { Employee } from '@/features/employees/types'
+import type { EmployeeRow } from '@/lib/services/employee-service'
 
 export function getApproverCurrentLevel(
-  approverEmail: string,
-  ownerEmployee: Employee
+  approverId: string,
+  ownerEmployee: EmployeeRow
 ): 1 | 2 | 3 | null {
-  const lowerEmail = approverEmail.toLowerCase()
-
-  if (ownerEmployee.approval_email_level_1?.toLowerCase() === lowerEmail) {
+  if (ownerEmployee.approval_employee_id_level_1 === approverId) {
     return 1
   }
 
-  if (ownerEmployee.approval_email_level_2?.toLowerCase() === lowerEmail) {
+  if (ownerEmployee.approval_employee_id_level_2 === approverId) {
     return 2
   }
 
-  if (ownerEmployee.approval_email_level_3?.toLowerCase() === lowerEmail) {
+  if (ownerEmployee.approval_employee_id_level_3 === approverId) {
     return 3
   }
 
@@ -23,11 +21,11 @@ export function getApproverCurrentLevel(
 }
 
 export function canApproveAtLevel(
-  approverEmail: string,
+  approverId: string,
   claim: Claim,
-  ownerEmployee: Employee
+  ownerEmployee: EmployeeRow
 ): boolean {
-  const approverLevel = getApproverCurrentLevel(approverEmail, ownerEmployee)
+  const approverLevel = getApproverCurrentLevel(approverId, ownerEmployee)
 
   return (
     approverLevel !== null && claim.current_approval_level === approverLevel

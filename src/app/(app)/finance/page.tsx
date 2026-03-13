@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-import { getEmployeeByEmail } from '@/features/employees/queries'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
 import {
   buildCursorNavigationLinks,
@@ -15,7 +15,6 @@ import {
   getFinanceHistoryAction,
   getFinanceQueueAction,
 } from '@/features/finance/actions'
-import { getClaimStatusCatalog } from '@/features/claims/queries'
 import { getFinanceFilterOptions } from '@/features/finance/queries'
 import {
   addFinanceFiltersToParams,
@@ -39,11 +38,14 @@ type FinancePageProps = {
     employeeName?: string
     claimNumber?: string
     ownerDesignation?: string
-    hodApproverEmail?: string
+    hodApproverEmployeeId?: string
     claimStatus?: string
     workLocation?: string
-    resubmittedOnly?: string
     actionFilter?: string
+    dateFilterField?: string
+    dateFrom?: string
+    dateTo?: string
+    claimDate?: string
     claimDateFrom?: string
     claimDateTo?: string
     actionDateFrom?: string
@@ -56,24 +58,48 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   const supabase = await createSupabaseServerClient()
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
-  if (!employee || !isFinanceTeamMember(employee)) {
+  if (!employee || !(await isFinanceTeamMember(supabase, employee))) {
     redirect('/dashboard')
   }
 
   const resolvedSearch = await searchParams
+
+  const legacyClaimDateFrom =
+    resolvedSearch?.claimDateFrom ?? resolvedSearch?.claimDate
+  const legacyClaimDateTo =
+    resolvedSearch?.claimDateTo ?? resolvedSearch?.claimDate
+  const legacyFinanceApprovedDateFrom = resolvedSearch?.actionDateFrom
+  const legacyFinanceApprovedDateTo = resolvedSearch?.actionDateTo
+
+  const dateFilterField =
+    resolvedSearch?.dateFilterField ??
+    (legacyFinanceApprovedDateFrom || legacyFinanceApprovedDateTo
+      ? 'finance_approved_date'
+      : 'claim_date')
+
+  const dateFrom =
+    resolvedSearch?.dateFrom ??
+    (dateFilterField === 'finance_approved_date'
+      ? legacyFinanceApprovedDateFrom
+      : legacyClaimDateFrom)
+
+  const dateTo =
+    resolvedSearch?.dateTo ??
+    (dateFilterField === 'finance_approved_date'
+      ? legacyFinanceApprovedDateTo
+      : legacyClaimDateTo)
+
   const rawFilters = {
     employeeName: resolvedSearch?.employeeName,
     claimNumber: resolvedSearch?.claimNumber,
     ownerDesignation: resolvedSearch?.ownerDesignation,
-    hodApproverEmail: resolvedSearch?.hodApproverEmail,
+    hodApproverEmployeeId: resolvedSearch?.hodApproverEmployeeId,
     claimStatus: resolvedSearch?.claimStatus,
     workLocation: resolvedSearch?.workLocation,
-    resubmittedOnly: resolvedSearch?.resubmittedOnly,
     actionFilter: resolvedSearch?.actionFilter,
-    claimDateFrom: resolvedSearch?.claimDateFrom,
-    claimDateTo: resolvedSearch?.claimDateTo,
-    actionDateFrom: resolvedSearch?.actionDateFrom,
-    actionDateTo: resolvedSearch?.actionDateTo,
+    dateFilterField,
+    dateFrom,
+    dateTo,
   }
 
   const normalizedFilters = (() => {
@@ -88,15 +114,19 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     employeeName: normalizedFilters.employeeName ?? undefined,
     claimNumber: normalizedFilters.claimNumber ?? undefined,
     ownerDesignation: normalizedFilters.ownerDesignation ?? undefined,
-    hodApproverEmail: normalizedFilters.hodApproverEmail ?? undefined,
+    hodApproverEmployeeId: normalizedFilters.hodApproverEmployeeId ?? undefined,
     claimStatus: normalizedFilters.claimStatus ?? undefined,
     workLocation: normalizedFilters.workLocation ?? undefined,
-    resubmittedOnly: normalizedFilters.resubmittedOnly ? 'true' : undefined,
-    actionFilter: normalizedFilters.actionFilter,
-    claimDateFrom: normalizedFilters.claimDateFrom ?? undefined,
-    claimDateTo: normalizedFilters.claimDateTo ?? undefined,
-    actionDateFrom: normalizedFilters.actionDateFrom ?? undefined,
-    actionDateTo: normalizedFilters.actionDateTo ?? undefined,
+    actionFilter:
+      normalizedFilters.actionFilter !== 'all'
+        ? normalizedFilters.actionFilter
+        : undefined,
+    dateFilterField:
+      normalizedFilters.dateFilterField !== 'claim_date'
+        ? normalizedFilters.dateFilterField
+        : undefined,
+    dateFrom: normalizedFilters.dateFrom ?? undefined,
+    dateTo: normalizedFilters.dateTo ?? undefined,
   }
 
   const queueCursor = resolvedSearch?.queueCursor ?? null
@@ -131,10 +161,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [queue, history, statusCatalog, filterOptions] = await Promise.all([
+  const [queue, history, filterOptions] = await Promise.all([
     getFinanceQueueAction(queueCursor, 10, normalizedFilterParams),
     getFinanceHistoryAction(historyCursor, 10, normalizedFilterParams),
-    getClaimStatusCatalog(supabase),
     getFinanceFilterOptions(supabase),
   ])
 
@@ -190,7 +219,6 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
             <FinanceQueue queue={queue} pagination={queuePagination} />
             <FinanceHistoryList
               history={history}
-              statusCatalog={statusCatalog}
               pagination={historyPagination}
             />
           </div>

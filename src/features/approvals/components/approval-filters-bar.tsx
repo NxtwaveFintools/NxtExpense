@@ -47,61 +47,11 @@ export function ApprovalFiltersBar({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Claim Date From</span>
+          <span className="text-foreground/80">Claim Date</span>
           <input
-            name="claimDateFrom"
+            name="claimDate"
             type="date"
-            defaultValue={filters.claimDateFrom ?? ''}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Claim Date To</span>
-          <input
-            name="claimDateTo"
-            type="date"
-            defaultValue={filters.claimDateTo ?? ''}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">HOD Approved From</span>
-          <input
-            name="hodApprovedFrom"
-            type="date"
-            defaultValue={filters.hodApprovedFrom ?? ''}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">HOD Approved To</span>
-          <input
-            name="hodApprovedTo"
-            type="date"
-            defaultValue={filters.hodApprovedTo ?? ''}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Finance Approved From</span>
-          <input
-            name="financeApprovedFrom"
-            type="date"
-            defaultValue={filters.financeApprovedFrom ?? ''}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Finance Approved To</span>
-          <input
-            name="financeApprovedTo"
-            type="date"
-            defaultValue={filters.financeApprovedTo ?? ''}
+            defaultValue={filters.claimDate ?? ''}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           />
         </label>

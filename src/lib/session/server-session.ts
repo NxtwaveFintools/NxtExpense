@@ -21,7 +21,7 @@ export async function getServerUser(): Promise<User | null> {
 
   if (error || !user) return null
 
-  if (!isAllowedCorporateEmail(user.email)) {
+  if (!(await isAllowedCorporateEmail(supabase, user.email))) {
     await supabase.auth.signOut()
     return null
   }

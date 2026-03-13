@@ -1,0 +1,86 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+    - banner [ref=e2]:
+        - generic [ref=e3]:
+            - generic [ref=e4]:
+                - link "NxtExpense" [ref=e5] [cursor=pointer]:
+                    - /url: /dashboard
+                - navigation "Main navigation" [ref=e8]:
+                    - link "Dashboard" [ref=e9] [cursor=pointer]:
+                        - /url: /dashboard
+                    - link "My Claims" [ref=e10] [cursor=pointer]:
+                        - /url: /claims
+            - generic [ref=e11]:
+                - link "Mutluri Yohan" [ref=e13] [cursor=pointer]:
+                    - /url: /profile
+                    - paragraph [ref=e14]: Mutluri Yohan
+                    - paragraph
+                - button "Switch to Dark mode" [ref=e15]:
+                    - img [ref=e16]
+                    - generic [ref=e18]: Dark mode
+                - button "Logout" [ref=e19]:
+                    - img [ref=e20]
+                    - text: Logout
+    - main [ref=e23]:
+        - generic [ref=e24]:
+            - link "Back to My Claims" [ref=e26] [cursor=pointer]:
+                - /url: /claims
+                - img [ref=e27]
+                - text: Back to My Claims
+            - generic [ref=e29]:
+                - generic [ref=e30]:
+                    - generic [ref=e31]:
+                        - heading "Submit Daily Expense Claim" [level=1] [ref=e32]
+                        - paragraph [ref=e33]: One claim must be submitted per calendar date.
+                    - generic [ref=e34]:
+                        - generic [ref=e35]:
+                            - img [ref=e36]
+                            - text: Claim Date
+                        - textbox "Claim Date" [ref=e38]: 2026-03-08
+                    - generic [ref=e39]:
+                        - generic [ref=e40]:
+                            - img [ref=e41]
+                            - text: Work Location
+                        - combobox "Work Location" [ref=e44]:
+                            - option "Office / WFH"
+                            - option "Field - Base Location" [selected]
+                            - option "Field - Outstation"
+                            - option "Leave"
+                            - option "Week-off"
+                    - generic [ref=e45]:
+                        - generic [ref=e47]:
+                            - img [ref=e48]
+                            - text: Vehicle Type
+                        - combobox "Vehicle Type" [ref=e52]:
+                            - option "Two Wheeler" [selected]
+                    - button "Submit Claim" [ref=e54]
+                - complementary [ref=e55]:
+                    - heading "Claim Summary" [level=3] [ref=e56]
+                    - list [ref=e57]:
+                        - listitem [ref=e58]:
+                            - generic [ref=e59]: Food allowance
+                            - generic [ref=e60]: Rs. 120.00
+                        - listitem [ref=e61]:
+                            - generic [ref=e62]: Two Wheeler fuel allowance
+                            - generic [ref=e63]: Rs. 180.00
+                    - paragraph [ref=e65]:
+                        - generic [ref=e66]: Total
+                        - generic [ref=e67]: Rs. 300.00
+    - region "Notifications alt+T":
+        - list:
+            - listitem [ref=e68]:
+                - button "Close toast" [ref=e69] [cursor=pointer]:
+                    - img [ref=e70]
+                - img [ref=e74]
+                - generic [ref=e77]: Claim submitted successfully (CLAIM-NW0000282-080326-0058).
+    - button "Open Next.js Dev Tools" [ref=e83] [cursor=pointer]:
+        - generic [ref=e86]:
+            - text: Compiling
+            - generic [ref=e87]:
+                - generic [ref=e88]: .
+                - generic [ref=e89]: .
+                - generic [ref=e90]: .
+    - alert [ref=e91]
+```

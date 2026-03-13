@@ -62,50 +62,39 @@ export const approvalHistoryFiltersSchema = z
       (val) => (val === '' ? undefined : val),
       z.enum(['all', 'sbh', 'hod', 'finance']).default('all')
     ),
-    claimDateFrom: optionalDateField('Claim date from'),
-    claimDateTo: optionalDateField('Claim date to'),
-    hodApprovedFrom: optionalDateField('HOD approval from'),
-    hodApprovedTo: optionalDateField('HOD approval to'),
-    financeApprovedFrom: optionalDateField('Finance approval from'),
-    financeApprovedTo: optionalDateField('Finance approval to'),
+    claimDate: optionalDateField('Claim date'),
+    hodApprovedFrom: optionalDateField('HOD approval date from'),
+    hodApprovedTo: optionalDateField('HOD approval date to'),
+    financeApprovedFrom: optionalDateField('Finance approval date from'),
+    financeApprovedTo: optionalDateField('Finance approval date to'),
   })
   .superRefine((value, context) => {
-    if (
-      value.claimDateFrom &&
-      value.claimDateTo &&
-      value.claimDateFrom > value.claimDateTo
+    function checkRange(
+      from: string | undefined,
+      to: string | undefined,
+      path: string,
+      label: string
     ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['claimDateTo'],
-        message: 'Claim date to must be on or after claim date from.',
-      })
+      if (from && to && from > to) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [path],
+          message: `${label} to must be on or after ${label.toLowerCase()} from.`,
+        })
+      }
     }
-
-    if (
-      value.hodApprovedFrom &&
-      value.hodApprovedTo &&
-      value.hodApprovedFrom > value.hodApprovedTo
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['hodApprovedTo'],
-        message: 'HOD approval to must be on or after HOD approval from.',
-      })
-    }
-
-    if (
-      value.financeApprovedFrom &&
-      value.financeApprovedTo &&
-      value.financeApprovedFrom > value.financeApprovedTo
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['financeApprovedTo'],
-        message:
-          'Finance approval to must be on or after finance approval from.',
-      })
-    }
+    checkRange(
+      value.hodApprovedFrom,
+      value.hodApprovedTo,
+      'hodApprovedTo',
+      'HOD approval date'
+    )
+    checkRange(
+      value.financeApprovedFrom,
+      value.financeApprovedTo,
+      'financeApprovedTo',
+      'Finance approval date'
+    )
   })
 
 export const bulkApprovalActionSchema = z

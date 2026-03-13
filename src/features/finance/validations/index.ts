@@ -2,7 +2,15 @@ import { z } from 'zod'
 
 import { parseDateDDMMYYYY, toISODate } from '@/lib/utils/date'
 
-const FINANCE_ACTIONS = ['issued', 'finance_rejected'] as const
+// These values mirror the `finance_action_type` PostgreSQL enum.
+// They can only change via a DB migration — single source of truth is the DB schema.
+const FINANCE_ACTION_VALUES = ['issued', 'finance_rejected'] as const
+const FINANCE_FILTER_VALUES = ['all', 'issued', 'finance_rejected'] as const
+const FINANCE_DATE_FILTER_FIELD_VALUES = [
+  'claim_date',
+  'finance_approved_date',
+] as const
+
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 function optionalDateField(label: string) {
@@ -34,7 +42,7 @@ function optionalDateField(label: string) {
 export const financeActionSchema = z
   .object({
     claimId: z.string().uuid('Invalid claim identifier.'),
-    action: z.enum(FINANCE_ACTIONS),
+    action: z.enum(FINANCE_ACTION_VALUES),
     notes: z
       .string()
       .trim()
@@ -55,7 +63,7 @@ export const financeActionSchema = z
 export const bulkFinanceActionSchema = z
   .object({
     claimIds: z.array(z.string().uuid('Invalid claim identifier.')).min(1),
-    action: z.enum(['issued', 'finance_rejected']),
+    action: z.enum(FINANCE_ACTION_VALUES),
     notes: z
       .string()
       .trim()
@@ -79,46 +87,30 @@ export const financeFiltersSchema = z
     claimNumber: z.string().trim().max(50).optional(),
     ownerDesignation: z.string().trim().max(100).optional(),
     // HTML GET forms submit empty string for the blank <option value="">.
-    // Preprocess '' → undefined so the email validator accepts it as "no filter".
-    hodApproverEmail: z.preprocess(
+    // Preprocess '' → undefined so the UUID validator accepts it as "no filter".
+    hodApproverEmployeeId: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().trim().email().optional()
+      z.string().trim().uuid().optional()
     ),
     claimStatus: z.string().trim().max(100).optional(),
     workLocation: z.string().trim().max(100).optional(),
-    resubmittedOnly: z.enum(['true', '1', 'on']).optional(),
-    // Defensive: treat empty string as the default 'all' value.
     actionFilter: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.enum(['all', 'issued', 'finance_rejected']).default('all')
+      z.enum(FINANCE_FILTER_VALUES).default('all')
     ),
-    claimDateFrom: optionalDateField('Claim date from'),
-    claimDateTo: optionalDateField('Claim date to'),
-    actionDateFrom: optionalDateField('Action date from'),
-    actionDateTo: optionalDateField('Action date to'),
+    dateFilterField: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.enum(FINANCE_DATE_FILTER_FIELD_VALUES).default('claim_date')
+    ),
+    dateFrom: optionalDateField('Date from'),
+    dateTo: optionalDateField('Date to'),
   })
   .superRefine((value, context) => {
-    if (
-      value.claimDateFrom &&
-      value.claimDateTo &&
-      value.claimDateFrom > value.claimDateTo
-    ) {
+    if (value.dateFrom && value.dateTo && value.dateFrom > value.dateTo) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['claimDateTo'],
-        message: 'Claim date to must be on or after claim date from.',
-      })
-    }
-
-    if (
-      value.actionDateFrom &&
-      value.actionDateTo &&
-      value.actionDateFrom > value.actionDateTo
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['actionDateTo'],
-        message: 'Action date to must be on or after action date from.',
+        path: ['dateTo'],
+        message: 'Date to must be on or after date from.',
       })
     }
   })

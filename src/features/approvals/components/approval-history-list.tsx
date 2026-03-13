@@ -5,7 +5,6 @@ import { CursorPaginationControls } from '@/components/ui/cursor-pagination-cont
 
 import { getApprovalHistoryAction } from '@/features/approvals/actions'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
-import type { ClaimStatusCatalogItem } from '@/features/claims/types'
 
 type ApprovalHistoryPayload = Awaited<
   ReturnType<typeof getApprovalHistoryAction>
@@ -13,7 +12,6 @@ type ApprovalHistoryPayload = Awaited<
 
 type ApprovalHistoryListProps = {
   history: ApprovalHistoryPayload
-  statusCatalog: ClaimStatusCatalogItem[]
   pagination: {
     backHref: string | null
     nextHref: string | null
@@ -21,9 +19,16 @@ type ApprovalHistoryListProps = {
   }
 }
 
+function isSameMoment(left: string | null, right: string): boolean {
+  if (!left) {
+    return false
+  }
+
+  return new Date(left).getTime() === new Date(right).getTime()
+}
+
 export function ApprovalHistoryList({
   history,
-  statusCatalog,
   pagination,
 }: ApprovalHistoryListProps) {
   if (history.data.length === 0) {
@@ -72,7 +77,7 @@ export function ApprovalHistoryList({
               <tr key={row.actionId} className="border-b border-border/70">
                 <td className="px-3 py-3 font-medium">
                   <Link
-                    href={`/claims/${row.claimId}`}
+                    href={`/claims/${row.claimId}?from=approvals`}
                     className="underline decoration-border underline-offset-4 hover:decoration-foreground"
                   >
                     {row.claimNumber}
@@ -94,17 +99,21 @@ export function ApprovalHistoryList({
                 </td>
                 <td className="px-3 py-3">{formatDatetime(row.actedAt)}</td>
                 <td className="px-3 py-3">
-                  {row.hodApprovedAt ? formatDatetime(row.hodApprovedAt) : '-'}
+                  {row.hodApprovedAt &&
+                  !isSameMoment(row.hodApprovedAt, row.actedAt)
+                    ? formatDate(row.hodApprovedAt)
+                    : '-'}
                 </td>
                 <td className="px-3 py-3">
-                  {row.financeApprovedAt
-                    ? formatDatetime(row.financeApprovedAt)
+                  {row.financeApprovedAt &&
+                  !isSameMoment(row.financeApprovedAt, row.actedAt)
+                    ? formatDate(row.financeApprovedAt)
                     : '-'}
                 </td>
                 <td className="px-3 py-3">
                   <ClaimStatusBadge
-                    status={row.claimStatus}
-                    statusCatalog={statusCatalog}
+                    statusName={row.claimStatusName}
+                    statusDisplayColor={row.claimStatusDisplayColor}
                   />
                 </td>
               </tr>

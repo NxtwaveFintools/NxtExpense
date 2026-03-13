@@ -4,13 +4,12 @@ import { formatDate, formatDatetime } from '@/lib/utils/date'
 import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
 
 import { getFinanceHistoryAction } from '@/features/finance/actions'
-import type { ClaimStatusCatalogItem } from '@/features/claims/types'
+import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
 
 type FinanceHistoryPayload = Awaited<ReturnType<typeof getFinanceHistoryAction>>
 
 type FinanceHistoryListProps = {
   history: FinanceHistoryPayload
-  statusCatalog: ClaimStatusCatalogItem[]
   pagination: {
     backHref: string | null
     nextHref: string | null
@@ -18,49 +17,8 @@ type FinanceHistoryListProps = {
   }
 }
 
-const COMPACT_STATUS_STYLE_BY_TOKEN: Record<string, string> = {
-  slate:
-    'border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300',
-  blue: 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  amber:
-    'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  orange:
-    'border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  emerald:
-    'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  red: 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300',
-  indigo:
-    'border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-  teal: 'border-teal-500/20 bg-teal-500/10 text-teal-700 dark:text-teal-300',
-  rose: 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300',
-  neutral: 'border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300',
-}
-
-function FinanceStatusBadge({
-  status,
-  statusCatalog,
-}: {
-  status: string
-  statusCatalog: ClaimStatusCatalogItem[]
-}) {
-  const matchedStatus = statusCatalog.find((entry) => entry.status === status)
-  const colorToken = matchedStatus?.color_token ?? 'neutral'
-
-  return (
-    <span
-      className={`inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold ${
-        COMPACT_STATUS_STYLE_BY_TOKEN[colorToken] ??
-        COMPACT_STATUS_STYLE_BY_TOKEN.neutral
-      }`}
-    >
-      {matchedStatus?.display_label ?? status.replaceAll('_', ' ')}
-    </span>
-  )
-}
-
 export function FinanceHistoryList({
   history,
-  statusCatalog,
   pagination,
 }: FinanceHistoryListProps) {
   if (history.data.length === 0) {
@@ -104,7 +62,7 @@ export function FinanceHistoryList({
               <tr key={row.action.id} className="border-b border-border/70">
                 <td className="px-3 py-3 font-medium">
                   <Link
-                    href={`/claims/${row.claim.id}`}
+                    href={`/claims/${row.claim.id}?from=finance`}
                     className="underline decoration-border underline-offset-4 hover:decoration-foreground"
                   >
                     {row.claim.claim_number}
@@ -128,9 +86,9 @@ export function FinanceHistoryList({
                   {formatDatetime(row.action.acted_at)}
                 </td>
                 <td className="px-3 py-3">
-                  <FinanceStatusBadge
-                    status={row.claim.status}
-                    statusCatalog={statusCatalog}
+                  <ClaimStatusBadge
+                    statusName={row.claim.statusName}
+                    statusDisplayColor={row.claim.statusDisplayColor}
                   />
                 </td>
               </tr>

@@ -1,17 +1,20 @@
 import { formatDate } from '@/lib/utils/date'
 
 import type { ClaimWithItems } from '@/features/claims/types'
-import type { Employee } from '@/features/employees/types'
+import type { EmployeeRow } from '@/lib/services/employee-service'
 
 function resolveNextApprover(
   claim: ClaimWithItems['claim'],
-  owner: Employee | null
+  owner: EmployeeRow | null
 ): string | null {
-  if (!owner || claim.status !== 'pending_approval') return null
+  if (!owner) return null
   const level = claim.current_approval_level
-  if (level === 1) return owner.approval_email_level_1
-  if (level === 2) return owner.approval_email_level_2
-  if (level === 3) return owner.approval_email_level_3
+  if (!level || level > 2 || claim.is_terminal || claim.is_rejection)
+    return null
+  if (level === 1)
+    return owner.approval_employee_id_level_1 ? 'Level 1 Approver (SBH)' : null
+  if (level === 2)
+    return owner.approval_employee_id_level_3 ? 'Level 2 Approver (HOD)' : null
   return null
 }
 
@@ -19,7 +22,7 @@ type ClaimDetailProps = {
   claim: ClaimWithItems['claim']
   items: ClaimWithItems['items']
   employeeName: string
-  owner?: Employee | null
+  owner?: EmployeeRow | null
 }
 
 export function ClaimDetail({
@@ -61,6 +64,29 @@ export function ClaimDetail({
           </div>
         ) : null}
       </dl>
+
+      {claim.is_terminal && claim.is_rejection ? (
+        claim.allow_resubmit ? (
+          <div className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm">
+            <p className="font-medium text-green-700 dark:text-green-400">
+              New claim permitted
+            </p>
+            <p className="mt-0.5 text-green-700/80 dark:text-green-400/80">
+              The approver has allowed you to raise a new claim for this date.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
+            <p className="font-medium text-red-700 dark:text-red-400">
+              Permanently closed
+            </p>
+            <p className="mt-0.5 text-red-700/80 dark:text-red-400/80">
+              This claim is permanently closed. No new claim can be raised for
+              this date.
+            </p>
+          </div>
+        )
+      ) : null}
 
       <h3 className="mt-5 text-sm font-semibold uppercase tracking-[0.12em] text-foreground/70">
         Line Items

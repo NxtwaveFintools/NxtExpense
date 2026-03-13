@@ -1,8 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Claim } from '@/features/claims/types'
-import { getClaimAvailableActions } from '@/features/claims/queries'
-import type { Employee } from '@/features/employees/types'
+import {
+  getClaimAvailableActions,
+  CLAIM_COLUMNS,
+  mapClaimRow,
+} from '@/features/claims/queries'
+import type { EmployeeRow } from '@/lib/services/employee-service'
 import type {
   FinanceFilters,
   FinanceHistoryItem,
@@ -16,22 +20,17 @@ import {
 } from '@/features/finance/queries/filters'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
-const CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
-
 const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
   employeeName: null,
   claimNumber: null,
   ownerDesignation: null,
-  hodApproverEmail: null,
+  hodApproverEmployeeId: null,
   claimStatus: null,
   workLocation: null,
-  resubmittedOnly: false,
   actionFilter: 'all',
-  claimDateFrom: null,
-  claimDateTo: null,
-  actionDateFrom: null,
-  actionDateTo: null,
+  dateFilterField: 'claim_date',
+  dateFrom: null,
+  dateTo: null,
 }
 
 export { getFinanceFilterOptions }
@@ -42,12 +41,26 @@ export async function getFinanceQueuePaginated(
   limit = 10,
   filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
 ): Promise<PaginatedFinanceQueue> {
+  // Resolve finance-review status UUID from DB by semantic properties—
+  // no hardcoded status code strings anywhere in this function.
+  const { data: financeStatusRow } = await supabase
+    .from('claim_statuses')
+    .select('id')
+    .eq('approval_level', 3)
+    .eq('is_rejection', false)
+    .eq('is_terminal', false)
+    .eq('is_approval', false)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!financeStatusRow) {
+    return { data: [], hasNextPage: false, nextCursor: null, limit }
+  }
+
   const filteredClaimIds = await getFilteredClaimIdsForFinance(
     supabase,
     filters,
-    {
-      requiredStatus: 'finance_review',
-    }
+    { requiredStatusId: financeStatusRow.id }
   )
 
   if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
@@ -61,8 +74,8 @@ export async function getFinanceQueuePaginated(
 
   let query = supabase
     .from('expense_claims')
-    .select(`${CLAIM_COLUMNS}, employees!inner(*)`)
-    .eq('status', 'finance_review')
+    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
+    .eq('status_id', financeStatusRow.id)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1)
@@ -85,7 +98,7 @@ export async function getFinanceQueuePaginated(
   }
 
   const rows = (data ?? []) as Array<
-    Claim & { employees: Employee | Employee[] }
+    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
   >
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
@@ -100,10 +113,14 @@ export async function getFinanceQueuePaginated(
         throw new Error('Claim owner mapping not found.')
       }
 
-      const availableActions = await getClaimAvailableActions(supabase, row.id)
+      const claim = mapClaimRow(row) as Claim
+      const availableActions = await getClaimAvailableActions(
+        supabase,
+        row.id as string
+      )
 
       return {
-        claim: row,
+        claim,
         owner,
         availableActions,
       }
@@ -114,8 +131,8 @@ export async function getFinanceQueuePaginated(
   const nextCursor =
     hasNextPage && lastRecord
       ? encodeCursor({
-          created_at: lastRecord.created_at,
-          id: lastRecord.id,
+          created_at: lastRecord.created_at as string,
+          id: lastRecord.id as string,
         })
       : null
 
@@ -151,24 +168,35 @@ export async function getFinanceHistoryPaginated(
   // The finance_actions RLS policy already restricts rows to Finance designation.
   let query = supabase
     .from('finance_actions')
-    .select('id, claim_id, actor_email, action, notes, acted_at')
+    .select(
+      'id, claim_id, actor_employee_id, action, notes, acted_at, actor:employees!actor_employee_id(employee_email, employee_name)'
+    )
     .in('action', ['issued', 'finance_rejected'])
     .order('acted_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1)
 
-  if (filters.actionFilter !== 'all') {
+  const filterByApprovedDate =
+    filters.dateFilterField === 'finance_approved_date' &&
+    (filters.dateFrom || filters.dateTo)
+
+  if (filterByApprovedDate) {
+    query = query.eq('action', 'issued')
+  } else if (filters.actionFilter !== 'all') {
     query = query.eq('action', filters.actionFilter)
   }
 
-  const actionDateFrom = toIstDayStart(filters.actionDateFrom)
-  if (actionDateFrom) {
-    query = query.gte('acted_at', actionDateFrom)
-  }
+  if (filterByApprovedDate) {
+    const dateFrom = toIstDayStart(filters.dateFrom)
+    const dateTo = toIstDayEnd(filters.dateTo)
 
-  const actionDateTo = toIstDayEnd(filters.actionDateTo)
-  if (actionDateTo) {
-    query = query.lte('acted_at', actionDateTo)
+    if (dateFrom) {
+      query = query.gte('acted_at', dateFrom)
+    }
+
+    if (dateTo) {
+      query = query.lte('acted_at', dateTo)
+    }
   }
 
   if (Array.isArray(filteredClaimIds)) {
@@ -187,10 +215,14 @@ export async function getFinanceHistoryPaginated(
     throw new Error(error.message)
   }
 
-  const actionRows = (data ?? []) as Array<{
+  const actionRows = (data ?? []) as unknown as Array<{
     id: string
     claim_id: string
-    actor_email: string
+    actor_employee_id: string
+    actor:
+      | { employee_email: string; employee_name: string }
+      | { employee_email: string; employee_name: string }[]
+      | null
     action: 'issued' | 'finance_rejected'
     notes: string | null
     acted_at: string
@@ -209,35 +241,19 @@ export async function getFinanceHistoryPaginated(
   }
 
   const claimIds = [...new Set(pageData.map((row) => row.claim_id))]
-  const uniqueActorEmails = [...new Set(pageData.map((row) => row.actor_email))]
 
-  const [claimResult, actorResult] = await Promise.all([
-    supabase
-      .from('expense_claims')
-      .select(`${CLAIM_COLUMNS}, employees!inner(*)`)
-      .in('id', claimIds),
-    supabase
-      .from('employees')
-      .select('employee_email, employee_name')
-      .in('employee_email', uniqueActorEmails),
-  ])
+  const { data: claimData, error: claimError } = await supabase
+    .from('expense_claims')
+    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
+    .in('id', claimIds)
 
-  if (claimResult.error) {
-    throw new Error(claimResult.error.message)
+  if (claimError) {
+    throw new Error(claimError.message)
   }
 
-  const claimData = claimResult.data
-
-  const actorNameByEmail = new Map<string, string>(
-    (actorResult.data ?? []).map((e) => [
-      e.employee_email.toLowerCase(),
-      e.employee_name,
-    ])
-  )
-
-  const claimMap = new Map<string, { claim: Claim; owner: Employee }>()
+  const claimMap = new Map<string, { claim: Claim; owner: EmployeeRow }>()
   for (const row of (claimData ?? []) as Array<
-    Claim & { employees: Employee | Employee[] }
+    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
   >) {
     const owner = Array.isArray(row.employees)
       ? row.employees[0]
@@ -246,12 +262,11 @@ export async function getFinanceHistoryPaginated(
       continue
     }
 
-    const claimFields = { ...row } as Claim & {
-      employees?: Employee | Employee[]
-    }
+    const mapped = mapClaimRow(row)
+    const claimFields = { ...mapped } as Record<string, unknown>
     delete claimFields.employees
 
-    claimMap.set(row.id, {
+    claimMap.set(row.id as string, {
       claim: claimFields as Claim,
       owner,
     })
@@ -264,14 +279,20 @@ export async function getFinanceHistoryPaginated(
         return null
       }
 
+      const actorRaw = action.actor
+      const actor = Array.isArray(actorRaw) ? actorRaw[0] : actorRaw
+
       return {
         claim: claim.claim,
         owner: claim.owner,
         action: {
-          ...action,
-          actor_name:
-            actorNameByEmail.get(action.actor_email?.toLowerCase() ?? '') ??
-            null,
+          id: action.id,
+          claim_id: action.claim_id,
+          actor_email: actor?.employee_email ?? '',
+          actor_name: actor?.employee_name ?? null,
+          action: action.action,
+          notes: action.notes,
+          acted_at: action.acted_at,
         },
       }
     })

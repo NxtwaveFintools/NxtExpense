@@ -29,7 +29,11 @@ const OUTSTATION_RATES_4W = {
 describe('buildClaimItemsAndTotal — Field - Base Location', () => {
   it('calculates ₹300 for 2W base location (SUBMIT-001)', () => {
     const result = buildClaimItemsAndTotal(
-      { workLocation: 'Field - Base Location', vehicleType: 'Two Wheeler' },
+      {
+        workLocation: 'Field - Base Location',
+        requiresVehicleSelection: true,
+        vehicleType: 'Two Wheeler',
+      },
       BASE_RATES_2W
     )
     expect(result.total).toBe(300)
@@ -40,7 +44,11 @@ describe('buildClaimItemsAndTotal — Field - Base Location', () => {
 
   it('calculates ₹420 for 4W base location (SUBMIT-007)', () => {
     const result = buildClaimItemsAndTotal(
-      { workLocation: 'Field - Base Location', vehicleType: 'Four Wheeler' },
+      {
+        workLocation: 'Field - Base Location',
+        requiresVehicleSelection: true,
+        vehicleType: 'Four Wheeler',
+      },
       BASE_RATES_4W
     )
     expect(result.total).toBe(420)
@@ -51,7 +59,11 @@ describe('buildClaimItemsAndTotal — Field - Base Location', () => {
 
   it('generates correct descriptions', () => {
     const result = buildClaimItemsAndTotal(
-      { workLocation: 'Field - Base Location', vehicleType: 'Two Wheeler' },
+      {
+        workLocation: 'Field - Base Location',
+        requiresVehicleSelection: true,
+        vehicleType: 'Two Wheeler',
+      },
       BASE_RATES_2W
     )
     expect(result.items[0]?.description).toBe('Base location food allowance')
@@ -66,6 +78,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (own vehicle)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Two Wheeler',
         kmTravelled: 100,
@@ -85,6 +98,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (own vehicle)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Four Wheeler',
         kmTravelled: 100,
@@ -104,6 +118,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (own vehicle)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Two Wheeler',
         kmTravelled: 150,
@@ -117,6 +132,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (own vehicle)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Four Wheeler',
         kmTravelled: 300,
@@ -130,6 +146,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (own vehicle)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Two Wheeler',
         kmTravelled: 1,
@@ -143,6 +160,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (own vehicle)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Two Wheeler',
         kmTravelled: 100,
@@ -161,6 +179,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (taxi)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: false,
         taxiAmount: 500,
         transportType: 'Rapido/Uber/Ola',
@@ -180,6 +199,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (taxi)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: false,
         taxiAmount: 0,
         transportType: 'Rapido/Uber/Ola',
@@ -194,6 +214,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (taxi)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: false,
         transportType: 'Rental Vehicle',
       },
@@ -207,6 +228,7 @@ describe('buildClaimItemsAndTotal — Field - Outstation (taxi)', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: false,
         taxiAmount: 1200,
         transportType: 'Rental Vehicle',
@@ -244,7 +266,11 @@ describe('buildClaimItemsAndTotal — non-expense locations', () => {
 describe('buildClaimItemsAndTotal — missing rates fallback to 0', () => {
   it('defaults to 0 when foodBase rate is missing', () => {
     const result = buildClaimItemsAndTotal(
-      { workLocation: 'Field - Base Location', vehicleType: 'Two Wheeler' },
+      {
+        workLocation: 'Field - Base Location',
+        requiresVehicleSelection: true,
+        vehicleType: 'Two Wheeler',
+      },
       { fuelBase: 180 }
     )
     expect(result.items[0]?.amount).toBe(0)
@@ -253,7 +279,11 @@ describe('buildClaimItemsAndTotal — missing rates fallback to 0', () => {
 
   it('defaults to 0 when fuelBase rate is missing', () => {
     const result = buildClaimItemsAndTotal(
-      { workLocation: 'Field - Base Location', vehicleType: 'Two Wheeler' },
+      {
+        workLocation: 'Field - Base Location',
+        requiresVehicleSelection: true,
+        vehicleType: 'Two Wheeler',
+      },
       { foodBase: 120 }
     )
     expect(result.items[1]?.amount).toBe(0)
@@ -264,6 +294,7 @@ describe('buildClaimItemsAndTotal — missing rates fallback to 0', () => {
     const result = buildClaimItemsAndTotal(
       {
         workLocation: 'Field - Outstation',
+        requiresOutstationDetails: true,
         ownVehicleUsed: true,
         vehicleType: 'Two Wheeler',
         kmTravelled: 100,

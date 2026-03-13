@@ -17,7 +17,7 @@ export class DashboardPage {
   }
 
   get myClaimsLink() {
-    return this.page.getByRole('link', { name: /my claims/i })
+    return this.page.locator('a[href="/claims"]').first()
   }
 
   get approvalsLink() {

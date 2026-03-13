@@ -8,7 +8,7 @@ import {
   getClaimAvailableActions,
   getClaimById,
 } from '@/features/claims/queries'
-import { getEmployeeById } from '@/features/employees/queries'
+import { getEmployeeById } from '@/lib/services/employee-service'
 import { getClaimApprovalHistory } from '@/features/approvals/queries'
 import { ApprovalDetail } from '@/features/approvals/components/approval-detail'
 import { ApprovalActions } from '@/features/approvals/components/approval-actions'

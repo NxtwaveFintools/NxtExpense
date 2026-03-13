@@ -53,13 +53,12 @@ describe('finance validation schemas', () => {
     )
   })
 
-  it('accepts status/location/resubmitted finance filters', () => {
+  it('accepts status/location finance filters', () => {
     const parsed = financeFiltersSchema.safeParse({
       claimStatus: 'finance_review',
       workLocation: 'Field - Base Location',
-      resubmittedOnly: 'true',
-      claimDateFrom: '07/03/2026',
-      claimDateTo: '08/03/2026',
+      dateFilterField: 'claim_date',
+      dateFrom: '07/03/2026',
     })
 
     expect(parsed.success).toBe(true)

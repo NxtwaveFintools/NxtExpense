@@ -7,7 +7,7 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   azure_tenant_url_invalid:
     'Azure Tenant URL is invalid in Supabase. Set it to https://login.microsoftonline.com/<tenant-id> (without /v2.0) or leave it empty.',
   email_domain_not_allowed:
-    'Only @nxtwave.co.in, @nxtwave.tech, and @nxtwave.in emails are allowed.',
+    'Your email domain is not authorized. Please use a corporate email.',
 }
 
 export function isDevelopmentAuthEnabled(): boolean {

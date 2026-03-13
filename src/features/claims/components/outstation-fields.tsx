@@ -1,26 +1,36 @@
-import { Car, MapPin, Receipt, Route } from 'lucide-react'
+import { Bed, Car, MapPin, Receipt, Route, Utensils } from 'lucide-react'
 
-import type { TransportType, VehicleType } from '@/features/claims/types'
+import type {
+  SelectOption,
+  TransportType,
+  VehicleType,
+} from '@/features/claims/types'
 
 type OutstationFieldsProps = {
   ownVehicleUsed: boolean
   vehicleType: VehicleType
   transportType: TransportType
-  outstationLocation: string
-  fromCity: string
-  toCity: string
+  outstationCityId: string
+  fromCityId: string
+  toCityId: string
   kmTravelled: string
   taxiAmount: string
-  allowedVehicleTypes: readonly VehicleType[]
-  transportTypeOptions: readonly TransportType[]
+  accommodationNights: string
+  foodWithPrincipalsAmount: string
+  allowedVehicleTypes: readonly SelectOption[]
+  transportTypeOptions: readonly SelectOption[]
+  cityOptions: readonly SelectOption[]
+  showFoodWithPrincipals: boolean
   onOwnVehicleUsedChange: (value: boolean) => void
   onVehicleTypeChange: (value: VehicleType) => void
   onTransportTypeChange: (value: TransportType) => void
-  onOutstationLocationChange: (value: string) => void
-  onFromCityChange: (value: string) => void
-  onToCityChange: (value: string) => void
+  onOutstationCityIdChange: (value: string) => void
+  onFromCityIdChange: (value: string) => void
+  onToCityIdChange: (value: string) => void
   onKmTravelledChange: (value: string) => void
   onTaxiAmountChange: (value: string) => void
+  onAccommodationNightsChange: (value: string) => void
+  onFoodWithPrincipalsAmountChange: (value: string) => void
 }
 
 export function OutstationFields(props: OutstationFieldsProps) {
@@ -28,7 +38,7 @@ export function OutstationFields(props: OutstationFieldsProps) {
     <div className="space-y-4">
       <div className="space-y-2">
         <label
-          htmlFor="outstationLocation"
+          htmlFor="outstationCityId"
           className="text-sm font-medium text-foreground/80"
         >
           <span className="inline-flex items-center gap-2">
@@ -36,16 +46,22 @@ export function OutstationFields(props: OutstationFieldsProps) {
             Outstation Location
           </span>
         </label>
-        <input
-          id="outstationLocation"
-          name="outstationLocation"
-          value={props.outstationLocation}
+        <select
+          id="outstationCityId"
+          name="outstationCityId"
+          value={props.outstationCityId}
           onChange={(event) =>
-            props.onOutstationLocationChange(event.target.value)
+            props.onOutstationCityIdChange(event.target.value)
           }
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          placeholder="Enter city worked in"
-        />
+        >
+          <option value="">Select city...</option>
+          {props.cityOptions.map((city) => (
+            <option key={city.id} value={city.id}>
+              {city.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <fieldset className="space-y-2">
@@ -100,8 +116,8 @@ export function OutstationFields(props: OutstationFieldsProps) {
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
             >
               {props.allowedVehicleTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+                <option key={type.id} value={type.id}>
+                  {type.name}
                 </option>
               ))}
             </select>
@@ -110,21 +126,37 @@ export function OutstationFields(props: OutstationFieldsProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-sm font-medium text-foreground/80">
               <span>From City</span>
-              <input
-                name="fromCity"
-                value={props.fromCity}
-                onChange={(event) => props.onFromCityChange(event.target.value)}
+              <select
+                name="fromCityId"
+                value={props.fromCityId}
+                onChange={(event) =>
+                  props.onFromCityIdChange(event.target.value)
+                }
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              />
+              >
+                <option value="">Select city...</option>
+                {props.cityOptions.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="space-y-2 text-sm font-medium text-foreground/80">
               <span>To City</span>
-              <input
-                name="toCity"
-                value={props.toCity}
-                onChange={(event) => props.onToCityChange(event.target.value)}
+              <select
+                name="toCityId"
+                value={props.toCityId}
+                onChange={(event) => props.onToCityIdChange(event.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              />
+              >
+                <option value="">Select city...</option>
+                {props.cityOptions.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -155,16 +187,16 @@ export function OutstationFields(props: OutstationFieldsProps) {
             <div className="flex flex-wrap gap-2">
               {props.transportTypeOptions.map((option) => (
                 <button
-                  key={option}
+                  key={option.id}
                   type="button"
-                  onClick={() => props.onTransportTypeChange(option)}
+                  onClick={() => props.onTransportTypeChange(option.id)}
                   className={`rounded-lg border px-3 py-2 text-sm ${
-                    props.transportType === option
+                    props.transportType === option.id
                       ? 'border-foreground bg-foreground text-background'
                       : 'border-border bg-background'
                   }`}
                 >
-                  {option}
+                  {option.name}
                 </button>
               ))}
             </div>
@@ -187,6 +219,50 @@ export function OutstationFields(props: OutstationFieldsProps) {
           </label>
         </>
       )}
+
+      {/* Accommodation — available for all outstation claims */}
+      <label className="space-y-2 text-sm font-medium text-foreground/80">
+        <span className="inline-flex items-center gap-2">
+          <Bed className="size-4" aria-hidden="true" />
+          Accommodation Nights
+        </span>
+        <input
+          name="accommodationNights"
+          type="number"
+          min={0}
+          max={30}
+          step="1"
+          value={props.accommodationNights}
+          onChange={(event) =>
+            props.onAccommodationNightsChange(event.target.value)
+          }
+          placeholder="0"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        />
+      </label>
+
+      {/* Food with Principals — designation-restricted */}
+      {props.showFoodWithPrincipals ? (
+        <label className="space-y-2 text-sm font-medium text-foreground/80">
+          <span className="inline-flex items-center gap-2">
+            <Utensils className="size-4" aria-hidden="true" />
+            Food with Principals (max ₹500)
+          </span>
+          <input
+            name="foodWithPrincipalsAmount"
+            type="number"
+            min={0}
+            max={500}
+            step="0.01"
+            value={props.foodWithPrincipalsAmount}
+            onChange={(event) =>
+              props.onFoodWithPrincipalsAmountChange(event.target.value)
+            }
+            placeholder="0"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          />
+        </label>
+      ) : null}
     </div>
   )
 }

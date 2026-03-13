@@ -1,4 +1,4 @@
-import { getEmployeeByEmail } from '@/features/employees/queries'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
 import {
   getAllFilteredFinanceHistory,
@@ -26,19 +26,43 @@ async function handleExportRequest(request: Request) {
     const mode = getExportMode(searchParams.get('mode'))
     const historyCursor = searchParams.get('historyCursor')
 
+    const legacyClaimDateFrom =
+      searchParams.get('claimDateFrom') ?? searchParams.get('claimDate')
+    const legacyClaimDateTo =
+      searchParams.get('claimDateTo') ?? searchParams.get('claimDate')
+    const legacyFinanceApprovedDateFrom = searchParams.get('actionDateFrom')
+    const legacyFinanceApprovedDateTo = searchParams.get('actionDateTo')
+
+    const dateFilterField =
+      searchParams.get('dateFilterField') ??
+      (legacyFinanceApprovedDateFrom || legacyFinanceApprovedDateTo
+        ? 'finance_approved_date'
+        : 'claim_date')
+
+    const dateFrom =
+      searchParams.get('dateFrom') ??
+      (dateFilterField === 'finance_approved_date'
+        ? legacyFinanceApprovedDateFrom
+        : legacyClaimDateFrom)
+
+    const dateTo =
+      searchParams.get('dateTo') ??
+      (dateFilterField === 'finance_approved_date'
+        ? legacyFinanceApprovedDateTo
+        : legacyClaimDateTo)
+
     const filters = normalizeFinanceFilters({
       employeeName: searchParams.get('employeeName') ?? undefined,
       claimNumber: searchParams.get('claimNumber') ?? undefined,
       ownerDesignation: searchParams.get('ownerDesignation') ?? undefined,
-      hodApproverEmail: searchParams.get('hodApproverEmail') ?? undefined,
+      hodApproverEmployeeId:
+        searchParams.get('hodApproverEmployeeId') ?? undefined,
       claimStatus: searchParams.get('claimStatus') ?? undefined,
       workLocation: searchParams.get('workLocation') ?? undefined,
-      resubmittedOnly: searchParams.get('resubmittedOnly') ?? undefined,
       actionFilter: searchParams.get('actionFilter') ?? undefined,
-      claimDateFrom: searchParams.get('claimDateFrom') ?? undefined,
-      claimDateTo: searchParams.get('claimDateTo') ?? undefined,
-      actionDateFrom: searchParams.get('actionDateFrom') ?? undefined,
-      actionDateTo: searchParams.get('actionDateTo') ?? undefined,
+      dateFilterField,
+      dateFrom: dateFrom ?? undefined,
+      dateTo: dateTo ?? undefined,
     })
 
     const supabase = await createSupabaseServerClient()
@@ -51,7 +75,7 @@ async function handleExportRequest(request: Request) {
     }
 
     const employee = await getEmployeeByEmail(supabase, user.email)
-    if (!employee || !isFinanceTeamMember(employee)) {
+    if (!employee || !(await isFinanceTeamMember(supabase, employee))) {
       return new Response('Finance access is required.', { status: 403 })
     }
 

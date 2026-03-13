@@ -3,17 +3,23 @@ import Link from 'next/link'
 import type {
   ClaimStatusCatalogItem,
   MyClaimsFilters,
+  WorkLocationOption,
 } from '@/features/claims/types'
-import { WORK_LOCATION_FILTER_VALUES } from '@/features/claims/types'
 
 type ClaimsFiltersBarProps = {
   filters: MyClaimsFilters
   statusCatalog: ClaimStatusCatalogItem[]
+  workLocationOptions: WorkLocationOption[]
+  exportCurrentPageHref: string
+  exportAllHref: string
 }
 
 export function ClaimsFiltersBar({
   filters,
   statusCatalog,
+  workLocationOptions,
+  exportCurrentPageHref,
+  exportAllHref,
 }: ClaimsFiltersBarProps) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
@@ -48,42 +54,22 @@ export function ClaimsFiltersBar({
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           >
             <option value="">All Locations</option>
-            {WORK_LOCATION_FILTER_VALUES.map((location) => (
-              <option key={location} value={location}>
-                {location}
+            {workLocationOptions.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.location_name}
               </option>
             ))}
           </select>
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Claim Date From</span>
+          <span className="text-foreground/80">Claim Date</span>
           <input
-            name="claimDateFrom"
+            name="claimDate"
             type="date"
-            defaultValue={filters.claimDateFrom ?? ''}
+            defaultValue={filters.claimDate ?? ''}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Claim Date To</span>
-          <input
-            name="claimDateTo"
-            type="date"
-            defaultValue={filters.claimDateTo ?? ''}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="md:col-span-4 inline-flex items-center gap-2 text-sm text-foreground/80">
-          <input
-            name="resubmittedOnly"
-            type="checkbox"
-            value="true"
-            defaultChecked={filters.resubmittedOnly}
-          />
-          Show resubmitted claims only
         </label>
 
         <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-1">
@@ -98,6 +84,18 @@ export function ClaimsFiltersBar({
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium"
           >
             Clear Filters
+          </Link>
+          <Link
+            href={exportCurrentPageHref}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium"
+          >
+            Download Current Page CSV
+          </Link>
+          <Link
+            href={exportAllHref}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium"
+          >
+            Download All Filtered CSV
           </Link>
         </div>
       </form>

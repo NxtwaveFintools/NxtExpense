@@ -1,0 +1,1646 @@
+{
+  "task": "COMPLETE ID-BASED ARCHITECTURE MIGRATION - ZERO TEXT-BASED REFERENCES",
+  "severity": "CRITICAL - FULL ARCHITECTURAL TRANSFORMATION TO ID-BASED SYSTEM",
+  "context": "NxtExpense currently relies heavily on text-based references (emails, role names, status text) throughout the database, backend, and frontend. This creates massive scalability issues: when employees leave, get promoted, or teams change, the entire system breaks. When workflow statuses need modification, code must be changed across DB, backend, and frontend. This migration eliminates ALL text-based logic and implements a pure ID-based relational architecture where EVERYTHING is referenced by IDs at the database level. Surface-level changes (renaming roles, restructuring workflows, changing approval chains) become trivial configuration updates instead of code rewrites.",
+
+  "mandate": {
+    "iron_law_1": "Database level: EVERYTHING references by ID - ZERO text matching, ZERO email matching, ZERO role name matching",
+    "iron_law_2": "Workflow status: Completely redesigned to support L1/L2/L3/L4 approval hierarchy with ID-based status tracking",
+    "iron_law_3": "Employee changes: Promotions, role changes, team moves must NEVER break existing data or logic",
+    "iron_law_4": "Scalability: Adding new roles, approval levels, statuses, or workflow stages requires ONLY configuration data changes",
+    "iron_law_5": "MCP usage: MANDATORY for every schema change, migration, and code refactor",
+    "iron_law_6": "Follow copilot-instructions.md: All standards apply - file size limits, testing requirements, RLS policies, proper TypeScript",
+    "iron_law_7": "Surface-level flexibility: Business teams must be able to rename roles, restructure approvals, modify statuses without touching code"
+  },
+
+  "critical_problems_with_current_architecture": {
+    "text_based_foreign_keys": {
+      "problem": "approval_mail_id_level_1, approval_mail_id_level_2, approval_mail_id_level_3 are EMAIL STRINGS",
+      "why_catastrophic": [
+        "When employee leaves company, all FK references break",
+        "When employee email changes, all approval chains break",
+        "Cannot enforce referential integrity with email strings",
+        "Cannot track approval history when approver changes",
+        "No way to handle interim approvers or delegation",
+        "Cannot query 'all claims I approved' efficiently"
+      ],
+      "correct_approach": "employee_id INTEGER FK to employees table"
+    },
+    "text_based_role_logic": {
+      "problem": "Code checks designation === 'State Business Head' throughout codebase",
+      "why_catastrophic": [
+        "Typos break logic ('State Business Head' vs 'State Buiness Head')",
+        "Case sensitivity issues",
+        "Cannot rename roles without find-replace across entire codebase",
+        "Cannot add role variations (Senior SBH, Junior SBH)",
+        "Logic scattered across 50+ files instead of one config table"
+      ],
+      "correct_approach": "designation_id INTEGER FK to designations table, business rules in designation_config table"
+    },
+    "text_based_status_workflow": {
+      "problem": "Status values are text strings: 'Pending Approval', 'Approved', 'Rejected'",
+      "why_catastrophic": [
+        "Cannot distinguish WHICH level approved/rejected (L1? L2? L3?)",
+        "Cannot track partial approvals (L1 approved but L2 pending)",
+        "Cannot implement multi-level approval workflows",
+        "Status changes require code changes in frontend and backend",
+        "Cannot query 'all claims pending at L2' efficiently",
+        "Audit trail is impossible - who approved at which level?"
+      ],
+      "correct_approach": "status_id INTEGER FK to claim_statuses table with hierarchical workflow support"
+    },
+    "email_based_permissions": {
+      "problem": "Access control checks user.email === 'mansoor@nxtwave.co.in'",
+      "why_catastrophic": [
+        "Email changes break all permissions",
+        "Cannot delegate permissions temporarily",
+        "Cannot have multiple admins with same permission level",
+        "No role-based access control (RBAC)",
+        "Cannot audit who had what permissions when"
+      ],
+      "correct_approach": "role_id INTEGER FK to roles table, permissions table with role_permission junction"
+    },
+    "state_based_approval_routing": {
+      "problem": "state_mapping.json maps state NAME to approver EMAIL",
+      "why_catastrophic": [
+        "State name changes break routing",
+        "Approver email changes break routing",
+        "Cannot handle multi-state approvers",
+        "Cannot track historical changes in approval hierarchy",
+        "No referential integrity"
+      ],
+      "correct_approach": "state_id INTEGER, approval_routing table with employee_id FKs"
+    }
+  },
+
+  "redesigned_workflow_status_system": {
+    "current_status_problems": {
+      "issues": [
+        "Cannot distinguish between L1/L2/L3 rejections",
+        "Cannot track which level is currently reviewing",
+        "Cannot show 'L1 Approved, pending L2' status",
+        "Finance review is buried in generic statuses",
+        "No clear distinction between operational approvals (L1/L2) and financial approvals (L3/L4)"
+      ]
+    },
+    "new_status_architecture": {
+      "principles": [
+        "Each approval level has explicit Approved/Rejected/Pending statuses",
+        "Status progression is hierarchical: Draft → L1 → L2 → L3 → L4 → Issued",
+        "Finance steps are clearly separated from operational approvals",
+        "Returned for Modification can happen at any level",
+        "All statuses are ID-based with metadata in claim_statuses table"
+      ],
+      "status_hierarchy": {
+        "draft_stage": {
+          "status_id": 1,
+          "status_code": "DRAFT",
+          "status_name": "Draft",
+          "description": "Employee is creating/editing the claim",
+          "level": 0,
+          "is_terminal": false,
+          "next_possible_statuses": [2, 21]
+        },
+        "submission_stage": {
+          "status_id": 2,
+          "status_code": "SUBMITTED",
+          "status_name": "Submitted",
+          "description": "Claim submitted by employee, awaiting L1 review",
+          "level": 0,
+          "is_terminal": false,
+          "next_possible_statuses": [3, 4, 21]
+        },
+        "level_1_stage": {
+          "l1_pending": {
+            "status_id": 3,
+            "status_code": "L1_PENDING",
+            "status_name": "L1 - Pending Review",
+            "description": "Awaiting State Business Head approval (L1)",
+            "level": 1,
+            "approval_level": "L1",
+            "is_terminal": false,
+            "requires_approver_role_id": 4,
+            "next_possible_statuses": [5, 6, 21]
+          },
+          "l1_approved": {
+            "status_id": 5,
+            "status_code": "L1_APPROVED",
+            "status_name": "L1 - Approved",
+            "description": "Approved by State Business Head, moving to L2",
+            "level": 1,
+            "approval_level": "L1",
+            "is_approval": true,
+            "is_terminal": false,
+            "auto_transition_to": 7,
+            "next_possible_statuses": [7]
+          },
+          "l1_rejected": {
+            "status_id": 6,
+            "status_code": "L1_REJECTED",
+            "status_name": "L1 - Rejected",
+            "description": "Rejected by State Business Head",
+            "level": 1,
+            "approval_level": "L1",
+            "is_rejection": true,
+            "is_terminal": true,
+            "requires_comment": true,
+            "next_possible_statuses": []
+          }
+        },
+        "level_2_stage": {
+          "l2_pending": {
+            "status_id": 7,
+            "status_code": "L2_PENDING",
+            "status_name": "L2 - Pending Review",
+            "description": "Awaiting Program Manager/HOD approval (L2)",
+            "level": 2,
+            "approval_level": "L2",
+            "is_terminal": false,
+            "requires_approver_role_id": 6,
+            "next_possible_statuses": [8, 9, 21]
+          },
+          "l2_approved": {
+            "status_id": 8,
+            "status_code": "L2_APPROVED",
+            "status_name": "L2 - Approved",
+            "description": "Approved by Program Manager, moving to Finance Review",
+            "level": 2,
+            "approval_level": "L2",
+            "is_approval": true,
+            "is_terminal": false,
+            "auto_transition_to": 10,
+            "next_possible_statuses": [10]
+          },
+          "l2_rejected": {
+            "status_id": 9,
+            "status_code": "L2_REJECTED",
+            "status_name": "L2 - Rejected",
+            "description": "Rejected by Program Manager",
+            "level": 2,
+            "approval_level": "L2",
+            "is_rejection": true,
+            "is_terminal": true,
+            "requires_comment": true,
+            "next_possible_statuses": []
+          }
+        },
+        "level_3_finance_stage": {
+          "l3_pending": {
+            "status_id": 10,
+            "status_code": "L3_PENDING_FINANCE_REVIEW",
+            "status_name": "L3 - Finance Review",
+            "description": "Awaiting Finance team review and verification (L3)",
+            "level": 3,
+            "approval_level": "L3",
+            "is_terminal": false,
+            "requires_approver_role_id": 8,
+            "next_possible_statuses": [11, 12, 21]
+          },
+          "l3_approved": {
+            "status_id": 11,
+            "status_code": "L3_APPROVED_FINANCE",
+            "status_name": "L3 - Finance Approved",
+            "description": "Approved by Finance team, ready for payment processing",
+            "level": 3,
+            "approval_level": "L3",
+            "is_approval": true,
+            "is_terminal": false,
+            "auto_transition_to": 13,
+            "next_possible_statuses": [13]
+          },
+          "l3_rejected": {
+            "status_id": 12,
+            "status_code": "L3_REJECTED_FINANCE",
+            "status_name": "L3 - Finance Rejected",
+            "description": "Rejected by Finance team due to policy violation or documentation issues",
+            "level": 3,
+            "approval_level": "L3",
+            "is_rejection": true,
+            "is_terminal": true,
+            "requires_comment": true,
+            "next_possible_statuses": []
+          }
+        },
+        "level_4_payment_stage": {
+          "l4_pending": {
+            "status_id": 13,
+            "status_code": "L4_PENDING_PAYMENT_PROCESSING",
+            "status_name": "L4 - Payment Processing",
+            "description": "Finance team processing payment (L4)",
+            "level": 4,
+            "approval_level": "L4",
+            "is_terminal": false,
+            "requires_approver_role_id": 9,
+            "next_possible_statuses": [14, 15]
+          },
+          "l4_issued": {
+            "status_id": 14,
+            "status_code": "L4_ISSUED",
+            "status_name": "L4 - Payment Issued",
+            "description": "Payment has been issued to employee",
+            "level": 4,
+            "approval_level": "L4",
+            "is_approval": true,
+            "is_terminal": true,
+            "is_payment_issued": true,
+            "next_possible_statuses": []
+          },
+          "l4_payment_failed": {
+            "status_id": 15,
+            "status_code": "L4_PAYMENT_FAILED",
+            "status_name": "L4 - Payment Failed",
+            "description": "Payment processing failed, requires investigation",
+            "level": 4,
+            "approval_level": "L4",
+            "is_terminal": false,
+            "requires_comment": true,
+            "next_possible_statuses": [13, 12]
+          }
+        },
+        "cross_level_statuses": {
+          "returned_for_modification": {
+            "status_id": 21,
+            "status_code": "RETURNED_FOR_MODIFICATION",
+            "status_name": "Returned for Modification",
+            "description": "Claim returned to employee for corrections/additional information",
+            "level": null,
+            "is_terminal": false,
+            "requires_comment": true,
+            "can_be_triggered_from_any_level": true,
+            "next_possible_statuses": [1, 2]
+          }
+        }
+      },
+      "status_transition_rules": {
+        "principle": "Status transitions are validated against claim_status_transitions table",
+        "table_structure": {
+          "claim_status_transitions": {
+            "columns": [
+              "transition_id SERIAL PRIMARY KEY",
+              "from_status_id INTEGER FK claim_statuses(status_id)",
+              "to_status_id INTEGER FK claim_statuses(status_id)",
+              "requires_role_id INTEGER FK roles(role_id)",
+              "requires_comment BOOLEAN DEFAULT false",
+              "is_auto_transition BOOLEAN DEFAULT false",
+              "validation_rules JSONB"
+            ],
+            "purpose": "Define which status transitions are allowed and who can trigger them"
+          }
+        }
+      },
+      "approval_level_mapping": {
+        "designation_based_routing": {
+          "sro_boa_abh": {
+            "designations": [
+              "Student Relationship Officer",
+              "Business Operation Associate",
+              "Area Business Head"
+            ],
+            "approval_flow": "L1 (SBH) → L2 (Mansoor/PM) → L3 (Finance Review) → L4 (Payment)",
+            "status_progression": "SUBMITTED → L1_PENDING → L1_APPROVED → L2_PENDING → L2_APPROVED → L3_PENDING_FINANCE_REVIEW → L3_APPROVED_FINANCE → L4_PENDING_PAYMENT_PROCESSING → L4_ISSUED"
+          },
+          "sbh_zbh_pm": {
+            "designations": [
+              "State Business Head",
+              "Zonal Business Head",
+              "Program Manager"
+            ],
+            "approval_flow": "L2 (Mansoor/PM) → L3 (Finance Review) → L4 (Payment)",
+            "status_progression": "SUBMITTED → L2_PENDING → L2_APPROVED → L3_PENDING_FINANCE_REVIEW → L3_APPROVED_FINANCE → L4_PENDING_PAYMENT_PROCESSING → L4_ISSUED"
+          }
+        },
+        "implementation": "designation_approval_flow table maps designation_id to required approval_levels"
+      }
+    }
+  },
+
+  "complete_id_based_schema_design": {
+    "core_principle": "Every table uses surrogate integer primary keys. Every relationship uses integer foreign keys. Zero text-based lookups.",
+
+    "master_tables": {
+      "employees": {
+        "purpose": "Central employee registry - SINGLE SOURCE OF TRUTH for all employee data",
+        "columns": [
+          "employee_id SERIAL PRIMARY KEY -- Auto-incrementing ID",
+          "employee_code VARCHAR(20) UNIQUE NOT NULL -- External ID like 'NW0000023'",
+          "employee_name VARCHAR(255) NOT NULL",
+          "employee_email VARCHAR(255) UNIQUE NOT NULL",
+          "designation_id INTEGER NOT NULL FK designations(designation_id)",
+          "state_id INTEGER FK states(state_id) -- Can be NULL for all-state employees",
+          "status_id INTEGER NOT NULL FK employee_statuses(status_id) -- Active, Inactive, On Leave, etc.",
+          "date_of_joining DATE",
+          "date_of_leaving DATE",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()",
+          "created_by INTEGER FK employees(employee_id)",
+          "updated_by INTEGER FK employees(employee_id)"
+        ],
+        "indexes": [
+          "CREATE INDEX idx_employees_designation ON employees(designation_id)",
+          "CREATE INDEX idx_employees_state ON employees(state_id)",
+          "CREATE INDEX idx_employees_email ON employees(employee_email)",
+          "CREATE INDEX idx_employees_code ON employees(employee_code)",
+          "CREATE INDEX idx_employees_status ON employees(status_id)"
+        ],
+        "critical_rules": [
+          "Employee records are NEVER deleted - only marked inactive via status_id",
+          "Historical approvals MUST reference employee_id not email",
+          "When employee leaves, date_of_leaving is set, status_id changed to 'Inactive'",
+          "All historical claims still reference this employee_id"
+        ]
+      },
+
+      "designations": {
+        "purpose": "Master table for all job titles/roles",
+        "columns": [
+          "designation_id SERIAL PRIMARY KEY",
+          "designation_code VARCHAR(50) UNIQUE NOT NULL -- 'SRO', 'BOA', 'ABH', 'SBH', etc.",
+          "designation_name VARCHAR(255) UNIQUE NOT NULL -- 'Student Relationship Officer'",
+          "designation_abbreviation VARCHAR(10) -- 'SRO'",
+          "hierarchy_level INTEGER NOT NULL -- 1=Junior, 6=Senior",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'SRO', 'Student Relationship Officer', 'SRO', 1, true)",
+          "(2, 'BOA', 'Business Operation Associate', 'BOA', 2, true)",
+          "(3, 'ABH', 'Area Business Head', 'ABH', 3, true)",
+          "(4, 'SBH', 'State Business Head', 'SBH', 4, true)",
+          "(5, 'ZBH', 'Zonal Business Head', 'ZBH', 5, true)",
+          "(6, 'PM', 'Program Manager', 'PM', 6, true)"
+        ],
+        "critical_rules": [
+          "Business logic NEVER checks designation_name text",
+          "All business rules reference designation_id",
+          "Renaming a designation only updates designation_name - NO code changes needed"
+        ]
+      },
+
+      "states": {
+        "purpose": "Master table for geographical states",
+        "columns": [
+          "state_id SERIAL PRIMARY KEY",
+          "state_code VARCHAR(10) UNIQUE NOT NULL -- 'AP', 'TN', 'KA', etc.",
+          "state_name VARCHAR(100) UNIQUE NOT NULL -- 'Andhra Pradesh'",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'AP', 'Andhra Pradesh', true)",
+          "(2, 'TG', 'Telangana', true)",
+          "(3, 'TN', 'Tamil Nadu', true)",
+          "(4, 'KL', 'Kerala', true)",
+          "(5, 'KA', 'Karnataka', true)",
+          "(6, 'MH', 'Maharashtra', true)",
+          "(7, 'RJ', 'Rajasthan', true)",
+          "(8, 'DL', 'Delhi NCR', true)",
+          "(9, 'UP', 'Uttar Pradesh', true)",
+          "(10, 'WB', 'West Bengal', true)",
+          "(11, 'OD', 'Odisha', true)"
+        ]
+      },
+
+      "cities": {
+        "purpose": "Master table for cities (for outstation dropdowns)",
+        "columns": [
+          "city_id SERIAL PRIMARY KEY",
+          "city_name VARCHAR(255) NOT NULL",
+          "state_id INTEGER NOT NULL FK states(state_id)",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "UNIQUE(city_name, state_id) -- Same city name can exist in different states"
+        ],
+        "indexes": [
+          "CREATE INDEX idx_cities_state ON cities(state_id)",
+          "CREATE INDEX idx_cities_active ON cities(is_active)"
+        ]
+      },
+
+      "roles": {
+        "purpose": "System roles for RBAC (separate from job designations)",
+        "columns": [
+          "role_id SERIAL PRIMARY KEY",
+          "role_code VARCHAR(50) UNIQUE NOT NULL -- 'EMPLOYEE', 'APPROVER_L1', 'APPROVER_L2', 'FINANCE', etc.",
+          "role_name VARCHAR(255) UNIQUE NOT NULL",
+          "role_description TEXT",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'EMPLOYEE', 'Employee', 'Standard employee who can submit claims')",
+          "(2, 'APPROVER_L1', 'Level 1 Approver', 'State Business Head level approval')",
+          "(3, 'APPROVER_L2', 'Level 2 Approver', 'Program Manager/HOD level approval')",
+          "(4, 'FINANCE_REVIEWER', 'Finance Reviewer', 'Finance team review and verification')",
+          "(5, 'FINANCE_PROCESSOR', 'Finance Processor', 'Finance team payment processing')",
+          "(6, 'ADMIN', 'System Administrator', 'Full system access')",
+          "(7, 'HR_MANAGER', 'HR Manager', 'Manage employee data')"
+        ],
+        "critical_rules": [
+          "Roles are system-level permissions, NOT job titles",
+          "One employee can have multiple roles via employee_roles junction table",
+          "Approval routing uses roles, not email addresses"
+        ]
+      },
+
+      "employee_roles": {
+        "purpose": "Junction table for many-to-many employee-role relationship",
+        "columns": [
+          "employee_role_id SERIAL PRIMARY KEY",
+          "employee_id INTEGER NOT NULL FK employees(employee_id) ON DELETE CASCADE",
+          "role_id INTEGER NOT NULL FK roles(role_id) ON DELETE CASCADE",
+          "assigned_at TIMESTAMPTZ DEFAULT NOW()",
+          "assigned_by INTEGER FK employees(employee_id)",
+          "is_active BOOLEAN DEFAULT true",
+          "UNIQUE(employee_id, role_id)"
+        ],
+        "indexes": [
+          "CREATE INDEX idx_employee_roles_employee ON employee_roles(employee_id)",
+          "CREATE INDEX idx_employee_roles_role ON employee_roles(role_id)",
+          "CREATE INDEX idx_employee_roles_active ON employee_roles(is_active)"
+        ],
+        "example_data": [
+          "-- Ravinder Jangili is both Employee and L1 Approver",
+          "INSERT INTO employee_roles (employee_id, role_id) VALUES (1, 1), (1, 2);",
+          "-- Mansoor is Employee, L2 Approver, and Admin",
+          "INSERT INTO employee_roles (employee_id, role_id) VALUES (4, 1), (4, 3), (4, 6);"
+        ]
+      },
+
+      "employee_statuses": {
+        "purpose": "Status values for employees (Active, Inactive, On Leave, etc.)",
+        "columns": [
+          "status_id SERIAL PRIMARY KEY",
+          "status_code VARCHAR(50) UNIQUE NOT NULL",
+          "status_name VARCHAR(100) UNIQUE NOT NULL",
+          "is_active_status BOOLEAN DEFAULT false -- True if employee is working",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'ACTIVE', 'Active', true)",
+          "(2, 'INACTIVE', 'Inactive', false)",
+          "(3, 'ON_LEAVE', 'On Leave', true)",
+          "(4, 'TERMINATED', 'Terminated', false)",
+          "(5, 'RESIGNED', 'Resigned', false)"
+        ]
+      }
+    },
+
+    "approval_workflow_tables": {
+      "approval_routing": {
+        "purpose": "Define who approves what based on designation and state - REPLACES EMAIL-BASED ROUTING",
+        "columns": [
+          "routing_id SERIAL PRIMARY KEY",
+          "submitter_designation_id INTEGER NOT NULL FK designations(designation_id)",
+          "submitter_state_id INTEGER FK states(state_id) -- NULL means applies to all states",
+          "approval_level INTEGER NOT NULL -- 1, 2, 3, 4",
+          "approver_role_id INTEGER NOT NULL FK roles(role_id)",
+          "approver_designation_id INTEGER FK designations(designation_id) -- Optional filter",
+          "approver_state_id INTEGER FK states(state_id) -- Optional filter for state-based routing",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "example_data": [
+          "-- SRO in Telangana → L1 approver must be SBH from Telangana",
+          "(1, 1, 2, 1, 2, 4, 2, true) -- submitter_designation=SRO, submitter_state=Telangana, level=1, approver_role=APPROVER_L1, approver_designation=SBH, approver_state=Telangana",
+          "-- SRO in any state → L2 approver is PM (Mansoor)",
+          "(2, 1, NULL, 2, 3, 6, NULL, true) -- submitter_designation=SRO, submitter_state=ANY, level=2, approver_role=APPROVER_L2, approver_designation=PM",
+          "-- SBH in any state → L2 approver is PM (Mansoor) - NO L1 needed",
+          "(3, 4, NULL, 2, 3, 6, NULL, true)"
+        ],
+        "critical_rules": [
+          "When claim submitted, query this table to determine required approvers by employee_id",
+          "NEVER hardcode approver emails",
+          "State-based routing uses state_id FK not state name text",
+          "Adding new approval rules requires ONLY new rows in this table"
+        ]
+      },
+
+      "claim_statuses": {
+        "purpose": "Master table for all possible claim statuses - IMPLEMENTS NEW L1/L2/L3/L4 WORKFLOW",
+        "columns": [
+          "status_id SERIAL PRIMARY KEY",
+          "status_code VARCHAR(50) UNIQUE NOT NULL -- 'L1_PENDING', 'L1_APPROVED', etc.",
+          "status_name VARCHAR(100) UNIQUE NOT NULL -- 'L1 - Pending Review'",
+          "status_description TEXT",
+          "approval_level INTEGER -- 1, 2, 3, 4, or NULL for non-approval statuses",
+          "is_approval BOOLEAN DEFAULT false -- True for L1_APPROVED, L2_APPROVED, etc.",
+          "is_rejection BOOLEAN DEFAULT false -- True for L1_REJECTED, L2_REJECTED, etc.",
+          "is_terminal BOOLEAN DEFAULT false -- True for final statuses (issued, rejected)",
+          "is_payment_issued BOOLEAN DEFAULT false -- True only for L4_ISSUED",
+          "requires_comment BOOLEAN DEFAULT false -- True for rejections and returns",
+          "display_color VARCHAR(20) -- For UI: 'green', 'red', 'yellow', 'blue'",
+          "display_order INTEGER -- For sorting in dropdowns/filters",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'DRAFT', 'Draft', 'Employee is creating/editing the claim', NULL, false, false, false, false, false, 'gray', 1, true)",
+          "(2, 'SUBMITTED', 'Submitted', 'Claim submitted, awaiting review', NULL, false, false, false, false, false, 'blue', 2, true)",
+          "(3, 'L1_PENDING', 'L1 - Pending Review', 'Awaiting State Business Head approval', 1, false, false, false, false, false, 'yellow', 3, true)",
+          "(5, 'L1_APPROVED', 'L1 - Approved', 'Approved by State Business Head', 1, true, false, false, false, false, 'green', 4, true)",
+          "(6, 'L1_REJECTED', 'L1 - Rejected', 'Rejected by State Business Head', 1, false, true, true, false, true, 'red', 5, true)",
+          "(7, 'L2_PENDING', 'L2 - Pending Review', 'Awaiting Program Manager approval', 2, false, false, false, false, false, 'yellow', 6, true)",
+          "(8, 'L2_APPROVED', 'L2 - Approved', 'Approved by Program Manager', 2, true, false, false, false, false, 'green', 7, true)",
+          "(9, 'L2_REJECTED', 'L2 - Rejected', 'Rejected by Program Manager', 2, false, true, true, false, true, 'red', 8, true)",
+          "(10, 'L3_PENDING_FINANCE_REVIEW', 'L3 - Finance Review', 'Awaiting Finance team review', 3, false, false, false, false, false, 'yellow', 9, true)",
+          "(11, 'L3_APPROVED_FINANCE', 'L3 - Finance Approved', 'Approved by Finance team', 3, true, false, false, false, false, 'green', 10, true)",
+          "(12, 'L3_REJECTED_FINANCE', 'L3 - Finance Rejected', 'Rejected by Finance team', 3, false, true, true, false, true, 'red', 11, true)",
+          "(13, 'L4_PENDING_PAYMENT_PROCESSING', 'L4 - Payment Processing', 'Finance processing payment', 4, false, false, false, false, false, 'yellow', 12, true)",
+          "(14, 'L4_ISSUED', 'L4 - Payment Issued', 'Payment issued to employee', 4, true, false, true, true, false, 'green', 13, true)",
+          "(15, 'L4_PAYMENT_FAILED', 'L4 - Payment Failed', 'Payment processing failed', 4, false, false, false, false, true, 'red', 14, true)",
+          "(21, 'RETURNED_FOR_MODIFICATION', 'Returned for Modification', 'Returned to employee for corrections', NULL, false, false, false, false, true, 'orange', 15, true)"
+        ],
+        "critical_rules": [
+          "Frontend NEVER hardcodes status dropdown - fetches from this table",
+          "Backend NEVER checks status === 'L1 Approved' - checks status_id === 5",
+          "Business can rename statuses by updating status_name - NO code changes",
+          "Adding new approval levels requires new rows - NO code changes"
+        ]
+      },
+
+      "claim_status_transitions": {
+        "purpose": "Define allowed status transitions and who can trigger them",
+        "columns": [
+          "transition_id SERIAL PRIMARY KEY",
+          "from_status_id INTEGER NOT NULL FK claim_statuses(status_id)",
+          "to_status_id INTEGER NOT NULL FK claim_statuses(status_id)",
+          "requires_role_id INTEGER FK roles(role_id) -- NULL means employee can do it",
+          "requires_comment BOOLEAN DEFAULT false",
+          "is_auto_transition BOOLEAN DEFAULT false -- True for auto-progression (L1_APPROVED → L2_PENDING)",
+          "validation_rules JSONB -- Custom rules for this transition",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "UNIQUE(from_status_id, to_status_id, requires_role_id)"
+        ],
+        "example_data": [
+          "-- Employee can submit draft",
+          "(1, 1, 2, 1, false, false, NULL, true) -- DRAFT → SUBMITTED (role: EMPLOYEE)",
+          "-- L1 Approver can approve or reject",
+          "(2, 3, 5, 2, false, false, NULL, true) -- L1_PENDING → L1_APPROVED (role: APPROVER_L1)",
+          "(3, 3, 6, 2, true, false, NULL, true) -- L1_PENDING → L1_REJECTED (role: APPROVER_L1, requires comment)",
+          "-- Auto-transition after L1 approval",
+          "(4, 5, 7, NULL, false, true, NULL, true) -- L1_APPROVED → L2_PENDING (auto)",
+          "-- Any approver can return for modification",
+          "(5, 3, 21, 2, true, false, NULL, true) -- L1_PENDING → RETURNED (role: APPROVER_L1, requires comment)",
+          "(6, 7, 21, 3, true, false, NULL, true) -- L2_PENDING → RETURNED (role: APPROVER_L2, requires comment)"
+        ],
+        "critical_rules": [
+          "Status transition validation uses this table - NO hardcoded if/else chains",
+          "UI enables/disables buttons based on this table",
+          "Adding new transitions requires ONLY new rows - NO code changes"
+        ]
+      },
+
+      "claim_approvals": {
+        "purpose": "Track approval history for each claim - WHO approved WHAT and WHEN",
+        "columns": [
+          "approval_id SERIAL PRIMARY KEY",
+          "claim_id INTEGER NOT NULL FK claims(claim_id) ON DELETE CASCADE",
+          "approval_level INTEGER NOT NULL -- 1, 2, 3, 4",
+          "approver_employee_id INTEGER NOT NULL FK employees(employee_id) -- ID not email!",
+          "approver_role_id INTEGER NOT NULL FK roles(role_id)",
+          "old_status_id INTEGER NOT NULL FK claim_statuses(status_id)",
+          "new_status_id INTEGER NOT NULL FK claim_statuses(status_id)",
+          "action_type VARCHAR(20) NOT NULL -- 'APPROVED', 'REJECTED', 'RETURNED'",
+          "comments TEXT",
+          "approved_at TIMESTAMPTZ DEFAULT NOW()",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "indexes": [
+          "CREATE INDEX idx_claim_approvals_claim ON claim_approvals(claim_id)",
+          "CREATE INDEX idx_claim_approvals_approver ON claim_approvals(approver_employee_id)",
+          "CREATE INDEX idx_claim_approvals_level ON claim_approvals(approval_level)"
+        ],
+        "critical_rules": [
+          "Uses approver_employee_id FK not email",
+          "Even if approver leaves company, historical records remain intact",
+          "Can query 'all claims approved by employee X' using employee_id",
+          "Audit trail is complete and traceable"
+        ]
+      },
+
+      "designation_approval_flow": {
+        "purpose": "Map which designations require which approval levels",
+        "columns": [
+          "flow_id SERIAL PRIMARY KEY",
+          "designation_id INTEGER NOT NULL FK designations(designation_id)",
+          "required_approval_levels INTEGER[] NOT NULL -- e.g., [1, 2, 3, 4] or [2, 3, 4]",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "UNIQUE(designation_id)"
+        ],
+        "seed_data": [
+          "-- SRO, BOA, ABH need all 4 levels",
+          "INSERT INTO designation_approval_flow (designation_id, required_approval_levels) VALUES (1, ARRAY[1,2,3,4]), (2, ARRAY[1,2,3,4]), (3, ARRAY[1,2,3,4]);",
+          "-- SBH, ZBH, PM skip L1",
+          "INSERT INTO designation_approval_flow (designation_id, required_approval_levels) VALUES (4, ARRAY[2,3,4]), (5, ARRAY[2,3,4]), (6, ARRAY[2,3,4]);"
+        ],
+        "critical_rules": [
+          "When claim submitted, determine status progression from this table",
+          "Changing approval requirements requires ONLY updating this table",
+          "Backend computes next required status dynamically"
+        ]
+      }
+    },
+
+    "claim_configuration_tables": {
+      "work_locations": {
+        "purpose": "Master table for work location types - REPLACES PostgreSQL ENUM",
+        "columns": [
+          "location_id SERIAL PRIMARY KEY",
+          "location_code VARCHAR(50) UNIQUE NOT NULL -- 'OFFICE_WFH', 'FIELD_BASE', etc.",
+          "location_name VARCHAR(100) UNIQUE NOT NULL -- 'Office / WFH'",
+          "requires_vehicle_selection BOOLEAN DEFAULT false",
+          "requires_outstation_details BOOLEAN DEFAULT false",
+          "display_order INTEGER",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'OFFICE_WFH', 'Office / WFH', false, false, 1, true)",
+          "(2, 'FIELD_BASE', 'Field – Base Location', true, false, 2, true)",
+          "(3, 'FIELD_OUTSTATION', 'Field – Outstation', false, true, 3, true)",
+          "(4, 'LEAVE', 'Leave', false, false, 4, true)",
+          "(5, 'WEEK_OFF', 'Week-off', false, false, 5, true)"
+        ],
+        "critical_rules": [
+          "Claims table uses location_id FK not text enum",
+          "Form logic reads requires_* flags from this table",
+          "Adding new work locations requires ONLY new rows - NO code changes"
+        ]
+      },
+
+      "vehicle_types": {
+        "purpose": "Master table for vehicle types - REPLACES PostgreSQL ENUM",
+        "columns": [
+          "vehicle_type_id SERIAL PRIMARY KEY",
+          "vehicle_code VARCHAR(50) UNIQUE NOT NULL -- 'TWO_WHEELER', 'FOUR_WHEELER'",
+          "vehicle_name VARCHAR(100) UNIQUE NOT NULL -- 'Two Wheeler'",
+          "base_fuel_rate_per_day DECIMAL(10,2)",
+          "intercity_rate_per_km DECIMAL(10,2)",
+          "max_km_round_trip INTEGER",
+          "display_order INTEGER",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'TWO_WHEELER', 'Two Wheeler', 180.00, 5.00, 150, 1, true)",
+          "(2, 'FOUR_WHEELER', 'Four Wheeler', 300.00, 8.00, 300, 2, true)"
+        ]
+      },
+
+      "designation_vehicle_permissions": {
+        "purpose": "Define which designations can use which vehicles - REPLACES HARDCODED ARRAYS",
+        "columns": [
+          "permission_id SERIAL PRIMARY KEY",
+          "designation_id INTEGER NOT NULL FK designations(designation_id)",
+          "vehicle_type_id INTEGER NOT NULL FK vehicle_types(vehicle_type_id)",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "UNIQUE(designation_id, vehicle_type_id)"
+        ],
+        "seed_data": [
+          "-- SRO can only use two wheeler",
+          "INSERT INTO designation_vehicle_permissions (designation_id, vehicle_type_id) VALUES (1, 1);",
+          "-- SBH can use both",
+          "INSERT INTO designation_vehicle_permissions (designation_id, vehicle_type_id) VALUES (4, 1), (4, 2);",
+          "-- PM can use both",
+          "INSERT INTO designation_vehicle_permissions (designation_id, vehicle_type_id) VALUES (6, 1), (6, 2);"
+        ],
+        "critical_rules": [
+          "Vehicle dropdown filtered by designation_id using this table",
+          "Backend validation checks this table - NO hardcoded designation checks",
+          "Changing vehicle permissions requires ONLY updating this table"
+        ]
+      },
+
+      "expense_rates": {
+        "purpose": "Configurable expense rates - REPLACES MAGIC NUMBERS",
+        "columns": [
+          "rate_id SERIAL PRIMARY KEY",
+          "designation_id INTEGER FK designations(designation_id) -- NULL means applies to all",
+          "location_id INTEGER FK work_locations(location_id)",
+          "expense_type VARCHAR(50) NOT NULL -- 'FOOD_BASE', 'FOOD_OUTSTATION', 'ACCOMMODATION', etc.",
+          "rate_amount DECIMAL(10,2) NOT NULL",
+          "effective_from DATE DEFAULT CURRENT_DATE",
+          "effective_to DATE -- NULL means currently active",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "-- Food base location (all designations)",
+          "(1, NULL, 2, 'FOOD_BASE', 120.00, CURRENT_DATE, NULL, true)",
+          "-- Food outstation (all designations)",
+          "(2, NULL, 3, 'FOOD_OUTSTATION', 350.00, CURRENT_DATE, NULL, true)",
+          "-- Accommodation SRO/BOA/ABH",
+          "(3, 1, 3, 'ACCOMMODATION', 1000.00, CURRENT_DATE, NULL, true)",
+          "(4, 2, 3, 'ACCOMMODATION', 1000.00, CURRENT_DATE, NULL, true)",
+          "(5, 3, 3, 'ACCOMMODATION', 1000.00, CURRENT_DATE, NULL, true)",
+          "-- Accommodation SBH/ZBH/PM",
+          "(6, 4, 3, 'ACCOMMODATION', 2000.00, CURRENT_DATE, NULL, true)",
+          "(7, 5, 3, 'ACCOMMODATION', 2000.00, CURRENT_DATE, NULL, true)",
+          "(8, 6, 3, 'ACCOMMODATION', 2000.00, CURRENT_DATE, NULL, true)"
+        ],
+        "critical_rules": [
+          "ALL calculations read from this table - NO magic numbers like 120, 350, 1000",
+          "Rate changes tracked via effective_from/effective_to for historical accuracy",
+          "Can query historical rates for audit purposes"
+        ]
+      },
+
+      "transport_types": {
+        "purpose": "Master table for transport types (Taxi, Bus, Train, etc.)",
+        "columns": [
+          "transport_type_id SERIAL PRIMARY KEY",
+          "transport_code VARCHAR(50) UNIQUE NOT NULL",
+          "transport_name VARCHAR(100) UNIQUE NOT NULL",
+          "display_order INTEGER",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'TAXI', 'Taxi', 1, true)",
+          "(2, 'AUTO', 'Auto Rickshaw', 2, true)",
+          "(3, 'BUS', 'Bus', 3, true)",
+          "(4, 'TRAIN', 'Train', 4, true)",
+          "(5, 'FLIGHT', 'Flight', 5, true)",
+          "(6, 'RENTAL_CAR', 'Rental Car', 6, true)"
+        ]
+      },
+
+      "validation_rules": {
+        "purpose": "Dynamic validation rules - REPLACES HARDCODED CONSTANTS",
+        "columns": [
+          "rule_id SERIAL PRIMARY KEY",
+          "rule_code VARCHAR(100) UNIQUE NOT NULL -- 'MAX_CLAIM_DAYS', 'MIN_TAXI_AMOUNT', etc.",
+          "rule_name VARCHAR(255) NOT NULL",
+          "rule_value JSONB NOT NULL -- Flexible: can be number, string, object, array",
+          "rule_description TEXT",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'MAX_CLAIM_DAYS', 'Maximum days in single claim submission', '{\"value\": 7}', 'Maximum date range for claim submission', true)",
+          "(2, 'FUTURE_DATES_ALLOWED', 'Allow future date claims', '{\"value\": false}', 'Whether employees can submit claims for future dates', true)",
+          "(3, 'FUEL_TAXI_MUTUAL_EXCLUSION', 'Fuel and taxi mutually exclusive', '{\"value\": true}', 'Cannot claim both fuel and taxi for same day', true)",
+          "(4, 'MAX_PRINCIPAL_FOOD_TIMES_PER_MONTH', 'Max food with principals per month', '{\"value\": 5, \"applicable_designations\": [3,4,5,6]}', 'Maximum times per month ABH/SBH/ZBH/PM can claim food with principals', true)"
+        ],
+        "critical_rules": [
+          "Backend validation reads rules from this table - NO hardcoded 7 days, etc.",
+          "Changing business rules requires ONLY updating rule_value - NO code deploy",
+          "JSONB allows flexible rule structures for complex validations"
+        ]
+      }
+    },
+
+    "refactored_claims_table": {
+      "claims": {
+        "purpose": "Core claims table - FULLY ID-BASED, NO TEXT REFERENCES",
+        "columns": [
+          "claim_id SERIAL PRIMARY KEY",
+          "employee_id INTEGER NOT NULL FK employees(employee_id) -- ID not email!",
+          "designation_id INTEGER NOT NULL FK designations(designation_id) -- Snapshot of designation at claim time",
+          "claim_date DATE NOT NULL -- Single day this claim represents",
+          "work_location_id INTEGER NOT NULL FK work_locations(location_id) -- ID not enum!",
+          "vehicle_type_id INTEGER FK vehicle_types(vehicle_type_id) -- NULL if not applicable",
+          "outstation_city_id INTEGER FK cities(city_id) -- NULL if not outstation",
+          "from_city_id INTEGER FK cities(city_id) -- For intercity travel",
+          "to_city_id INTEGER FK cities(city_id) -- For intercity travel",
+          "km_travelled DECIMAL(10,2)",
+          "own_vehicle_used BOOLEAN",
+          "total_amount DECIMAL(10,2) NOT NULL",
+          "food_amount DECIMAL(10,2) DEFAULT 0",
+          "fuel_amount DECIMAL(10,2) DEFAULT 0",
+          "accommodation_amount DECIMAL(10,2) DEFAULT 0",
+          "transport_amount DECIMAL(10,2) DEFAULT 0",
+          "other_amount DECIMAL(10,2) DEFAULT 0",
+          "status_id INTEGER NOT NULL FK claim_statuses(status_id) -- ID not text!",
+          "current_approval_level INTEGER -- 1, 2, 3, 4, or NULL if not in approval",
+          "submitted_at TIMESTAMPTZ",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()",
+          "created_by INTEGER FK employees(employee_id)",
+          "updated_by INTEGER FK employees(employee_id)"
+        ],
+        "indexes": [
+          "CREATE INDEX idx_claims_employee ON claims(employee_id)",
+          "CREATE INDEX idx_claims_status ON claims(status_id)",
+          "CREATE INDEX idx_claims_date ON claims(claim_date)",
+          "CREATE INDEX idx_claims_designation ON claims(designation_id)",
+          "CREATE INDEX idx_claims_approval_level ON claims(current_approval_level)",
+          "CREATE UNIQUE INDEX idx_claims_unique_employee_date ON claims(employee_id, claim_date) -- One claim per employee per day"
+        ],
+        "critical_rules": [
+          "ZERO text-based FKs - everything is integer IDs",
+          "Employee promotion doesn't break claims - designation_id is snapshot",
+          "Status changes use status_id not text matching",
+          "Outstation/city references use city_id not city names"
+        ]
+      },
+
+      "claim_expenses": {
+        "purpose": "Detailed expense line items for each claim",
+        "columns": [
+          "expense_id SERIAL PRIMARY KEY",
+          "claim_id INTEGER NOT NULL FK claims(claim_id) ON DELETE CASCADE",
+          "expense_type VARCHAR(50) NOT NULL -- 'FOOD', 'FUEL', 'TAXI', 'ACCOMMODATION', etc.",
+          "transport_type_id INTEGER FK transport_types(transport_type_id) -- For taxi/transport",
+          "amount DECIMAL(10,2) NOT NULL",
+          "bill_number VARCHAR(100)",
+          "bill_date DATE",
+          "bill_attachment_url TEXT",
+          "description TEXT",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "indexes": [
+          "CREATE INDEX idx_claim_expenses_claim ON claim_expenses(claim_id)",
+          "CREATE INDEX idx_claim_expenses_type ON claim_expenses(expense_type)"
+        ]
+      }
+    },
+
+    "system_configuration_tables": {
+      "allowed_email_domains": {
+        "purpose": "Corporate email domain validation - REPLACES HARDCODED ARRAY",
+        "columns": [
+          "domain_id SERIAL PRIMARY KEY",
+          "domain_name VARCHAR(255) UNIQUE NOT NULL -- 'nxtwave.co.in'",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": ["(1, 'nxtwave.co.in', true)"]
+      },
+
+      "system_settings": {
+        "purpose": "Global system configuration - REPLACES HARDCODED CONSTANTS",
+        "columns": [
+          "setting_id SERIAL PRIMARY KEY",
+          "setting_key VARCHAR(100) UNIQUE NOT NULL",
+          "setting_value JSONB NOT NULL",
+          "setting_description TEXT",
+          "data_type VARCHAR(50) NOT NULL -- 'string', 'number', 'boolean', 'json'",
+          "is_active BOOLEAN DEFAULT true",
+          "created_at TIMESTAMPTZ DEFAULT NOW()",
+          "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        ],
+        "seed_data": [
+          "(1, 'COMPANY_NAME', '{\"value\": \"NxtWave\"}', 'Company name', 'string', true)",
+          "(2, 'CURRENCY_CODE', '{\"value\": \"INR\"}', 'Currency code', 'string', true)",
+          "(3, 'CURRENCY_SYMBOL', '{\"value\": \"₹\"}', 'Currency symbol', 'string', true)",
+          "(4, 'DATE_FORMAT', '{\"value\": \"DD/MM/YYYY\"}', 'Date display format', 'string', true)",
+          "(5, 'FISCAL_YEAR_START_MONTH', '{\"value\": 4}', 'Fiscal year starts in April', 'number', true)"
+        ]
+      }
+    }
+  },
+
+  "migration_execution_plan": {
+    "phase_1_create_master_tables": {
+      "priority": "P0 - Must execute first",
+      "migrations": [
+        {
+          "file": "supabase/migrations/100_create_employee_statuses.sql",
+          "purpose": "Create employee_statuses table before employees table (FK dependency)",
+          "content": [
+            "CREATE TABLE employee_statuses",
+            "INSERT seed data",
+            "CREATE indexes",
+            "Add RLS policies",
+            "GRANT permissions"
+          ]
+        },
+        {
+          "file": "supabase/migrations/101_create_states.sql",
+          "purpose": "Create states master table",
+          "content": "Full table creation + seed data for 11 states"
+        },
+        {
+          "file": "supabase/migrations/102_create_designations.sql",
+          "purpose": "Create designations master table",
+          "content": "Full table creation + seed data for 6 designations"
+        },
+        {
+          "file": "supabase/migrations/103_create_roles.sql",
+          "purpose": "Create system roles table for RBAC",
+          "content": "Full table creation + seed data for 7 roles"
+        },
+        {
+          "file": "supabase/migrations/104_create_employees.sql",
+          "purpose": "Create employees table with ID-based FKs",
+          "content": [
+            "CREATE TABLE with employee_id PK",
+            "FKs to designation_id, state_id, status_id",
+            "Migrate existing employee data from employees.json",
+            "Create indexes including email, code, designation, state",
+            "Add RLS policies",
+            "CRITICAL: Populate employee_id values for existing users"
+          ]
+        },
+        {
+          "file": "supabase/migrations/105_create_employee_roles.sql",
+          "purpose": "Create employee-role junction table",
+          "content": [
+            "CREATE TABLE employee_roles",
+            "Assign roles based on current designation logic",
+            "SBH → EMPLOYEE + APPROVER_L1",
+            "Mansoor/PM → EMPLOYEE + APPROVER_L2 + ADMIN"
+          ]
+        },
+        {
+          "file": "supabase/migrations/106_create_cities.sql",
+          "purpose": "Create cities master table",
+          "content": [
+            "CREATE TABLE cities with state_id FK",
+            "Seed data for major cities in each state",
+            "Create indexes"
+          ]
+        }
+      ]
+    },
+
+    "phase_2_create_workflow_tables": {
+      "priority": "P0 - Required for claims",
+      "migrations": [
+        {
+          "file": "supabase/migrations/107_create_claim_statuses.sql",
+          "purpose": "Create NEW L1/L2/L3/L4 status hierarchy",
+          "content": [
+            "CREATE TABLE claim_statuses",
+            "INSERT 15 new status rows with full metadata",
+            "Create indexes on approval_level, display_order",
+            "Add RLS policies"
+          ]
+        },
+        {
+          "file": "supabase/migrations/108_create_claim_status_transitions.sql",
+          "purpose": "Define allowed status transitions",
+          "content": [
+            "CREATE TABLE claim_status_transitions",
+            "INSERT transition rules for all status pairs",
+            "Define role requirements for each transition",
+            "Mark auto-transitions (L1_APPROVED → L2_PENDING)"
+          ]
+        },
+        {
+          "file": "supabase/migrations/109_create_approval_routing.sql",
+          "purpose": "ID-based approval routing - REPLACES EMAIL ROUTING",
+          "content": [
+            "CREATE TABLE approval_routing",
+            "Migrate state_mapping.json to ID-based routing rules",
+            "Define L1/L2/L3/L4 approvers by designation and state",
+            "Create indexes"
+          ]
+        },
+        {
+          "file": "supabase/migrations/110_create_designation_approval_flow.sql",
+          "purpose": "Map designations to required approval levels",
+          "content": [
+            "CREATE TABLE designation_approval_flow",
+            "SRO/BOA/ABH → [1,2,3,4]",
+            "SBH/ZBH/PM → [2,3,4]"
+          ]
+        },
+        {
+          "file": "supabase/migrations/111_create_claim_approvals.sql",
+          "purpose": "Approval history tracking with employee_id",
+          "content": [
+            "CREATE TABLE claim_approvals",
+            "Uses approver_employee_id FK not email",
+            "Tracks old_status_id → new_status_id transitions",
+            "Create indexes"
+          ]
+        }
+      ]
+    },
+
+    "phase_3_create_configuration_tables": {
+      "priority": "P0 - Required for claims",
+      "migrations": [
+        {
+          "file": "supabase/migrations/112_create_work_locations.sql",
+          "purpose": "Replace PostgreSQL work_location enum with table",
+          "content": [
+            "CREATE TABLE work_locations",
+            "INSERT 5 location types with metadata",
+            "Create indexes"
+          ]
+        },
+        {
+          "file": "supabase/migrations/113_create_vehicle_types.sql",
+          "purpose": "Replace PostgreSQL vehicle_type enum with table",
+          "content": [
+            "CREATE TABLE vehicle_types",
+            "INSERT 2 vehicle types with rates and limits",
+            "Create indexes"
+          ]
+        },
+        {
+          "file": "supabase/migrations/114_create_designation_vehicle_permissions.sql",
+          "purpose": "Define which designations can use which vehicles",
+          "content": [
+            "CREATE TABLE designation_vehicle_permissions",
+            "INSERT permission rows based on expense_rules.json",
+            "SRO → only two_wheeler",
+            "SBH/ZBH/PM → both vehicles"
+          ]
+        },
+        {
+          "file": "supabase/migrations/115_create_transport_types.sql",
+          "purpose": "Master table for transport types",
+          "content": [
+            "CREATE TABLE transport_types",
+            "INSERT taxi, bus, train, flight, etc."
+          ]
+        },
+        {
+          "file": "supabase/migrations/116_create_expense_rates.sql",
+          "purpose": "Configurable expense rates - REPLACES MAGIC NUMBERS",
+          "content": [
+            "CREATE TABLE expense_rates",
+            "INSERT all rates from expense_rules.json",
+            "Food base: 120, Food outstation: 350",
+            "Accommodation: 1000 or 2000 by designation",
+            "Track effective_from/effective_to for history"
+          ]
+        },
+        {
+          "file": "supabase/migrations/117_create_validation_rules.sql",
+          "purpose": "Dynamic validation rules",
+          "content": [
+            "CREATE TABLE validation_rules",
+            "INSERT rules for max days, future dates, mutual exclusions",
+            "JSONB values for flexible rule structures"
+          ]
+        },
+        {
+          "file": "supabase/migrations/118_create_system_settings.sql",
+          "purpose": "Global system configuration",
+          "content": [
+            "CREATE TABLE system_settings",
+            "INSERT currency, date format, company name, etc."
+          ]
+        },
+        {
+          "file": "supabase/migrations/119_create_allowed_email_domains.sql",
+          "purpose": "Email domain validation",
+          "content": [
+            "CREATE TABLE allowed_email_domains",
+            "INSERT nxtwave.co.in"
+          ]
+        }
+      ]
+    },
+
+    "phase_4_migrate_claims_table": {
+      "priority": "P1 - HIGH RISK - Affects existing data",
+      "critical_warnings": [
+        "This migration modifies the core claims table",
+        "Requires downtime or staged migration",
+        "Must preserve all existing claim data",
+        "Extensive testing required before production"
+      ],
+      "migrations": [
+        {
+          "file": "supabase/migrations/120_backup_existing_claims.sql",
+          "purpose": "Safety: Create backup of existing claims table",
+          "content": [
+            "CREATE TABLE claims_backup_pre_id_migration AS SELECT * FROM claims;",
+            "Verify row count matches",
+            "Create restore procedure"
+          ]
+        },
+        {
+          "file": "supabase/migrations/121_add_id_columns_to_claims.sql",
+          "purpose": "Add new ID-based columns to claims table",
+          "content": [
+            "ALTER TABLE claims ADD COLUMN designation_id INTEGER;",
+            "ALTER TABLE claims ADD COLUMN work_location_id INTEGER;",
+            "ALTER TABLE claims ADD COLUMN vehicle_type_id INTEGER;",
+            "ALTER TABLE claims ADD COLUMN outstation_city_id INTEGER;",
+            "ALTER TABLE claims ADD COLUMN from_city_id INTEGER;",
+            "ALTER TABLE claims ADD COLUMN to_city_id INTEGER;",
+            "ALTER TABLE claims ADD COLUMN status_id INTEGER;",
+            "DO NOT add FK constraints yet - data migration first"
+          ]
+        },
+        {
+          "file": "supabase/migrations/122_migrate_claim_data_to_ids.sql",
+          "purpose": "Populate new ID columns from existing text values",
+          "content": [
+            "-- Migrate designation text to designation_id",
+            "UPDATE claims c SET designation_id = d.designation_id FROM designations d WHERE c.designation = d.designation_name;",
+            "-- Migrate work_location enum to work_location_id",
+            "UPDATE claims c SET work_location_id = wl.location_id FROM work_locations wl WHERE c.work_location::text = wl.location_code;",
+            "-- Migrate vehicle_type enum to vehicle_type_id",
+            "UPDATE claims c SET vehicle_type_id = vt.vehicle_type_id FROM vehicle_types vt WHERE c.vehicle_type::text = vt.vehicle_code;",
+            "-- Migrate status text to status_id",
+            "UPDATE claims c SET status_id = cs.status_id FROM claim_statuses cs WHERE c.status = cs.status_code;",
+            "-- Migrate city names to city_ids (requires city name matching)",
+            "UPDATE claims c SET outstation_city_id = ct.city_id FROM cities ct WHERE c.outstation_location = ct.city_name;",
+            "-- Verify all migrations successful",
+            "SELECT COUNT(*) FROM claims WHERE status_id IS NULL; -- Should be 0"
+          ]
+        },
+        {
+          "file": "supabase/migrations/123_add_fk_constraints_to_claims.sql",
+          "purpose": "Add FK constraints after data migration",
+          "content": [
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_designation FOREIGN KEY (designation_id) REFERENCES designations(designation_id);",
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_work_location FOREIGN KEY (work_location_id) REFERENCES work_locations(location_id);",
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_vehicle_type FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(vehicle_type_id);",
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_status FOREIGN KEY (status_id) REFERENCES claim_statuses(status_id);",
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_outstation_city FOREIGN KEY (outstation_city_id) REFERENCES cities(city_id);",
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_from_city FOREIGN KEY (from_city_id) REFERENCES cities(city_id);",
+            "ALTER TABLE claims ADD CONSTRAINT fk_claims_to_city FOREIGN KEY (to_city_id) REFERENCES cities(city_id);",
+            "Create indexes on new FK columns"
+          ]
+        },
+        {
+          "file": "supabase/migrations/124_drop_old_text_columns.sql",
+          "purpose": "Remove old text-based columns after verification",
+          "critical_warning": "ONLY execute after extensive testing of ID-based system",
+          "content": [
+            "-- Verify ID-based system working for 2+ weeks",
+            "-- Then execute:",
+            "ALTER TABLE claims DROP COLUMN designation;",
+            "ALTER TABLE claims DROP COLUMN work_location;",
+            "ALTER TABLE claims DROP COLUMN vehicle_type;",
+            "ALTER TABLE claims DROP COLUMN status;",
+            "ALTER TABLE claims DROP COLUMN outstation_location; -- text city name",
+            "-- Keep text columns in backup table for safety"
+          ]
+        },
+        {
+          "file": "supabase/migrations/125_create_claim_expenses.sql",
+          "purpose": "Create detailed expense line items table",
+          "content": [
+            "CREATE TABLE claim_expenses",
+            "Migrate existing taxi_bills to claim_expenses",
+            "One row per taxi bill, fuel entry, accommodation, etc."
+          ]
+        }
+      ]
+    }
+  },
+
+  "backend_refactoring_requirements": {
+    "eliminate_all_text_based_logic": {
+      "current_problems": [
+        "if (designation === 'State Business Head') - WRONG",
+        "if (user.email === approver_email) - WRONG",
+        "if (status === 'Pending Approval') - WRONG",
+        "const FOUR_WHEELER_ALLOWED = ['SBH', 'ZBH', 'PM'] - WRONG"
+      ],
+      "correct_approach": [
+        "if (designation_id === 4) - CORRECT but still not ideal",
+        "BEST: Query designation_vehicle_permissions table",
+        "BEST: Query approval_routing table with employee_id",
+        "BEST: Query claim_status_transitions table"
+      ]
+    },
+
+    "required_api_endpoints": {
+      "config_apis": [
+        "GET /api/config/designations - Fetch all designations",
+        "GET /api/config/states - Fetch all states",
+        "GET /api/config/cities?state_id={id} - Fetch cities for state",
+        "GET /api/config/work-locations - Fetch work location types",
+        "GET /api/config/vehicle-types?designation_id={id} - Fetch allowed vehicles",
+        "GET /api/config/transport-types - Fetch transport types",
+        "GET /api/config/claim-statuses - Fetch all statuses",
+        "GET /api/config/validation-rules - Fetch all validation rules",
+        "GET /api/config/system-settings - Fetch system settings",
+        "GET /api/config/expense-rates?designation_id={id}&location_id={id} - Fetch applicable rates"
+      ],
+      "workflow_apis": [
+        "GET /api/workflow/required-approvers?claim_id={id} - Get approval routing for claim",
+        "GET /api/workflow/allowed-transitions?claim_id={id}&user_id={id} - Get valid next statuses",
+        "POST /api/workflow/transition - Execute status transition with validation",
+        "GET /api/workflow/approval-hierarchy?employee_id={id} - Get employee's approvers"
+      ],
+      "claim_apis": [
+        "POST /api/claims/calculate - Calculate claim total using DB rates",
+        "POST /api/claims/validate - Validate claim against DB rules",
+        "GET /api/claims/my-approvals - Claims waiting for my approval (using employee_id)",
+        "GET /api/claims?status_id={id} - Filter by status_id not status text",
+        "GET /api/claims?approver_id={id} - Claims I approved (using employee_id)"
+      ]
+    },
+
+    "service_layer_refactoring": {
+      "employee_service": {
+        "file": "src/lib/services/employee-service.ts",
+        "responsibilities": [
+          "getEmployeeById(employee_id) - Never use email as lookup",
+          "getEmployeeRoles(employee_id) - Get all roles for employee",
+          "getEmployeeApprovers(employee_id) - Get approval chain using routing table",
+          "canEmployeeUseVehicle(employee_id, vehicle_type_id) - Check permissions",
+          "getEmployeeState(employee_id) - Get state_id FK"
+        ]
+      },
+      "approval_service": {
+        "file": "src/lib/services/approval-service.ts",
+        "responsibilities": [
+          "getRequiredApprovers(claim_id) - Query approval_routing by designation_id + state_id",
+          "canUserApprove(user_employee_id, claim_id) - Check if user has required role",
+          "getAllowedTransitions(claim_id, user_employee_id) - Query claim_status_transitions",
+          "executeTransition(claim_id, to_status_id, user_employee_id, comments) - With validation",
+          "recordApproval(claim_id, approver_employee_id, level, old_status_id, new_status_id)"
+        ]
+      },
+      "calculation_service": {
+        "file": "src/lib/services/calculation-service.ts",
+        "responsibilities": [
+          "calculateClaimTotal(claim_data) - Query expense_rates table, NO magic numbers",
+          "getFoodRate(designation_id, location_id) - Query expense_rates",
+          "getFuelRate(vehicle_type_id) - Query vehicle_types",
+          "getAccommodationLimit(designation_id) - Query expense_rates",
+          "validateKmLimit(vehicle_type_id, km) - Query vehicle_types.max_km_round_trip"
+        ]
+      },
+      "validation_service": {
+        "file": "src/lib/services/validation-service.ts",
+        "responsibilities": [
+          "validateClaim(claim_data) - Query validation_rules table",
+          "checkDateRange(from, to) - Query validation_rules.MAX_CLAIM_DAYS",
+          "checkFuelTaxiExclusion(claim_data) - Query validation_rules.FUEL_TAXI_MUTUAL_EXCLUSION",
+          "checkDuplicateClaim(employee_id, claim_date) - Query claims table",
+          "validateTransition(from_status_id, to_status_id, user_role_id) - Query claim_status_transitions"
+        ]
+      },
+      "config_service": {
+        "file": "src/lib/services/config-service.ts",
+        "responsibilities": [
+          "getAllDesignations() - Cached query",
+          "getAllStates() - Cached query",
+          "getCitiesByState(state_id) - Cached query",
+          "getAllWorkLocations() - Cached query",
+          "getVehicleTypesByDesignation(designation_id) - Query designation_vehicle_permissions",
+          "getAllClaimStatuses() - Cached query",
+          "getSystemSetting(setting_key) - Query system_settings"
+        ],
+        "caching_strategy": [
+          "Use React Server Components cache for config data",
+          "Cache duration: 1 hour for master tables",
+          "Cache invalidation: On config updates via admin panel",
+          "Consider Redis for high-traffic production"
+        ]
+      }
+    },
+
+    "zod_schema_refactoring": {
+      "current_problem": "z.enum(['State Business Head', ...]) with hardcoded values",
+      "solution": "Dynamic schema factories that fetch from DB",
+      "implementation": {
+        "file": "src/lib/validation/dynamic-schemas.ts",
+        "approach": [
+          "export async function getClaimSchema() {",
+          "  const designations = await configService.getAllDesignations();",
+          "  const workLocations = await configService.getAllWorkLocations();",
+          "  const vehicleTypes = await configService.getAllVehicleTypes();",
+          "  return z.object({",
+          "    designation_id: z.number().refine(id => designations.some(d => d.designation_id === id)),",
+          "    work_location_id: z.number().refine(id => workLocations.some(w => w.location_id === id)),",
+          "    vehicle_type_id: z.number().optional().refine(id => !id || vehicleTypes.some(v => v.vehicle_type_id === id)),",
+          "    ...",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  },
+
+  "frontend_refactoring_requirements": {
+    "eliminate_all_hardcoded_data": {
+      "dropdown_components": {
+        "generic_dropdown": {
+          "file": "src/components/ui/dynamic-select.tsx",
+          "usage": [
+            "<DynamicSelect",
+            "  endpoint='/api/config/designations'",
+            "  valueKey='designation_id'",
+            "  labelKey='designation_name'",
+            "  placeholder='Select designation'",
+            "/>"
+          ],
+          "features": [
+            "Fetches options from API",
+            "Caches results",
+            "Loading states",
+            "Error handling",
+            "No hardcoded options"
+          ]
+        },
+        "dependent_dropdown": {
+          "usage": [
+            "-- Cities dropdown filtered by selected state_id",
+            "<DynamicSelect",
+            "  endpoint='/api/config/cities'",
+            "  queryParams={{ state_id: selectedStateId }}",
+            "  valueKey='city_id'",
+            "  labelKey='city_name'",
+            "/>"
+          ]
+        }
+      },
+
+      "status_display": {
+        "current_problem": "Hardcoded status badges with text matching",
+        "solution": {
+          "component": "src/components/claims/status-badge.tsx",
+          "props": "status_id (integer), statusData (fetched from API)",
+          "logic": [
+            "Fetch claim_statuses once on page load",
+            "Map status_id to status object",
+            "Display status_name with display_color from DB",
+            "NO hardcoded status text or colors"
+          ]
+        }
+      },
+
+      "form_validation": {
+        "current_problem": "Frontend duplicates backend validation with hardcoded rules",
+        "solution": {
+          "approach": "Frontend provides UX hints, backend enforces rules",
+          "implementation": [
+            "Fetch validation_rules from API on form load",
+            "Show hints like 'Maximum 7 days' using fetched rules",
+            "On submit, backend validates using DB rules",
+            "Display backend validation errors to user",
+            "NO hardcoded validation logic in frontend"
+          ]
+        }
+      },
+
+      "permission_checks": {
+        "current_problem": "if (user.role === 'admin') in frontend components",
+        "solution": {
+          "approach": "Backend provides user permissions via API",
+          "implementation": [
+            "GET /api/auth/me returns { employee_id, roles: [role_id, ...], permissions: [...] }",
+            "Frontend checks permissions array, not role names",
+            "Buttons enabled/disabled based on allowed_transitions API",
+            "NO role-based logic in frontend"
+          ]
+        }
+      }
+    },
+
+    "required_refactors": {
+      "claim_form_component": [
+        "Replace all <option> hardcoded values with DynamicSelect",
+        "Work location dropdown fetches from /api/config/work-locations",
+        "Vehicle type dropdown fetches from /api/config/vehicle-types?designation_id={id}",
+        "City dropdowns fetch from /api/config/cities?state_id={id}",
+        "Status filter fetches from /api/config/claim-statuses",
+        "Remove all hardcoded validation - call /api/claims/validate on change",
+        "Remove calculation logic - call /api/claims/calculate for preview"
+      ],
+      "approval_dashboard": [
+        "Fetch claims using GET /api/claims/my-approvals (uses employee_id not email)",
+        "Display status using StatusBadge component (status_id based)",
+        "Show allowed actions using /api/workflow/allowed-transitions",
+        "Execute actions via POST /api/workflow/transition",
+        "NO hardcoded status checks or permission logic"
+      ],
+      "admin_panel": [
+        "CRUD for all master tables (designations, states, cities, etc.)",
+        "Update expense_rates with effective_from dates",
+        "Modify validation_rules via UI",
+        "Manage approval_routing rules",
+        "Configure claim_status_transitions",
+        "ALL changes via API - cache invalidation automatic"
+      ]
+    }
+  },
+
+  "testing_requirements": {
+    "unit_tests": [
+      "Employee service functions with employee_id lookups",
+      "Approval service routing logic using IDs",
+      "Calculation service with DB rates",
+      "Validation service with DB rules",
+      "Status transition validation",
+      "Permission checks using role_id"
+    ],
+    "integration_tests": [
+      "Full claim submission flow with ID-based workflow",
+      "Multi-level approval flow (L1 → L2 → L3 → L4)",
+      "Status transitions following claim_status_transitions table",
+      "Employee role changes don't break approvals",
+      "Designation changes snapshot correctly in claims",
+      "Vehicle permission checks work for all designations"
+    ],
+    "migration_tests": [
+      "All existing claims migrated with correct IDs",
+      "No orphaned records after enum migration",
+      "Historical approvals reference valid employee_ids",
+      "Status migrations preserve business logic",
+      "Rollback procedure tested and documented"
+    ],
+    "regression_tests": [
+      "All existing functionality works with ID-based system",
+      "No broken dropdowns or filters",
+      "Calculations produce same results as before",
+      "Approval routing matches previous logic",
+      "No performance degradation"
+    ]
+  },
+
+  "rollout_strategy": {
+    "phase_1_infrastructure": {
+      "duration": "2 weeks",
+      "tasks": [
+        "Execute all database migrations (100-119)",
+        "Create all master tables and seed data",
+        "Migrate employees.json to employees table",
+        "Create API endpoints for config data",
+        "Implement caching strategy",
+        "TESTING: Verify all tables populated correctly"
+      ],
+      "deliverable": "Complete ID-based database schema with API layer"
+    },
+
+    "phase_2_backend_refactoring": {
+      "duration": "2 weeks",
+      "tasks": [
+        "Implement all service layers (employee, approval, calculation, validation, config)",
+        "Create dynamic Zod schema factories",
+        "Replace all text-based lookups with ID lookups",
+        "Implement workflow APIs",
+        "Replace all hardcoded constants with DB queries",
+        "TESTING: 100% unit test coverage for services"
+      ],
+      "deliverable": "Backend fully ID-based with zero hardcoding"
+    },
+
+    "phase_3_claims_migration": {
+      "duration": "1 week",
+      "critical": true,
+      "tasks": [
+        "Execute migrations 120-124 (claims table transformation)",
+        "Extensive testing in staging environment",
+        "Backup verification",
+        "Data migration validation",
+        "TESTING: All existing claims work with new schema"
+      ],
+      "deliverable": "Claims table fully migrated to ID-based FKs",
+      "rollback_plan": "Documented procedure to restore from backup"
+    },
+
+    "phase_4_frontend_refactoring": {
+      "duration": "2 weeks",
+      "tasks": [
+        "Implement DynamicSelect component",
+        "Refactor all claim forms to use API-fetched data",
+        "Replace status displays with StatusBadge",
+        "Remove all frontend validation logic",
+        "Implement permission-based UI rendering",
+        "TESTING: E2E tests for all user flows"
+      ],
+      "deliverable": "Frontend fully dumb, all data from APIs"
+    },
+
+    "phase_5_admin_panel": {
+      "duration": "1 week",
+      "tasks": [
+        "Build admin UI for master table management",
+        "Implement rate configuration UI",
+        "Implement validation rules editor",
+        "Implement approval routing configurator",
+        "TESTING: Admin can modify all config without code changes"
+      ],
+      "deliverable": "Self-service configuration for business team"
+    },
+
+    "phase_6_cleanup": {
+      "duration": "1 week",
+      "tasks": [
+        "Execute migration 124 (drop old text columns) after 2+ weeks of stability",
+        "Remove all commented-out hardcoded logic",
+        "Update documentation",
+        "Performance optimization",
+        "Final regression testing"
+      ],
+      "deliverable": "Clean codebase with zero hardcoding"
+    }
+  },
+
+  "success_criteria": {
+    "database_level": [
+      "✅ All 20+ master tables created with full seed data",
+      "✅ All FKs use integer IDs - ZERO email or text FKs",
+      "✅ Employees table migrated from employees.json",
+      "✅ Claims table uses status_id, designation_id, location_id, vehicle_type_id, city_id FKs",
+      "✅ New L1/L2/L3/L4 status workflow implemented",
+      "✅ Approval routing table replaces email-based routing",
+      "✅ All indexes created for performance"
+    ],
+    "backend_level": [
+      "✅ ZERO grep matches for: designation === 'State Business Head'",
+      "✅ ZERO grep matches for: user.email === approver_email",
+      "✅ ZERO grep matches for: status === 'Pending Approval'",
+      "✅ ZERO const arrays with business data",
+      "✅ ZERO magic numbers in calculations",
+      "✅ All validation reads from validation_rules table",
+      "✅ All calculations read from expense_rates table",
+      "✅ All permissions check via role_id not email",
+      "✅ Dynamic Zod schemas query DB for enums"
+    ],
+    "frontend_level": [
+      "✅ ZERO hardcoded <option> values",
+      "✅ ZERO hardcoded status text",
+      "✅ ZERO hardcoded validation rules",
+      "✅ ZERO calculation logic",
+      "✅ ZERO permission checks without API",
+      "✅ All dropdowns fetch from /api/config/*",
+      "✅ All forms validate via backend APIs"
+    ],
+    "workflow_level": [
+      "✅ Status progression follows designation_approval_flow table",
+      "✅ Approvers determined by approval_routing table using employee_id",
+      "✅ Status transitions validated against claim_status_transitions table",
+      "✅ Approval history uses approver_employee_id not email",
+      "✅ Can query 'claims pending at L2' using status_id and approval_level",
+      "✅ Can query 'claims I approved' using employee_id"
+    ],
+    "scalability_level": [
+      "✅ Employee promotion changes designation_id - all claims still work",
+      "✅ Employee leaving company marked inactive - historical data intact",
+      "✅ Renaming designation updates one row - zero code changes",
+      "✅ Adding new status adds rows to claim_statuses - zero code changes",
+      "✅ Modifying approval flow updates routing table - zero code changes",
+      "✅ Changing expense rates updates expense_rates - zero code changes",
+      "✅ Admin panel allows all config changes without developer"
+    ]
+  },
+
+  "deliverables": {
+    "migration_files": [
+      "supabase/migrations/100-125 (26 migration files)",
+      "Each with complete SQL, seed data, indexes, RLS policies"
+    ],
+    "service_files": [
+      "src/lib/services/employee-service.ts",
+      "src/lib/services/approval-service.ts",
+      "src/lib/services/calculation-service.ts",
+      "src/lib/services/validation-service.ts",
+      "src/lib/services/config-service.ts"
+    ],
+    "api_files": [
+      "src/app/api/config/[resource]/route.ts (10+ endpoints)",
+      "src/app/api/workflow/*/route.ts (4+ endpoints)",
+      "src/app/api/claims/*/route.ts (refactored)"
+    ],
+    "component_files": [
+      "src/components/ui/dynamic-select.tsx",
+      "src/components/claims/status-badge.tsx",
+      "src/components/claims/claim-form.tsx (refactored)",
+      "src/components/admin/* (admin panel components)"
+    ],
+    "documentation": [
+      "docs/architecture/id-based-design.md - System architecture explanation",
+      "docs/migration/migration-guide.md - Step-by-step migration execution",
+      "docs/api/config-endpoints.md - All config API documentation",
+      "docs/admin/configuration-guide.md - How to use admin panel",
+      "docs/testing/test-plan.md - Complete test coverage",
+      "docs/rollback/rollback-procedure.md - How to rollback if needed"
+    ]
+  },
+
+  "mcp_usage_instructions": {
+    "mandatory_mcp_calls": [
+      "Use Filesystem MCP to inspect existing schema before migrations",
+      "Use Supabase MCP to verify table structure after each migration",
+      "Use Supabase MCP to validate data after migration 122 (claims ID migration)",
+      "Use Next.js MCP to locate all files using text-based lookups",
+      "Use Git MCP to commit each migration separately",
+      "Use Playwright MCP to test UI after frontend refactoring",
+      "Use memory MCP to track migration progress and issues"
+    ],
+    "mcp_workflow": [
+      "BEFORE each migration: Supabase MCP inspect current schema",
+      "EXECUTE migration",
+      "AFTER each migration: Supabase MCP verify new schema",
+      "AFTER each migration: Supabase MCP query new tables to verify data",
+      "BEFORE backend refactor: Filesystem MCP locate files to change",
+      "AFTER backend refactor: grep for text-based patterns to verify removed",
+      "BEFORE frontend refactor: Next.js MCP understand component structure",
+      "AFTER frontend refactor: Playwright MCP test UI flows"
+    ]
+  },
+
+  "final_instructions": {
+    "tone": "This is a COMPLETE architectural transformation. Every single text-based reference must be eliminated. Every single hardcoded value must move to database. Zero tolerance for shortcuts.",
+    "approach": "Execute migrations in strict order. Test extensively at each phase. Document everything. Use MCP religiously.",
+    "quality": "Follow copilot-instructions.md: file size limits, TypeScript strict mode, proper error handling, RLS policies, indexes, tests.",
+    "mindset": "Database is source of truth. IDs are keys, not text. Employees change jobs, emails change, roles change - system must handle gracefully. Surface-level config changes should NEVER require code changes.",
+    "output": "Provide COMPLETE migration SQL files, COMPLETE service implementations, COMPLETE API routes, COMPLETE component refactors. No TODOs. No placeholders. Production-ready code.",
+    "testing": "Every migration tested. Every service unit tested. Every API integration tested. Every UI flow E2E tested. Rollback procedure documented and tested.",
+    "no_assumptions": "Use MCP to verify current state before every change. Never assume schema. Never assume data. Never assume code structure."
+  }
+}

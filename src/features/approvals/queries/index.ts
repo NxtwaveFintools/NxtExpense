@@ -1,9 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Claim, ClaimItem } from '@/features/claims/types'
-import { getClaimAvailableActions } from '@/features/claims/queries'
-import { getEmployeeById } from '@/features/employees/queries'
-import type { Employee } from '@/features/employees/types'
+import {
+  getClaimAvailableActions,
+  CLAIM_COLUMNS,
+  mapClaimRow,
+} from '@/features/claims/queries'
+import { getEmployeeById } from '@/lib/services/employee-service'
+import type { EmployeeRow } from '@/lib/services/employee-service'
+import { getDesignationByCode } from '@/lib/services/config-service'
 import type {
   ApprovalAction,
   ApprovalHistoryItem,
@@ -12,9 +17,6 @@ import type {
   PendingApproval,
 } from '@/features/approvals/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
-
-const CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
 
 export async function getPendingApprovalsPaginated(
   supabase: SupabaseClient,
@@ -28,29 +30,52 @@ export async function getPendingApprovalsPaginated(
 ) {
   const lowerEmail = approverEmail.toLowerCase()
 
-  // Only L1 (SBH for SRO/BOA/ABH) and L3 (Mansoor, final for all) are actual
-  // approval stops. L2 is org-hierarchy only and is never a pending-approval stop.
-  const [level1Employees, level3Employees] = await Promise.all([
+  // Resolve actor to employee ID and fetch pending status IDs in parallel
+  const [actorResult, pendingStatusesResult] = await Promise.all([
     supabase
       .from('employees')
       .select('id')
-      .eq('approval_email_level_1', lowerEmail),
+      .eq('employee_email', lowerEmail)
+      .maybeSingle(),
     supabase
-      .from('employees')
+      .from('claim_statuses')
       .select('id')
-      .eq('approval_email_level_3', lowerEmail),
+      .not('approval_level', 'is', null)
+      .eq('is_rejection', false)
+      .eq('is_terminal', false)
+      .eq('is_active', true)
+      .in('approval_level', [1, 2]),
   ])
 
-  if (level1Employees.error) {
-    throw new Error(level1Employees.error.message)
+  if (actorResult.error) throw new Error(actorResult.error.message)
+  if (pendingStatusesResult.error)
+    throw new Error(pendingStatusesResult.error.message)
+
+  if (!actorResult.data) {
+    return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  if (level3Employees.error) {
-    throw new Error(level3Employees.error.message)
-  }
+  const actorEmployeeId = actorResult.data.id
+  const pendingStatusIds = (pendingStatusesResult.data ?? []).map((s) => s.id)
+
+  // L1: actor is the level-1 approver for these employees (SBH for SRO/BOA/ABH)
+  // L2: actor is the level-3 approver (Mansoor's UUID is stored in approval_employee_id_level_3)
+  const [level1Employees, level2Employees] = await Promise.all([
+    supabase
+      .from('employees')
+      .select('id')
+      .eq('approval_employee_id_level_1', actorEmployeeId),
+    supabase
+      .from('employees')
+      .select('id')
+      .eq('approval_employee_id_level_3', actorEmployeeId),
+  ])
+
+  if (level1Employees.error) throw new Error(level1Employees.error.message)
+  if (level2Employees.error) throw new Error(level2Employees.error.message)
 
   const level1Ids = (level1Employees.data ?? []).map((row) => row.id)
-  const level3Ids = (level3Employees.data ?? []).map((row) => row.id)
+  const level2Ids = (level2Employees.data ?? []).map((row) => row.id)
 
   const toInList = (ids: string[]) =>
     ids.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(',')
@@ -63,9 +88,9 @@ export async function getPendingApprovalsPaginated(
     )
   }
 
-  if (level3Ids.length > 0) {
+  if (level2Ids.length > 0) {
     approvalFilters.push(
-      `and(current_approval_level.eq.3,employee_id.in.(${toInList(level3Ids)}))`
+      `and(current_approval_level.eq.2,employee_id.in.(${toInList(level2Ids)}))`
     )
   }
 
@@ -80,8 +105,8 @@ export async function getPendingApprovalsPaginated(
 
   let query = supabase
     .from('expense_claims')
-    .select(`${CLAIM_COLUMNS}, employees!inner(*)`)
-    .eq('status', 'pending_approval')
+    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
+    .in('status_id', pendingStatusIds)
     .or(approvalFilters.join(','))
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
@@ -104,15 +129,21 @@ export async function getPendingApprovalsPaginated(
   }
 
   if (filters.actorFilter === 'sbh') {
-    query = query.eq('employees.designation', 'State Business Head')
+    const sbhDesignation = await getDesignationByCode(supabase, 'SBH')
+    if (sbhDesignation) {
+      query = query.eq('employees.designation_id', sbhDesignation.id)
+    }
   }
 
   if (filters.actorFilter === 'finance') {
-    query = query.eq('employees.designation', 'Finance')
+    const finDesignation = await getDesignationByCode(supabase, 'FIN')
+    if (finDesignation) {
+      query = query.eq('employees.designation_id', finDesignation.id)
+    }
   }
 
   if (filters.actorFilter === 'hod') {
-    query = query.not('employees.approval_email_level_3', 'is', null)
+    query = query.not('employees.approval_employee_id_level_3', 'is', null)
   }
 
   const { data, error } = await query
@@ -122,7 +153,7 @@ export async function getPendingApprovalsPaginated(
   }
 
   const rows = (data ?? []) as Array<
-    Claim & { employees: Employee | Employee[] }
+    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
   >
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
@@ -137,13 +168,15 @@ export async function getPendingApprovalsPaginated(
         throw new Error('Claim owner mapping not found.')
       }
 
+      const claim = mapClaimRow(row as Record<string, unknown>)
+
       const [{ data: itemsData, error: itemsError }, actions] =
         await Promise.all([
           supabase
             .from('expense_claim_items')
             .select('id, claim_id, item_type, description, amount, created_at')
-            .eq('claim_id', row.id),
-          getClaimAvailableActions(supabase, row.id),
+            .eq('claim_id', row.id as string),
+          getClaimAvailableActions(supabase, row.id as string),
         ])
 
       if (itemsError) {
@@ -151,7 +184,7 @@ export async function getPendingApprovalsPaginated(
       }
 
       return {
-        claim: row,
+        claim: claim as Claim,
         owner,
         items: (itemsData ?? []) as ClaimItem[],
         availableActions: actions,
@@ -163,8 +196,8 @@ export async function getPendingApprovalsPaginated(
   const nextCursor =
     hasNextPage && lastRecord
       ? encodeCursor({
-          created_at: lastRecord.created_at,
-          id: lastRecord.id,
+          created_at: lastRecord.created_at as string,
+          id: lastRecord.id as string,
         })
       : null
 
@@ -183,7 +216,7 @@ export async function getClaimApprovalHistory(
   const { data, error } = await supabase
     .from('approval_history')
     .select(
-      'id, claim_id, approver_email, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
+      'id, claim_id, approver_employee_id, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at, approver:employees!approver_employee_id(employee_email)'
     )
     .eq('claim_id', claimId)
     .order('acted_at', { ascending: true })
@@ -192,13 +225,21 @@ export async function getClaimApprovalHistory(
     throw new Error(error.message)
   }
 
-  return (data ?? []) as ApprovalAction[]
+  return (data ?? []).map((r) => {
+    const approverRaw = r.approver as unknown
+    const approver = Array.isArray(approverRaw) ? approverRaw[0] : approverRaw
+    return {
+      ...r,
+      approver_email:
+        (approver as { employee_email: string } | null)?.employee_email ?? '',
+    } as ApprovalAction
+  })
 }
 
 export async function getClaimWithOwner(
   supabase: SupabaseClient,
   claimId: string
-): Promise<{ claim: Claim; owner: Employee } | null> {
+): Promise<{ claim: Claim; owner: EmployeeRow } | null> {
   const { data, error } = await supabase
     .from('expense_claims')
     .select(`${CLAIM_COLUMNS}`)
@@ -218,7 +259,7 @@ export async function getClaimWithOwner(
     throw new Error('Claim owner record not found.')
   }
 
-  return { claim: data as Claim, owner }
+  return { claim: mapClaimRow(data as Record<string, unknown>) as Claim, owner }
 }
 
 export async function getMyApprovalHistoryPaginated(
@@ -229,12 +270,27 @@ export async function getMyApprovalHistoryPaginated(
 ): Promise<PaginatedApprovalHistory> {
   const lowerEmail = approverEmail.toLowerCase()
 
+  // Resolve employee ID from email for ID-based filtering
+  const { data: empData, error: empError } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('employee_email', lowerEmail)
+    .maybeSingle()
+
+  if (empError) {
+    throw new Error(empError.message)
+  }
+
+  if (!empData) {
+    return { data: [], hasNextPage: false, nextCursor: null, limit }
+  }
+
   let query = supabase
     .from('approval_history')
     .select(
-      'id, claim_id, approver_email, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
+      'id, claim_id, approver_employee_id, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at, approver:employees!approver_employee_id(employee_email)'
     )
-    .eq('approver_email', lowerEmail)
+    .eq('approver_employee_id', empData.id)
     .order('acted_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1)
@@ -251,7 +307,15 @@ export async function getMyApprovalHistoryPaginated(
     throw new Error(error.message)
   }
 
-  const historyRows = (data ?? []) as ApprovalAction[]
+  const historyRows = (data ?? []).map((r) => {
+    const approverRaw = (r as Record<string, unknown>).approver as unknown
+    const approver = Array.isArray(approverRaw) ? approverRaw[0] : approverRaw
+    return {
+      ...r,
+      approver_email:
+        (approver as { employee_email: string } | null)?.employee_email ?? '',
+    } as ApprovalAction
+  })
   const hasNextPage = historyRows.length > limit
   const pageData = hasNextPage ? historyRows.slice(0, limit) : historyRows
 
@@ -267,16 +331,16 @@ export async function getMyApprovalHistoryPaginated(
   const claimIds = [...new Set(pageData.map((row) => row.claim_id))]
   const { data: claimData, error: claimError } = await supabase
     .from('expense_claims')
-    .select(`${CLAIM_COLUMNS}, employees!inner(*)`)
+    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
     .in('id', claimIds)
 
   if (claimError) {
     throw new Error(claimError.message)
   }
 
-  const claimMap = new Map<string, { claim: Claim; owner: Employee }>()
+  const claimMap = new Map<string, { claim: Claim; owner: EmployeeRow }>()
   for (const row of (claimData ?? []) as Array<
-    Claim & { employees: Employee | Employee[] }
+    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
   >) {
     const owner = Array.isArray(row.employees)
       ? row.employees[0]
@@ -286,12 +350,11 @@ export async function getMyApprovalHistoryPaginated(
       continue
     }
 
-    const claimFields = { ...row } as Claim & {
-      employees?: Employee | Employee[]
-    }
+    const mapped = mapClaimRow(row)
+    const claimFields = { ...mapped } as Record<string, unknown>
     delete claimFields.employees
 
-    claimMap.set(row.id, {
+    claimMap.set(row.id as string, {
       claim: claimFields as Claim,
       owner,
     })

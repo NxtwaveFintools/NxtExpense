@@ -7,6 +7,11 @@ import {
   isDevelopmentAuthEnabled,
   getLoginErrorMessage,
 } from '@/lib/auth/auth-helpers'
+import {
+  appendAllowedDomainHint,
+  getAllowedCorporateEmailHint,
+} from '@/lib/auth/allowed-email-domains'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 type LoginPageProps = {
@@ -29,7 +34,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const messageCode = Array.isArray(messageValue)
     ? messageValue[0]
     : messageValue
-  const errorMessage = getLoginErrorMessage(errorCode)
+  let errorMessage = getLoginErrorMessage(errorCode)
+  if (errorCode === 'email_domain_not_allowed') {
+    try {
+      const supabase = await createSupabaseServerClient()
+      const hint = await getAllowedCorporateEmailHint(supabase)
+      errorMessage = appendAllowedDomainHint(
+        'Your email domain is not authorized. Please use a corporate email.',
+        hint
+      )
+    } catch {
+      // Keep generic fallback if DB is unavailable
+    }
+  }
   const showPasswordForm = isDevelopmentAuthEnabled()
 
   return (

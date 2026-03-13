@@ -1,12 +1,11 @@
 import { requireCurrentUser } from '@/features/auth/queries'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { canAccessApprovals } from '@/features/employees/permissions'
 import {
   getEmployeeByEmail,
   hasApproverAssignments,
-} from '@/features/employees/queries'
+} from '@/lib/services/employee-service'
 import {
   buildCursorNavigationLinks,
   decodeCursorTrail,
@@ -26,7 +25,6 @@ import {
   getApprovalHistoryAction,
   getPendingApprovalsAction,
 } from '@/features/approvals/actions'
-import { getClaimStatusCatalog } from '@/features/claims/queries'
 import { ApprovalList } from '@/features/approvals/components/approval-list'
 import { ApprovalFiltersBar } from '@/features/approvals/components/approval-filters-bar'
 import { ApprovalHistoryList } from '@/features/approvals/components/approval-history-list'
@@ -39,6 +37,7 @@ type ApprovalsPageProps = {
     historyTrail?: string
     employeeName?: string
     actorFilter?: string
+    claimDate?: string
     claimDateFrom?: string
     claimDateTo?: string
     hodApprovedFrom?: string
@@ -68,13 +67,17 @@ export default async function ApprovalsPage({
   }
 
   const resolvedSearch = await searchParams
+  const legacyClaimDate =
+    resolvedSearch?.claimDateFrom && resolvedSearch?.claimDateTo
+      ? resolvedSearch.claimDateFrom === resolvedSearch.claimDateTo
+        ? resolvedSearch.claimDateFrom
+        : undefined
+      : (resolvedSearch?.claimDateFrom ?? resolvedSearch?.claimDateTo)
+
   const rawFilters = {
     employeeName: resolvedSearch?.employeeName,
-    // No designation-based default: always start from 'all' and let the user
-    // choose. RLS policies enforce data visibility — no URL param needed.
     actorFilter: resolvedSearch?.actorFilter,
-    claimDateFrom: resolvedSearch?.claimDateFrom,
-    claimDateTo: resolvedSearch?.claimDateTo,
+    claimDate: resolvedSearch?.claimDate ?? legacyClaimDate,
     hodApprovedFrom: resolvedSearch?.hodApprovedFrom,
     hodApprovedTo: resolvedSearch?.hodApprovedTo,
     financeApprovedFrom: resolvedSearch?.financeApprovedFrom,
@@ -87,8 +90,7 @@ export default async function ApprovalsPage({
       return {
         employeeName: null,
         actorFilter: 'all' as const,
-        claimDateFrom: null,
-        claimDateTo: null,
+        claimDate: null,
         hodApprovedFrom: null,
         hodApprovedTo: null,
         financeApprovedFrom: null,
@@ -100,8 +102,7 @@ export default async function ApprovalsPage({
   const normalizedFilterParams = {
     employeeName: normalizedFilters.employeeName ?? undefined,
     actorFilter: normalizedFilters.actorFilter,
-    claimDateFrom: normalizedFilters.claimDateFrom ?? undefined,
-    claimDateTo: normalizedFilters.claimDateTo ?? undefined,
+    claimDate: normalizedFilters.claimDate ?? undefined,
     hodApprovedFrom: normalizedFilters.hodApprovedFrom ?? undefined,
     hodApprovedTo: normalizedFilters.hodApprovedTo ?? undefined,
     financeApprovedFrom: normalizedFilters.financeApprovedFrom ?? undefined,
@@ -139,10 +140,9 @@ export default async function ApprovalsPage({
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [approvals, history, statusCatalog] = await Promise.all([
+  const [approvals, history] = await Promise.all([
     getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
     getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
-    getClaimStatusCatalog(supabase),
   ])
 
   const pendingPagination = buildCursorNavigationLinks({
@@ -199,7 +199,6 @@ export default async function ApprovalsPage({
             />
             <ApprovalHistoryList
               history={history}
-              statusCatalog={statusCatalog}
               pagination={historyPagination}
             />
           </div>

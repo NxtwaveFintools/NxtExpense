@@ -184,57 +184,57 @@ describe('financeFiltersSchema', () => {
     }
   })
 
-  it('treats empty hodApproverEmail as no filter', () => {
-    const parsed = financeFiltersSchema.safeParse({ hodApproverEmail: '' })
+  it('treats empty hodApproverEmployeeId as no filter', () => {
+    const parsed = financeFiltersSchema.safeParse({ hodApproverEmployeeId: '' })
     expect(parsed.success).toBe(true)
     if (parsed.success) {
-      expect(parsed.data.hodApproverEmail).toBeUndefined()
+      expect(parsed.data.hodApproverEmployeeId).toBeUndefined()
     }
   })
 
-  it('accepts valid hodApproverEmail', () => {
+  it('accepts valid hodApproverEmployeeId (UUID)', () => {
     const parsed = financeFiltersSchema.safeParse({
-      hodApproverEmail: 'mansoor@nxtwave.co.in',
+      hodApproverEmployeeId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     })
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects invalid hodApproverEmail', () => {
+  it('rejects invalid hodApproverEmployeeId (non-UUID)', () => {
     const parsed = financeFiltersSchema.safeParse({
-      hodApproverEmail: 'not-an-email',
+      hodApproverEmployeeId: 'not-a-uuid',
     })
     expect(parsed.success).toBe(false)
   })
 
   it('accepts ISO date filters', () => {
     const parsed = financeFiltersSchema.safeParse({
-      claimDateFrom: '2026-03-01',
-      claimDateTo: '2026-03-07',
+      dateFilterField: 'claim_date',
+      dateFrom: '2026-03-01',
     })
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects inverted claim date range', () => {
+  it('accepts DD/MM/YYYY date range input', () => {
     const parsed = financeFiltersSchema.safeParse({
-      claimDateFrom: '2026-03-08',
-      claimDateTo: '2026-03-01',
+      dateFilterField: 'finance_approved_date',
+      dateFrom: '08/03/2026',
+      dateTo: '10/03/2026',
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('rejects inverted date range', () => {
+    const parsed = financeFiltersSchema.safeParse({
+      dateFrom: '2026-03-08',
+      dateTo: '2026-03-01',
     })
     expect(parsed.success).toBe(false)
   })
 
-  it('rejects inverted action date range', () => {
-    const parsed = financeFiltersSchema.safeParse({
-      actionDateFrom: '2026-03-08',
-      actionDateTo: '2026-03-01',
-    })
-    expect(parsed.success).toBe(false)
-  })
-
-  it('accepts status/location/resubmitted combination', () => {
+  it('accepts status/location combination', () => {
     const parsed = financeFiltersSchema.safeParse({
       claimStatus: 'finance_review',
       workLocation: 'Field - Base Location',
-      resubmittedOnly: 'true',
     })
     expect(parsed.success).toBe(true)
   })
@@ -256,48 +256,43 @@ describe('normalizeFinanceFilters', () => {
     expect(result.employeeName).toBeNull()
     expect(result.claimNumber).toBeNull()
     expect(result.ownerDesignation).toBeNull()
-    expect(result.hodApproverEmail).toBeNull()
+    expect(result.hodApproverEmployeeId).toBeNull()
     expect(result.claimStatus).toBeNull()
     expect(result.workLocation).toBeNull()
-    expect(result.resubmittedOnly).toBe(false)
     expect(result.actionFilter).toBe('all')
-    expect(result.claimDateFrom).toBeNull()
-    expect(result.claimDateTo).toBeNull()
-    expect(result.actionDateFrom).toBeNull()
-    expect(result.actionDateTo).toBeNull()
+    expect(result.dateFilterField).toBe('claim_date')
+    expect(result.dateFrom).toBeNull()
+    expect(result.dateTo).toBeNull()
   })
 
   it('normalizes trimmed string filters', () => {
     const result = normalizeFinanceFilters({
       employeeName: '  Yohan  ',
-      claimNumber: '  CLM-001  ',
+      claimNumber: '  CLAIM-001  ',
     })
     expect(result.employeeName).toBe('Yohan')
-    expect(result.claimNumber).toBe('CLM-001')
+    expect(result.claimNumber).toBe('CLAIM-001')
   })
 
   it('converts DD/MM/YYYY dates to ISO', () => {
     const result = normalizeFinanceFilters({
-      claimDateFrom: '01/03/2026',
-      claimDateTo: '07/03/2026',
+      dateFrom: '01/03/2026',
     })
-    expect(result.claimDateFrom).toBe('2026-03-01')
-    expect(result.claimDateTo).toBe('2026-03-07')
+    expect(result.dateFrom).toBe('2026-03-01')
   })
 
   it('preserves ISO dates', () => {
     const result = normalizeFinanceFilters({
-      actionDateFrom: '2026-03-01',
-      actionDateTo: '2026-03-07',
+      dateFilterField: 'finance_approved_date',
+      dateFrom: '2026-03-01',
+      dateTo: '2026-03-07',
     })
-    expect(result.actionDateFrom).toBe('2026-03-01')
-    expect(result.actionDateTo).toBe('2026-03-07')
+    expect(result.dateFrom).toBe('2026-03-01')
+    expect(result.dateTo).toBe('2026-03-07')
   })
 
   it('throws on invalid date format', () => {
-    expect(() =>
-      normalizeFinanceFilters({ claimDateFrom: '03-01-2026' })
-    ).toThrow()
+    expect(() => normalizeFinanceFilters({ dateFrom: '03-01-2026' })).toThrow()
   })
 
   it('regression: empty workLocation does not throw (FINANCE-001)', () => {
@@ -309,11 +304,11 @@ describe('normalizeFinanceFilters', () => {
     ).not.toThrow()
   })
 
-  it('regression: empty hodApproverEmail does not throw (FINANCE-002)', () => {
+  it('regression: empty hodApproverEmployeeId does not throw (FINANCE-002)', () => {
     expect(() =>
       normalizeFinanceFilters({
         employeeName: 'Test',
-        hodApproverEmail: '',
+        hodApproverEmployeeId: '',
       })
     ).not.toThrow()
   })
@@ -333,15 +328,13 @@ describe('hasFinanceClaimFilters', () => {
         employeeName: null,
         claimNumber: null,
         ownerDesignation: null,
-        hodApproverEmail: null,
+        hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        resubmittedOnly: false,
         actionFilter: 'all',
-        claimDateFrom: null,
-        claimDateTo: null,
-        actionDateFrom: null,
-        actionDateTo: null,
+        dateFilterField: 'claim_date',
+        dateFrom: null,
+        dateTo: null,
       })
     ).toBe(false)
   })
@@ -352,34 +345,30 @@ describe('hasFinanceClaimFilters', () => {
         employeeName: 'Yohan',
         claimNumber: null,
         ownerDesignation: null,
-        hodApproverEmail: null,
+        hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        resubmittedOnly: false,
         actionFilter: 'all',
-        claimDateFrom: null,
-        claimDateTo: null,
-        actionDateFrom: null,
-        actionDateTo: null,
+        dateFilterField: 'claim_date',
+        dateFrom: null,
+        dateTo: null,
       })
     ).toBe(true)
   })
 
-  it('returns true when resubmittedOnly is true', () => {
+  it('returns true when dateFrom is set', () => {
     expect(
       hasFinanceClaimFilters({
         employeeName: null,
         claimNumber: null,
         ownerDesignation: null,
-        hodApproverEmail: null,
+        hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        resubmittedOnly: true,
         actionFilter: 'all',
-        claimDateFrom: null,
-        claimDateTo: null,
-        actionDateFrom: null,
-        actionDateTo: null,
+        dateFilterField: 'claim_date',
+        dateFrom: '2026-03-07',
+        dateTo: null,
       })
     ).toBe(true)
   })

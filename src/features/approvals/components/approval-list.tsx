@@ -26,8 +26,10 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [notes, setNotes] = useState('')
-  const [allowResubmit, setAllowResubmit] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pendingBulkAction, setPendingBulkAction] = useState<
+    'approved' | 'rejected' | null
+  >(null)
 
   const selectableIds = useMemo(
     () =>
@@ -67,13 +69,14 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
     }
 
     setIsSubmitting(true)
+    setPendingBulkAction(action)
 
     try {
       const result = await submitBulkApprovalAction({
         claimIds: selectedIds,
         action,
         notes,
-        allowResubmit: action === 'rejected' ? allowResubmit : undefined,
+        allowResubmit: false,
       })
 
       if (result.succeeded > 0) {
@@ -91,7 +94,6 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
       if (result.ok) {
         setSelectedIds([])
         setNotes('')
-        setAllowResubmit(false)
       }
 
       router.refresh()
@@ -99,6 +101,7 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
       toast.error('Unexpected error while processing bulk approval action.')
     } finally {
       setIsSubmitting(false)
+      setPendingBulkAction(null)
     }
   }
 
@@ -146,7 +149,9 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
             disabled={isSubmitting || selectedIds.length === 0}
             className="rounded-lg bg-foreground px-3 py-2 text-xs font-medium text-background disabled:opacity-60"
           >
-            {isSubmitting ? 'Submitting...' : 'Bulk Approve'}
+            {isSubmitting && pendingBulkAction === 'approved'
+              ? 'Approving...'
+              : 'Bulk Approve'}
           </button>
 
           <button
@@ -155,7 +160,9 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
             disabled={isSubmitting || selectedIds.length === 0}
             className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium disabled:opacity-60"
           >
-            {isSubmitting ? 'Submitting...' : 'Bulk Reject'}
+            {isSubmitting && pendingBulkAction === 'rejected'
+              ? 'Rejecting...'
+              : 'Bulk Reject'}
           </button>
         </div>
 
@@ -166,15 +173,6 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
             onChange={(event) => setNotes(event.target.value)}
             className="min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2"
           />
-        </label>
-
-        <label className="mt-2 inline-flex items-center gap-2 text-sm text-foreground/80">
-          <input
-            type="checkbox"
-            checked={allowResubmit}
-            onChange={(event) => setAllowResubmit(event.target.checked)}
-          />
-          Allow employee modifications and resubmission (for reject)
         </label>
       </div>
 
@@ -212,7 +210,7 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
                 </td>
                 <td className="px-3 py-3">{row.owner.employee_name}</td>
                 <td className="px-3 py-3 text-xs text-foreground/70">
-                  {row.owner.designation}
+                  {row.owner.designations?.designation_name ?? ''}
                 </td>
                 <td className="px-3 py-3">
                   {formatDate(row.claim.claim_date)}

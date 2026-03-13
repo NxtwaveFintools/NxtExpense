@@ -6,7 +6,7 @@ type ApprovalHistoryTimelineProps = {
 }
 
 function formatActionLabel(action: string) {
-  return action.replaceAll('_', ' ')
+  return action.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 export function ApprovalHistoryTimeline({
@@ -40,11 +40,6 @@ export function ApprovalHistoryTimeline({
               </p>
               {entry.rejection_notes ? (
                 <p className="mt-1">Rejection notes: {entry.rejection_notes}</p>
-              ) : null}
-              {entry.allow_resubmit !== null ? (
-                <p className="text-foreground/70">
-                  Allow resubmit: {entry.allow_resubmit ? 'Yes' : 'No'}
-                </p>
               ) : null}
               {entry.bypass_reason ? (
                 <p className="mt-1">Bypass reason: {entry.bypass_reason}</p>

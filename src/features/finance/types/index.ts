@@ -1,10 +1,14 @@
 import type { Claim, ClaimAvailableAction } from '@/features/claims/types'
-import type { Employee } from '@/features/employees/types'
+import type { EmployeeRow } from '@/lib/services/employee-service'
 import type { PaginatedResult } from '@/lib/utils/pagination'
 
+// These type aliases mirror the `finance_action_type` PostgreSQL enum.
+// Single source of truth for all finance action string comparisons.
 export type FinanceActionType = 'issued' | 'finance_rejected'
 
-export type FinanceActionFilter = 'all' | 'issued' | 'finance_rejected'
+export type FinanceActionFilter = 'all' | FinanceActionType
+
+export type FinanceDateFilterField = 'claim_date' | 'finance_approved_date'
 
 export type FinanceAction = {
   id: string
@@ -18,7 +22,7 @@ export type FinanceAction = {
 
 export type FinanceQueueItem = {
   claim: Claim
-  owner: Employee
+  owner: EmployeeRow
   availableActions: ClaimAvailableAction[]
 }
 
@@ -26,7 +30,7 @@ export type PaginatedFinanceQueue = PaginatedResult<FinanceQueueItem>
 
 export type FinanceHistoryItem = {
   claim: Claim
-  owner: Employee
+  owner: EmployeeRow
   action: FinanceAction
 }
 
@@ -36,15 +40,13 @@ export type FinanceFilters = {
   employeeName: string | null
   claimNumber: string | null
   ownerDesignation: string | null
-  hodApproverEmail: string | null
+  hodApproverEmployeeId: string | null
   claimStatus: string | null
   workLocation: string | null
-  resubmittedOnly: boolean
   actionFilter: FinanceActionFilter
-  claimDateFrom: string | null
-  claimDateTo: string | null
-  actionDateFrom: string | null
-  actionDateTo: string | null
+  dateFilterField: FinanceDateFilterField
+  dateFrom: string | null
+  dateTo: string | null
 }
 
 export type FinanceFilterOption = {

@@ -3,8 +3,10 @@ import Link from 'next/link'
 import { getCurrentUser } from '@/features/auth/queries'
 import {
   getEmployeeByEmail,
+  getEmployeeRoles,
   hasApproverAssignments,
-} from '@/features/employees/queries'
+} from '@/lib/services/employee-service'
+import { getDashboardAccessFromRoles } from '@/lib/services/approval-service'
 import { LogoutButton } from '@/features/auth/components/logout-button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { AppNavLinks } from '@/components/ui/app-nav-links'
@@ -18,21 +20,24 @@ export async function AppHeader() {
   const employee = await getEmployeeByEmail(supabase, user.email)
   if (!employee) return null
 
-  const isFinance = employee.designation === 'Finance'
-  const canViewClaims =
-    employee.designation !== 'Finance' && employee.designation !== 'Admin'
-  const canViewFinance = isFinance
-  const canViewApprovals = await hasApproverAssignments(
-    supabase,
-    employee.employee_email
-  )
+  const [roles, canViewApprovals] = await Promise.all([
+    getEmployeeRoles(supabase, employee.id),
+    hasApproverAssignments(supabase, employee.employee_email),
+  ])
+
+  const access = getDashboardAccessFromRoles(roles, canViewApprovals)
 
   type NavLink = { href: string; label: string }
   const navLinks: NavLink[] = [
     { href: '/dashboard', label: 'Dashboard' },
-    ...(canViewClaims ? [{ href: '/claims', label: 'My Claims' }] : []),
-    ...(canViewApprovals ? [{ href: '/approvals', label: 'Approvals' }] : []),
-    ...(canViewFinance ? [{ href: '/finance', label: 'Finance' }] : []),
+    ...(access.canViewClaims ? [{ href: '/claims', label: 'My Claims' }] : []),
+    ...(access.canViewApprovals
+      ? [{ href: '/approvals', label: 'Approvals' }]
+      : []),
+    ...(access.canViewFinanceQueue
+      ? [{ href: '/finance', label: 'Finance' }]
+      : []),
+    ...(access.canViewAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ]
 
   return (
@@ -53,12 +58,14 @@ export async function AppHeader() {
 
         <div className="flex items-center gap-2">
           <div className="hidden text-right text-sm sm:block mr-1">
-            <p className="font-medium leading-tight text-foreground">
-              {employee.employee_name}
-            </p>
-            <p className="text-xs text-foreground/55 leading-tight">
-              {employee.designation}
-            </p>
+            <Link href="/profile" className="hover:underline">
+              <p className="font-medium leading-tight text-foreground">
+                {employee.employee_name}
+              </p>
+              <p className="text-xs text-foreground/55 leading-tight">
+                {employee.designation}
+              </p>
+            </Link>
           </div>
           <ThemeToggle />
           <LogoutButton />

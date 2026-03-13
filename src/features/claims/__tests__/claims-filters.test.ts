@@ -2,28 +2,26 @@ import { describe, expect, it } from 'vitest'
 
 import {
   addMyClaimsFiltersToParams,
+  buildMyClaimsCsv,
   normalizeMyClaimsFilters,
 } from '@/features/claims/utils/filters'
+import type { Claim } from '@/features/claims/types'
 
 describe('normalizeMyClaimsFilters', () => {
   // ─── Happy Path ────────────────────────────────────────────────────────────
 
-  it('normalizes ISO date inputs from native date pickers', () => {
+  it('normalizes ISO claimDate input from native date picker', () => {
     const result = normalizeMyClaimsFilters({
-      claimDateFrom: '2026-03-01',
-      claimDateTo: '2026-03-07',
+      claimDate: '2026-03-01',
     })
-    expect(result.claimDateFrom).toBe('2026-03-01')
-    expect(result.claimDateTo).toBe('2026-03-07')
+    expect(result.claimDate).toBe('2026-03-01')
   })
 
-  it('normalizes DD/MM/YYYY date inputs to ISO', () => {
+  it('normalizes DD/MM/YYYY claimDate input to ISO', () => {
     const result = normalizeMyClaimsFilters({
-      claimDateFrom: '01/03/2026',
-      claimDateTo: '07/03/2026',
+      claimDate: '01/03/2026',
     })
-    expect(result.claimDateFrom).toBe('2026-03-01')
-    expect(result.claimDateTo).toBe('2026-03-07')
+    expect(result.claimDate).toBe('2026-03-01')
   })
 
   it('normalizes claimStatus to trimmed string', () => {
@@ -40,29 +38,15 @@ describe('normalizeMyClaimsFilters', () => {
     expect(result.workLocation).toBe('Field - Base Location')
   })
 
-  it('normalizes resubmittedOnly = "true" to boolean true', () => {
-    const result = normalizeMyClaimsFilters({ resubmittedOnly: 'true' })
-    expect(result.resubmittedOnly).toBe(true)
-  })
-
-  it('defaults resubmittedOnly to false when absent', () => {
-    const result = normalizeMyClaimsFilters({})
-    expect(result.resubmittedOnly).toBe(false)
-  })
-
   it('applies all filters simultaneously', () => {
     const result = normalizeMyClaimsFilters({
       claimStatus: 'submitted',
       workLocation: 'Field - Outstation',
-      claimDateFrom: '2026-03-01',
-      claimDateTo: '2026-03-07',
-      resubmittedOnly: 'true',
+      claimDate: '2026-03-01',
     })
     expect(result.claimStatus).toBe('submitted')
     expect(result.workLocation).toBe('Field - Outstation')
-    expect(result.claimDateFrom).toBe('2026-03-01')
-    expect(result.claimDateTo).toBe('2026-03-07')
-    expect(result.resubmittedOnly).toBe(true)
+    expect(result.claimDate).toBe('2026-03-01')
   })
 
   // ─── Empty / Null States ───────────────────────────────────────────────────
@@ -72,14 +56,9 @@ describe('normalizeMyClaimsFilters', () => {
     expect(result.claimStatus).toBeNull()
   })
 
-  it('returns null for empty claimDateFrom string', () => {
-    const result = normalizeMyClaimsFilters({ claimDateFrom: '' })
-    expect(result.claimDateFrom).toBeNull()
-  })
-
-  it('returns null for empty claimDateTo string', () => {
-    const result = normalizeMyClaimsFilters({ claimDateTo: '' })
-    expect(result.claimDateTo).toBeNull()
+  it('returns null for empty claimDate string', () => {
+    const result = normalizeMyClaimsFilters({ claimDate: '' })
+    expect(result.claimDate).toBeNull()
   })
 
   it('returns null for null workLocation (absent filter)', () => {
@@ -103,17 +82,15 @@ describe('normalizeMyClaimsFilters', () => {
 
   it('preserves claimStatus when workLocation is empty string (CLAIMS-001 regression)', () => {
     // This is the exact scenario from the CLAIMS-001 bug report:
-    // form submits claimStatus=finance_rejected&workLocation=&claimDateFrom=&claimDateTo=
+    // form submits claimStatus=finance_rejected&workLocation=&claimDate=
     const result = normalizeMyClaimsFilters({
       claimStatus: 'finance_rejected',
       workLocation: '',
-      claimDateFrom: '',
-      claimDateTo: '',
+      claimDate: '',
     })
     expect(result.claimStatus).toBe('finance_rejected')
     expect(result.workLocation).toBeNull()
-    expect(result.claimDateFrom).toBeNull()
-    expect(result.claimDateTo).toBeNull()
+    expect(result.claimDate).toBeNull()
   })
 
   it('treats empty workLocation as no filter (null) when all fields are empty strings', () => {
@@ -121,14 +98,11 @@ describe('normalizeMyClaimsFilters', () => {
     const result = normalizeMyClaimsFilters({
       claimStatus: '',
       workLocation: '',
-      claimDateFrom: '',
-      claimDateTo: '',
+      claimDate: '',
     })
     expect(result.claimStatus).toBeNull()
     expect(result.workLocation).toBeNull()
-    expect(result.claimDateFrom).toBeNull()
-    expect(result.claimDateTo).toBeNull()
-    expect(result.resubmittedOnly).toBe(false)
+    expect(result.claimDate).toBeNull()
   })
 
   it('does NOT throw for all empty form fields (full form submit, nothing selected)', () => {
@@ -136,9 +110,7 @@ describe('normalizeMyClaimsFilters', () => {
       normalizeMyClaimsFilters({
         claimStatus: '',
         workLocation: '',
-        claimDateFrom: '',
-        claimDateTo: '',
-        resubmittedOnly: undefined,
+        claimDate: '',
       })
     ).not.toThrow()
   })
@@ -147,23 +119,13 @@ describe('normalizeMyClaimsFilters', () => {
 
   it('throws on invalid date format (not ISO or DD/MM/YYYY)', () => {
     expect(() =>
-      normalizeMyClaimsFilters({ claimDateFrom: '03-07-2026' })
-    ).toThrowError('Claim date from must be in DD/MM/YYYY format.')
+      normalizeMyClaimsFilters({ claimDate: '03-07-2026' })
+    ).toThrowError('Claim date must be in DD/MM/YYYY format.')
   })
 
-  it('throws when date range is inverted', () => {
-    expect(() =>
-      normalizeMyClaimsFilters({
-        claimDateFrom: '2026-03-08',
-        claimDateTo: '2026-03-01',
-      })
-    ).toThrowError('Claim date to must be on or after claim date from.')
-  })
-
-  it('throws on invalid workLocation value (not in allowed enum)', () => {
-    expect(() =>
-      normalizeMyClaimsFilters({ workLocation: 'Invalid Location' })
-    ).toThrow()
+  it('accepts any non-empty workLocation string (values come from DB)', () => {
+    const result = normalizeMyClaimsFilters({ workLocation: 'Custom Location' })
+    expect(result.workLocation).toBe('Custom Location')
   })
 })
 
@@ -171,9 +133,7 @@ describe('addMyClaimsFiltersToParams', () => {
   const emptyFilters = {
     claimStatus: null,
     workLocation: null,
-    claimDateFrom: null,
-    claimDateTo: null,
-    resubmittedOnly: false,
+    claimDate: null,
   }
 
   it('produces empty params when all filters are null/false', () => {
@@ -200,51 +160,23 @@ describe('addMyClaimsFiltersToParams', () => {
     expect(params.get('workLocation')).toBe('Field - Base Location')
   })
 
-  it('adds claimDateFrom param when set', () => {
+  it('adds claimDate param when set', () => {
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
       ...emptyFilters,
-      claimDateFrom: '2026-03-01',
+      claimDate: '2026-03-01',
     })
-    expect(params.get('claimDateFrom')).toBe('2026-03-01')
-  })
-
-  it('adds claimDateTo param when set', () => {
-    const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
-      ...emptyFilters,
-      claimDateTo: '2026-03-07',
-    })
-    expect(params.get('claimDateTo')).toBe('2026-03-07')
-  })
-
-  it('adds resubmittedOnly=true when flag is set', () => {
-    const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
-      ...emptyFilters,
-      resubmittedOnly: true,
-    })
-    expect(params.get('resubmittedOnly')).toBe('true')
-  })
-
-  it('does NOT add resubmittedOnly when false', () => {
-    const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
-      ...emptyFilters,
-      resubmittedOnly: false,
-    })
-    expect(params.has('resubmittedOnly')).toBe(false)
+    expect(params.get('claimDate')).toBe('2026-03-01')
   })
 
   it('adds multiple active filters simultaneously', () => {
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
       claimStatus: 'submitted',
       workLocation: 'Office / WFH',
-      claimDateFrom: '2026-03-01',
-      claimDateTo: '2026-03-07',
-      resubmittedOnly: true,
+      claimDate: '2026-03-01',
     })
     expect(params.get('claimStatus')).toBe('submitted')
     expect(params.get('workLocation')).toBe('Office / WFH')
-    expect(params.get('claimDateFrom')).toBe('2026-03-01')
-    expect(params.get('claimDateTo')).toBe('2026-03-07')
-    expect(params.get('resubmittedOnly')).toBe('true')
+    expect(params.get('claimDate')).toBe('2026-03-01')
   })
 
   it('round-trip: normalize then add to params preserves filters', () => {
@@ -252,12 +184,57 @@ describe('addMyClaimsFiltersToParams', () => {
     const normalized = normalizeMyClaimsFilters({
       claimStatus: 'finance_rejected',
       workLocation: '', // empty from form
-      claimDateFrom: '',
-      claimDateTo: '',
+      claimDate: '',
     })
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), normalized)
     // claimStatus=finance_rejected should be in params, workLocation should NOT
     expect(params.get('claimStatus')).toBe('finance_rejected')
     expect(params.has('workLocation')).toBe(false)
+  })
+})
+
+describe('buildMyClaimsCsv', () => {
+  it('builds CSV with expected columns and formatted values', () => {
+    const claim = {
+      id: 'claim-id-1',
+      claim_number: 'CLAIM-NW0000282-130326-0051',
+      employee_id: 'employee-id-1',
+      claim_date: '2026-03-13',
+      work_location: 'Field - Base Location',
+      own_vehicle_used: true,
+      vehicle_type: 'Two Wheeler',
+      outstation_city_id: null,
+      from_city_id: null,
+      to_city_id: null,
+      outstation_city_name: null,
+      from_city_name: null,
+      to_city_name: null,
+      km_travelled: 25,
+      total_amount: 300,
+      statusName: 'Finance Review',
+      statusDisplayColor: 'yellow',
+      status_id: 'status-id-1',
+      is_terminal: false,
+      is_rejection: false,
+      allow_resubmit: false,
+      is_superseded: false,
+      current_approval_level: 3,
+      submitted_at: '2026-03-13T05:57:00.000Z',
+      created_at: '2026-03-13T05:56:00.000Z',
+      updated_at: '2026-03-13T05:57:00.000Z',
+      resubmission_count: 1,
+      last_rejection_notes: null,
+      last_rejected_at: null,
+      accommodation_nights: null,
+      food_with_principals_amount: null,
+    } as Claim
+
+    const csv = buildMyClaimsCsv([claim])
+
+    expect(csv).toContain('Claim ID')
+    expect(csv).toContain('CLAIM-NW0000282-130326-0051')
+    expect(csv).toContain('13/03/2026')
+    expect(csv).toContain('Rs. 300.00')
+    expect(csv).toContain('Finance Review')
   })
 })

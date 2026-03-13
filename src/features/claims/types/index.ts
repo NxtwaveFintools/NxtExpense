@@ -1,20 +1,30 @@
 import type { PaginatedResult } from '@/lib/utils/pagination'
+import type {
+  WorkLocation as ConfigWorkLocation,
+  VehicleType as ConfigVehicleType,
+  TransportType as ConfigTransportType,
+} from '@/lib/services/config-service'
+
+// Actor scope mirrors the `claim_actor_scope` PostgreSQL enum — DB is source of truth.
+export type ActorScope = 'employee' | 'approver' | 'finance' | 'admin'
 
 export type WorkLocation = string
 export type VehicleType = string
 export type TransportType = string
-export type ClaimStatus = string
+export type ClaimStatus = string // used for catalog/filter values (status_code)
 export type ExpenseItemType = string
 
-export const WORK_LOCATION_FILTER_VALUES = [
-  'Office / WFH',
-  'Field - Base Location',
-  'Field - Outstation',
-  'Leave',
-  'Week-off',
-] as const
+/** A simple { id, name } option for select dropdowns */
+export type SelectOption = { id: string; name: string }
 
-export type WorkLocationFilter = (typeof WORK_LOCATION_FILTER_VALUES)[number]
+/** Full DB-backed work location object with behavioral flags */
+export type WorkLocationOption = ConfigWorkLocation
+
+/** Full DB-backed vehicle type with rates and limits */
+export type VehicleTypeOption = ConfigVehicleType
+
+/** Full DB-backed transport type */
+export type TransportTypeOption = ConfigTransportType
 
 export type Claim = {
   id: string
@@ -24,21 +34,30 @@ export type Claim = {
   work_location: WorkLocation
   own_vehicle_used: boolean | null
   vehicle_type: VehicleType | null
-  outstation_location: string | null
-  from_city: string | null
-  to_city: string | null
+  outstation_city_id: string | null
+  from_city_id: string | null
+  to_city_id: string | null
+  outstation_city_name: string | null
+  from_city_name: string | null
+  to_city_name: string | null
   km_travelled: number | null
   total_amount: number
-  status: ClaimStatus
+  statusName: string
+  statusDisplayColor: string
+  status_id: string
+  is_terminal: boolean
+  is_rejection: boolean
+  allow_resubmit: boolean
+  is_superseded: boolean
   current_approval_level: number | null
   submitted_at: string | null
   created_at: string
   updated_at: string
-  tenant_id: string
   resubmission_count: number
   last_rejection_notes: string | null
-  last_rejected_by_email: string | null
   last_rejected_at: string | null
+  accommodation_nights: number | null
+  food_with_principals_amount: number | null
 }
 
 export type ClaimItem = {
@@ -61,11 +80,13 @@ export type ClaimFormValues = {
   ownVehicleUsed?: boolean
   vehicleType?: VehicleType
   transportType?: TransportType
-  outstationLocation?: string
-  fromCity?: string
-  toCity?: string
+  outstationCityId?: string
+  fromCityId?: string
+  toCityId?: string
   kmTravelled?: number
   taxiAmount?: number
+  accommodationNights?: number
+  foodWithPrincipalsAmount?: number
 }
 
 export type ClaimFormInitialValues = {
@@ -74,11 +95,13 @@ export type ClaimFormInitialValues = {
   vehicleType?: VehicleType | null
   ownVehicleUsed?: boolean | null
   transportType?: TransportType | null
-  outstationLocation?: string | null
-  fromCity?: string | null
-  toCity?: string | null
+  outstationCityId?: string | null
+  fromCityId?: string | null
+  toCityId?: string | null
   kmTravelled?: number | null
   taxiAmount?: number | null
+  accommodationNights?: number | null
+  foodWithPrincipalsAmount?: number | null
 }
 
 export type ClaimStatusCatalogItem = {
@@ -118,8 +141,6 @@ export type PaginatedClaims = PaginatedResult<Claim>
 
 export type MyClaimsFilters = {
   claimStatus: ClaimStatus | null
-  workLocation: WorkLocationFilter | null
-  claimDateFrom: string | null
-  claimDateTo: string | null
-  resubmittedOnly: boolean
+  workLocation: string | null
+  claimDate: string | null
 }

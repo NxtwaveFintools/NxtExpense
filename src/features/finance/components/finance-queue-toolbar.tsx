@@ -2,8 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 
+import type { FinanceActionType } from '@/features/finance/types'
+
 type BulkAction = {
-  action: 'issued' | 'finance_rejected'
+  action: FinanceActionType
   label: string
 }
 
@@ -16,6 +18,7 @@ type FinanceQueueToolbarProps = {
   onToggleSelectAll: (checked: boolean) => void
   onBulkAction: (action: BulkAction['action']) => void
   disabled: boolean
+  processingAction: BulkAction['action'] | null
 }
 
 export function FinanceQueueToolbar({
@@ -27,6 +30,7 @@ export function FinanceQueueToolbar({
   onToggleSelectAll,
   onBulkAction,
   disabled,
+  processingAction,
 }: FinanceQueueToolbarProps) {
   const selectAllRef = useRef<HTMLInputElement | null>(null)
 
@@ -60,7 +64,9 @@ export function FinanceQueueToolbar({
             disabled={disabled || selectedCount === 0}
             className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
           >
-            {disabled ? 'Processing...' : bulkAction.label}
+            {processingAction === bulkAction.action
+              ? 'Processing...'
+              : bulkAction.label}
           </button>
         ))}
       </div>

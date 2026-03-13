@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 
 import type {
   FinanceActionFilter,
+  FinanceDateFilterField,
   FinanceFilterOptions,
   FinanceFilters,
 } from '@/features/finance/types'
@@ -15,10 +16,6 @@ type FinanceFiltersBarProps = {
   options: FinanceFilterOptions
   exportCurrentPageHref: string
   exportAllHref: string
-}
-
-function isFinanceActionFilter(value: string): value is FinanceActionFilter {
-  return value === 'all' || value === 'issued' || value === 'finance_rejected'
 }
 
 export function FinanceFiltersBar({
@@ -34,25 +31,18 @@ export function FinanceFiltersBar({
   const [ownerDesignation, setOwnerDesignation] = useState(
     filters.ownerDesignation ?? ''
   )
-  const [hodApproverEmail, setHodApproverEmail] = useState(
-    filters.hodApproverEmail ?? ''
+  const [hodApproverEmployeeId, setHodApproverEmployeeId] = useState(
+    filters.hodApproverEmployeeId ?? ''
   )
   const [claimStatus, setClaimStatus] = useState(filters.claimStatus ?? '')
   const [workLocation, setWorkLocation] = useState(filters.workLocation ?? '')
-  const [claimDateFrom, setClaimDateFrom] = useState(
-    filters.claimDateFrom ?? ''
+  const [actionFilter, setActionFilter] = useState<FinanceActionFilter>(
+    filters.actionFilter
   )
-  const [claimDateTo, setClaimDateTo] = useState(filters.claimDateTo ?? '')
-  const [actionFilter, setActionFilter] = useState(
-    filters.actionFilter ?? 'all'
-  )
-  const [actionDateFrom, setActionDateFrom] = useState(
-    filters.actionDateFrom ?? ''
-  )
-  const [actionDateTo, setActionDateTo] = useState(filters.actionDateTo ?? '')
-  const [resubmittedOnly, setResubmittedOnly] = useState(
-    filters.resubmittedOnly ?? false
-  )
+  const [dateFilterField, setDateFilterField] =
+    useState<FinanceDateFilterField>(filters.dateFilterField)
+  const [dateFrom, setDateFrom] = useState(filters.dateFrom ?? '')
+  const [dateTo, setDateTo] = useState(filters.dateTo ?? '')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,16 +50,18 @@ export function FinanceFiltersBar({
     if (employeeName) params.set('employeeName', employeeName)
     if (claimNumber) params.set('claimNumber', claimNumber)
     if (ownerDesignation) params.set('ownerDesignation', ownerDesignation)
-    if (hodApproverEmail) params.set('hodApproverEmail', hodApproverEmail)
+    if (hodApproverEmployeeId)
+      params.set('hodApproverEmployeeId', hodApproverEmployeeId)
     if (claimStatus) params.set('claimStatus', claimStatus)
     if (workLocation) params.set('workLocation', workLocation)
-    if (claimDateFrom) params.set('claimDateFrom', claimDateFrom)
-    if (claimDateTo) params.set('claimDateTo', claimDateTo)
-    if (actionFilter && actionFilter !== 'all')
+    if (actionFilter !== 'all') {
       params.set('actionFilter', actionFilter)
-    if (actionDateFrom) params.set('actionDateFrom', actionDateFrom)
-    if (actionDateTo) params.set('actionDateTo', actionDateTo)
-    if (resubmittedOnly) params.set('resubmittedOnly', 'true')
+    }
+    if (dateFilterField !== 'claim_date') {
+      params.set('dateFilterField', dateFilterField)
+    }
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
     const qs = params.toString()
     router.push(`/finance${qs ? `?${qs}` : ''}`)
   }
@@ -78,15 +70,13 @@ export function FinanceFiltersBar({
     setEmployeeName('')
     setClaimNumber('')
     setOwnerDesignation('')
-    setHodApproverEmail('')
+    setHodApproverEmployeeId('')
     setClaimStatus('')
     setWorkLocation('')
-    setClaimDateFrom('')
-    setClaimDateTo('')
     setActionFilter('all')
-    setActionDateFrom('')
-    setActionDateTo('')
-    setResubmittedOnly(false)
+    setDateFilterField('claim_date')
+    setDateFrom('')
+    setDateTo('')
     router.push('/finance')
   }
 
@@ -137,9 +127,9 @@ export function FinanceFiltersBar({
         <label className="space-y-1 text-sm">
           <span className="text-foreground/80">HOD Approver</span>
           <select
-            name="hodApproverEmail"
-            value={hodApproverEmail}
-            onChange={(e) => setHodApproverEmail(e.target.value)}
+            name="hodApproverEmployeeId"
+            value={hodApproverEmployeeId}
+            onChange={(e) => setHodApproverEmployeeId(e.target.value)}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           >
             <option value="">All HOD Approvers</option>
@@ -186,37 +176,13 @@ export function FinanceFiltersBar({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Claim Date From</span>
-          <input
-            name="claimDateFrom"
-            type="date"
-            value={claimDateFrom}
-            onChange={(e) => setClaimDateFrom(e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Claim Date To</span>
-          <input
-            name="claimDateTo"
-            type="date"
-            value={claimDateTo}
-            onChange={(e) => setClaimDateTo(e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          />
-        </label>
-
-        <label className="space-y-1 text-sm">
           <span className="text-foreground/80">Finance Action</span>
           <select
             name="actionFilter"
             value={actionFilter}
-            onChange={(e) => {
-              if (isFinanceActionFilter(e.target.value)) {
-                setActionFilter(e.target.value)
-              }
-            }}
+            onChange={(e) =>
+              setActionFilter(e.target.value as FinanceActionFilter)
+            }
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           >
             <option value="all">All Actions</option>
@@ -226,35 +192,40 @@ export function FinanceFiltersBar({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Action Date From</span>
+          <span className="text-foreground/80">Date Filter</span>
+          <select
+            name="dateFilterField"
+            value={dateFilterField}
+            onChange={(e) =>
+              setDateFilterField(e.target.value as FinanceDateFilterField)
+            }
+            className="w-full rounded-lg border border-border bg-background px-3 py-2"
+          >
+            <option value="claim_date">Claim Date</option>
+            <option value="finance_approved_date">Finance Approved Date</option>
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="text-foreground/80">From</span>
           <input
-            name="actionDateFrom"
+            name="dateFrom"
             type="date"
-            value={actionDateFrom}
-            onChange={(e) => setActionDateFrom(e.target.value)}
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           />
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Action Date To</span>
+          <span className="text-foreground/80">To</span>
           <input
-            name="actionDateTo"
+            name="dateTo"
             type="date"
-            value={actionDateTo}
-            onChange={(e) => setActionDateTo(e.target.value)}
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
             className="w-full rounded-lg border border-border bg-background px-3 py-2"
           />
-        </label>
-
-        <label className="md:col-span-4 inline-flex items-center gap-2 text-sm text-foreground/80">
-          <input
-            name="resubmittedOnly"
-            type="checkbox"
-            checked={resubmittedOnly}
-            onChange={(e) => setResubmittedOnly(e.target.checked)}
-          />
-          Show resubmitted claims only
         </label>
 
         <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-1">

@@ -41,19 +41,19 @@ export class ClaimsPage {
   }
 
   get kmInput() {
-    return this.page.getByLabel(/km|distance/i)
+    return this.page.locator('input[name="kmTravelled"]')
   }
 
   get fromCityInput() {
-    return this.page.getByLabel(/from.*city/i)
+    return this.page.locator('select[name="fromCityId"]')
   }
 
   get toCityInput() {
-    return this.page.getByLabel(/to.*city/i)
+    return this.page.locator('select[name="toCityId"]')
   }
 
   get outstationLocationInput() {
-    return this.page.getByLabel(/outstation.*location|location/i)
+    return this.page.locator('select[name="outstationCityId"]')
   }
 
   get transportTypeSelect() {
@@ -98,7 +98,7 @@ export class ClaimsPage {
     await this.ownVehicleYesButton.click()
     await this.vehicleTypeSelect.selectOption(vehicleType)
     await this.kmInput.fill(String(km))
-    await this.fromCityInput.fill(fromCity)
-    await this.toCityInput.fill(toCity)
+    await this.fromCityInput.selectOption({ label: fromCity })
+    await this.toCityInput.selectOption({ label: toCity })
   }
 }

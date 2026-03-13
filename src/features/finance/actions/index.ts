@@ -2,7 +2,7 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-import { getEmployeeByEmail } from '@/features/employees/queries'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
 import type { FinanceFilters } from '@/features/finance/types'
 import {
@@ -33,7 +33,7 @@ async function getFinanceEmployeeContext() {
   }
 
   const employee = await getEmployeeByEmail(supabase, user.email)
-  if (!employee || !isFinanceTeamMember(employee)) {
+  if (!employee || !(await isFinanceTeamMember(supabase, employee))) {
     throw new Error('Finance access is required.')
   }
 

@@ -10,8 +10,17 @@ import type {
 import {
   adminReassignApproverSchema,
   adminRollbackSchema,
+  adminToggleActiveSchema,
+  adminUpdateRateSchema,
+  adminUpdateVehicleRatesSchema,
 } from '@/features/admin/validations'
-import { getEmployeeByEmail } from '@/features/employees/queries'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
+import {
+  searchClaimsForAdmin,
+  searchEmployeesForAdmin,
+  type AdminClaimRow,
+  type AdminEmployeeRow,
+} from '@/features/admin/queries'
 
 async function getAdminContext() {
   const supabase = await createSupabaseServerClient()
@@ -24,7 +33,7 @@ async function getAdminContext() {
   }
 
   const employee = await getEmployeeByEmail(supabase, user.email)
-  if (!employee || !isAdminUser(employee)) {
+  if (!employee || !(await isAdminUser(supabase, employee))) {
     throw new Error('Admin access is required.')
   }
 
@@ -121,6 +130,234 @@ export async function reassignApproversAction(payload: {
         error instanceof Error
           ? error.message
           : 'Unable to reassign approvers.',
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// Search actions (for admin claim/employee lookups)
+// ────────────────────────────────────────────────────────────
+
+export async function searchClaimsAction(
+  query: string
+): Promise<{ ok: boolean; error: string | null; data: AdminClaimRow[] }> {
+  try {
+    const { supabase } = await getAdminContext()
+    const data = await searchClaimsForAdmin(supabase, query)
+    return { ok: true, error: null, data }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Search failed.',
+      data: [],
+    }
+  }
+}
+
+export async function searchEmployeesAction(
+  query: string
+): Promise<{ ok: boolean; error: string | null; data: AdminEmployeeRow[] }> {
+  try {
+    const { supabase } = await getAdminContext()
+    const data = await searchEmployeesForAdmin(supabase, query)
+    return { ok: true, error: null, data }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Search failed.',
+      data: [],
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// CRUD actions for lookup tables
+// ────────────────────────────────────────────────────────────
+
+type ToggleResult = { ok: boolean; error: string | null }
+
+export async function toggleDesignationActiveAction(payload: {
+  id: string
+  isActive: boolean
+}): Promise<ToggleResult> {
+  const parsed = adminToggleActiveSchema.safeParse(payload)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+    }
+
+  try {
+    const { supabase } = await getAdminContext()
+    const { error } = await supabase
+      .from('designations')
+      .update({ is_active: parsed.data.isActive })
+      .eq('id', parsed.data.id)
+    if (error) throw new Error(error.message)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to update designation.',
+    }
+  }
+}
+
+export async function toggleWorkLocationActiveAction(payload: {
+  id: string
+  isActive: boolean
+}): Promise<ToggleResult> {
+  const parsed = adminToggleActiveSchema.safeParse(payload)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+    }
+
+  try {
+    const { supabase } = await getAdminContext()
+    const { error } = await supabase
+      .from('work_locations')
+      .update({ is_active: parsed.data.isActive })
+      .eq('id', parsed.data.id)
+    if (error) throw new Error(error.message)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to update work location.',
+    }
+  }
+}
+
+export async function toggleVehicleTypeActiveAction(payload: {
+  id: string
+  isActive: boolean
+}): Promise<ToggleResult> {
+  const parsed = adminToggleActiveSchema.safeParse(payload)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+    }
+
+  try {
+    const { supabase } = await getAdminContext()
+    const { error } = await supabase
+      .from('vehicle_types')
+      .update({ is_active: parsed.data.isActive })
+      .eq('id', parsed.data.id)
+    if (error) throw new Error(error.message)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to update vehicle type.',
+    }
+  }
+}
+
+export async function updateVehicleRatesAction(payload: {
+  id: string
+  baseFuelRatePerDay: number
+  intercityRatePerKm: number
+  maxKmRoundTrip: number
+}): Promise<ToggleResult> {
+  const parsed = adminUpdateVehicleRatesSchema.safeParse(payload)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+    }
+
+  try {
+    const { supabase } = await getAdminContext()
+    const { error } = await supabase
+      .from('vehicle_types')
+      .update({
+        base_fuel_rate_per_day: parsed.data.baseFuelRatePerDay,
+        intercity_rate_per_km: parsed.data.intercityRatePerKm,
+        max_km_round_trip: parsed.data.maxKmRoundTrip,
+      })
+      .eq('id', parsed.data.id)
+    if (error) throw new Error(error.message)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to update vehicle rates.',
+    }
+  }
+}
+
+export async function updateExpenseRateAction(payload: {
+  id: string
+  rateAmount: number
+}): Promise<ToggleResult> {
+  const parsed = adminUpdateRateSchema.safeParse(payload)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+    }
+
+  try {
+    const { supabase } = await getAdminContext()
+    const { error } = await supabase
+      .from('expense_rates')
+      .update({ rate_amount: parsed.data.rateAmount })
+      .eq('id', parsed.data.id)
+    if (error) throw new Error(error.message)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to update expense rate.',
+    }
+  }
+}
+
+export async function toggleExpenseRateActiveAction(payload: {
+  id: string
+  isActive: boolean
+}): Promise<ToggleResult> {
+  const parsed = adminToggleActiveSchema.safeParse(payload)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+    }
+
+  try {
+    const { supabase } = await getAdminContext()
+    const { error } = await supabase
+      .from('expense_rates')
+      .update({ is_active: parsed.data.isActive })
+      .eq('id', parsed.data.id)
+    if (error) throw new Error(error.message)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to update expense rate.',
     }
   }
 }

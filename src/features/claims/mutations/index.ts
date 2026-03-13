@@ -1,26 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type {
-  ClaimStatus,
-  ExpenseItemType,
-  VehicleType,
-  WorkLocation,
-} from '@/features/claims/types'
+import type { ExpenseItemType } from '@/features/claims/types'
 
 type ClaimPayload = {
   employeeId: string
   claimDateIso: string
-  workLocation: WorkLocation
+  workLocationId: string | null
   ownVehicleUsed: boolean | null
-  vehicleType: VehicleType | null
-  outstationLocation: string | null
-  fromCity: string | null
-  toCity: string | null
+  vehicleTypeId: string | null
+  outstationCityId: string | null
+  fromCityId: string | null
+  toCityId: string | null
   kmTravelled: number | null
   totalAmount: number
-  status: ClaimStatus
+  statusId: string | null
   currentApprovalLevel: number | null
   submittedAt: string | null
+  designationId: string | null
+  accommodationNights: number | null
+  foodWithPrincipalsAmount: number | null
 }
 
 type InsertClaimItemInput = {
@@ -39,17 +37,20 @@ export async function insertClaim(
     .insert({
       employee_id: input.employeeId,
       claim_date: input.claimDateIso,
-      work_location: input.workLocation,
+      work_location_id: input.workLocationId,
       own_vehicle_used: input.ownVehicleUsed,
-      vehicle_type: input.vehicleType,
-      outstation_location: input.outstationLocation,
-      from_city: input.fromCity,
-      to_city: input.toCity,
+      vehicle_type_id: input.vehicleTypeId,
+      outstation_city_id: input.outstationCityId,
+      from_city_id: input.fromCityId,
+      to_city_id: input.toCityId,
       km_travelled: input.kmTravelled,
       total_amount: input.totalAmount,
-      status: input.status,
+      status_id: input.statusId,
       current_approval_level: input.currentApprovalLevel,
       submitted_at: input.submittedAt,
+      designation_id: input.designationId,
+      accommodation_nights: input.accommodationNights,
+      food_with_principals_amount: input.foodWithPrincipalsAmount,
     })
     .select('id, claim_number')
     .single()
@@ -70,17 +71,20 @@ export async function updateClaimDraftData(
     .from('expense_claims')
     .update({
       claim_date: input.claimDateIso,
-      work_location: input.workLocation,
+      work_location_id: input.workLocationId,
       own_vehicle_used: input.ownVehicleUsed,
-      vehicle_type: input.vehicleType,
-      outstation_location: input.outstationLocation,
-      from_city: input.fromCity,
-      to_city: input.toCity,
+      vehicle_type_id: input.vehicleTypeId,
+      outstation_city_id: input.outstationCityId,
+      from_city_id: input.fromCityId,
+      to_city_id: input.toCityId,
       km_travelled: input.kmTravelled,
       total_amount: input.totalAmount,
-      status: input.status,
+      status_id: input.statusId,
       current_approval_level: input.currentApprovalLevel,
       submitted_at: input.submittedAt,
+      designation_id: input.designationId,
+      accommodation_nights: input.accommodationNights,
+      food_with_principals_amount: input.foodWithPrincipalsAmount,
     })
     .eq('id', claimId)
 
@@ -135,13 +139,23 @@ export async function getClaimForDate(
 ): Promise<{
   id: string
   claim_number: string
-  status: ClaimStatus
+  status_code: string
+  current_approval_level: number | null
+  is_rejection: boolean
+  is_terminal: boolean
+  allow_resubmit: boolean
+  is_superseded: boolean
 } | null> {
+  // Only look at the ACTIVE (non-superseded) claim — the partial unique index
+  // guarantees at most one exists per employee+date.
   const { data, error } = await supabase
     .from('expense_claims')
-    .select('id, claim_number, status')
+    .select(
+      'id, claim_number, current_approval_level, allow_resubmit, is_superseded, claim_statuses!status_id(status_code, is_rejection, is_terminal)'
+    )
     .eq('employee_id', employeeId)
     .eq('claim_date', claimDateIso)
+    .eq('is_superseded', false)
     .maybeSingle()
 
   if (error && error.code !== 'PGRST116') {
@@ -152,36 +166,31 @@ export async function getClaimForDate(
     return null
   }
 
-  return data as { id: string; claim_number: string; status: ClaimStatus }
-}
-
-export async function getRateAmount(
-  supabase: SupabaseClient,
-  designation: string,
-  rateType: string,
-  vehicleType: VehicleType | null = null
-): Promise<number> {
-  let query = supabase
-    .from('expense_reimbursement_rates')
-    .select('amount')
-    .eq('designation', designation)
-    .eq('rate_type', rateType)
-
-  query = vehicleType
-    ? query.eq('vehicle_type', vehicleType)
-    : query.is('vehicle_type', null)
-
-  const { data, error } = await query.maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
+  const row = data as unknown as {
+    id: string
+    claim_number: string
+    current_approval_level: number | null
+    allow_resubmit: boolean
+    is_superseded: boolean
+    claim_statuses:
+      | { status_code: string; is_rejection: boolean; is_terminal: boolean }
+      | Array<{
+          status_code: string
+          is_rejection: boolean
+          is_terminal: boolean
+        }>
   }
-
-  if (!data) {
-    throw new Error(
-      `Missing reimbursement rate for ${designation} / ${rateType}.`
-    )
+  const statusInfo = Array.isArray(row.claim_statuses)
+    ? row.claim_statuses[0]
+    : row.claim_statuses
+  return {
+    id: row.id,
+    claim_number: row.claim_number,
+    status_code: statusInfo?.status_code ?? 'UNKNOWN',
+    current_approval_level: row.current_approval_level ?? null,
+    allow_resubmit: row.allow_resubmit ?? false,
+    is_superseded: row.is_superseded ?? false,
+    is_rejection: statusInfo?.is_rejection ?? false,
+    is_terminal: statusInfo?.is_terminal ?? false,
   }
-
-  return Number(data.amount)
 }

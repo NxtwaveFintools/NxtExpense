@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!isAllowedCorporateEmail(user?.email)) {
+  if (!(await isAllowedCorporateEmail(supabase, user?.email))) {
     await supabase.auth.signOut()
     return NextResponse.redirect(
       new URL('/login?error=email_domain_not_allowed', requestUrl.origin)

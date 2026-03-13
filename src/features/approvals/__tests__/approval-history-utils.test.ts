@@ -11,8 +11,7 @@ describe('normalizeApprovalHistoryFilters', () => {
     const result = normalizeApprovalHistoryFilters({})
     expect(result.employeeName).toBeNull()
     expect(result.actorFilter).toBe('all')
-    expect(result.claimDateFrom).toBeNull()
-    expect(result.claimDateTo).toBeNull()
+    expect(result.claimDate).toBeNull()
     expect(result.hodApprovedFrom).toBeNull()
     expect(result.hodApprovedTo).toBeNull()
     expect(result.financeApprovedFrom).toBeNull()
@@ -29,16 +28,14 @@ describe('normalizeApprovalHistoryFilters', () => {
   it('normalizes empty strings to null', () => {
     const result = normalizeApprovalHistoryFilters({
       employeeName: '',
-      claimDateFrom: '',
-      claimDateTo: '',
+      claimDate: '',
       hodApprovedFrom: '',
       hodApprovedTo: '',
       financeApprovedFrom: '',
       financeApprovedTo: '',
     })
     expect(result.employeeName).toBeNull()
-    expect(result.claimDateFrom).toBeNull()
-    expect(result.claimDateTo).toBeNull()
+    expect(result.claimDate).toBeNull()
     expect(result.hodApprovedFrom).toBeNull()
     expect(result.hodApprovedTo).toBeNull()
     expect(result.financeApprovedFrom).toBeNull()
@@ -47,11 +44,9 @@ describe('normalizeApprovalHistoryFilters', () => {
 
   it('converts DD/MM/YYYY to ISO', () => {
     const result = normalizeApprovalHistoryFilters({
-      claimDateFrom: '01/03/2026',
-      claimDateTo: '07/03/2026',
+      claimDate: '01/03/2026',
     })
-    expect(result.claimDateFrom).toBe('2026-03-01')
-    expect(result.claimDateTo).toBe('2026-03-07')
+    expect(result.claimDate).toBe('2026-03-01')
   })
 
   it('preserves ISO dates', () => {
@@ -75,15 +70,6 @@ describe('normalizeApprovalHistoryFilters', () => {
     }
   })
 
-  it('throws on inverted claim date range', () => {
-    expect(() =>
-      normalizeApprovalHistoryFilters({
-        claimDateFrom: '2026-03-08',
-        claimDateTo: '2026-03-01',
-      })
-    ).toThrow()
-  })
-
   it('throws on inverted HOD date range', () => {
     expect(() =>
       normalizeApprovalHistoryFilters({
@@ -104,7 +90,7 @@ describe('normalizeApprovalHistoryFilters', () => {
 
   it('throws on invalid date format', () => {
     expect(() =>
-      normalizeApprovalHistoryFilters({ claimDateFrom: '2026/03/01' })
+      normalizeApprovalHistoryFilters({ claimDate: '2026/03/01' })
     ).toThrow()
   })
 
@@ -112,8 +98,7 @@ describe('normalizeApprovalHistoryFilters', () => {
     const result = normalizeApprovalHistoryFilters({
       employeeName: 'Yohan',
       actorFilter: 'sbh',
-      claimDateFrom: '2026-03-01',
-      claimDateTo: '2026-03-07',
+      claimDate: '2026-03-01',
       hodApprovedFrom: '2026-03-02',
       hodApprovedTo: '2026-03-06',
       financeApprovedFrom: '2026-03-03',
@@ -121,8 +106,7 @@ describe('normalizeApprovalHistoryFilters', () => {
     })
     expect(result.employeeName).toBe('Yohan')
     expect(result.actorFilter).toBe('sbh')
-    expect(result.claimDateFrom).toBe('2026-03-01')
-    expect(result.claimDateTo).toBe('2026-03-07')
+    expect(result.claimDate).toBe('2026-03-01')
     expect(result.hodApprovedFrom).toBe('2026-03-02')
     expect(result.hodApprovedTo).toBe('2026-03-06')
     expect(result.financeApprovedFrom).toBe('2026-03-03')
@@ -131,44 +115,61 @@ describe('normalizeApprovalHistoryFilters', () => {
 })
 
 describe('getDefaultApprovalActorFilter', () => {
-  it('returns "sbh" for State Business Head', () => {
-    expect(getDefaultApprovalActorFilter('State Business Head')).toBe('sbh')
+  it('returns "sbh" for SBH designation (hierarchy level 4)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 4, isFinanceRole: false })
+    ).toBe('sbh')
   })
 
-  it('returns "hod" for Program Manager', () => {
-    expect(getDefaultApprovalActorFilter('Program Manager')).toBe('hod')
+  it('returns "hod" for PM designation (hierarchy level 6)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 6, isFinanceRole: false })
+    ).toBe('hod')
   })
 
-  it('returns "hod" for Zonal Business Head', () => {
-    expect(getDefaultApprovalActorFilter('Zonal Business Head')).toBe('hod')
+  it('returns "hod" for ZBH designation (hierarchy level 5)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 5, isFinanceRole: false })
+    ).toBe('hod')
   })
 
-  it('returns "finance" for Finance', () => {
-    expect(getDefaultApprovalActorFilter('Finance')).toBe('finance')
+  it('returns "finance" for finance role (isFinanceRole=true)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 7, isFinanceRole: true })
+    ).toBe('finance')
   })
 
-  it('returns "all" for SRO', () => {
-    expect(getDefaultApprovalActorFilter('Student Relationship Officer')).toBe(
-      'all'
-    )
+  it('returns "all" for SRO designation (hierarchy level 1)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 1, isFinanceRole: false })
+    ).toBe('all')
   })
 
-  it('returns "all" for BOA', () => {
-    expect(getDefaultApprovalActorFilter('Business Operation Associate')).toBe(
-      'all'
-    )
+  it('returns "all" for BOA designation (hierarchy level 2)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 2, isFinanceRole: false })
+    ).toBe('all')
   })
 
-  it('returns "all" for ABH', () => {
-    expect(getDefaultApprovalActorFilter('Area Business Head')).toBe('all')
+  it('returns "all" for ABH designation (hierarchy level 3)', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 3, isFinanceRole: false })
+    ).toBe('all')
   })
 
-  it('returns "all" for null designation', () => {
-    expect(getDefaultApprovalActorFilter(null)).toBe('all')
+  it('returns "all" for null hierarchy level', () => {
+    expect(
+      getDefaultApprovalActorFilter({
+        hierarchyLevel: null,
+        isFinanceRole: false,
+      })
+    ).toBe('all')
   })
 
-  it('returns "all" for undefined designation', () => {
-    expect(getDefaultApprovalActorFilter(undefined)).toBe('all')
+  it('returns "all" for non-special hierarchy levels', () => {
+    expect(
+      getDefaultApprovalActorFilter({ hierarchyLevel: 8, isFinanceRole: false })
+    ).toBe('all')
   })
 })
 
@@ -188,11 +189,12 @@ describe('buildApprovalHistoryCsv', () => {
       {
         actionId: 'act-1',
         claimId: 'claim-1',
-        claimNumber: 'CLM-001',
+        claimNumber: 'CLAIM-001',
         claimDate: '2026-03-06T00:00:00.000Z',
         workLocation: 'Field - Base Location',
         totalAmount: 300,
-        claimStatus: 'issued',
+        claimStatusName: 'Issued',
+        claimStatusDisplayColor: 'green',
         ownerName: 'Yohan Mutluri',
         ownerDesignation: 'Student Relationship Officer',
         actorEmail: 'nagaraju.madugula@nxtwave.co.in',
@@ -208,7 +210,7 @@ describe('buildApprovalHistoryCsv', () => {
 
     const lines = csv.split('\n')
     expect(lines).toHaveLength(2)
-    expect(lines[1]).toContain('CLM-001')
+    expect(lines[1]).toContain('CLAIM-001')
     expect(lines[1]).toContain('Yohan Mutluri')
     expect(lines[1]).toContain('Rs. 300.00')
   })
@@ -218,11 +220,12 @@ describe('buildApprovalHistoryCsv', () => {
       {
         actionId: 'act-1',
         claimId: 'claim-1',
-        claimNumber: 'CLM-001',
+        claimNumber: 'CLAIM-001',
         claimDate: '2026-03-06T00:00:00.000Z',
         workLocation: 'Field - Base Location',
         totalAmount: 300,
-        claimStatus: 'issued',
+        claimStatusName: 'Issued',
+        claimStatusDisplayColor: 'green',
         ownerName: 'User, With Comma',
         ownerDesignation: 'SRO',
         actorEmail: 'test@nxtwave.co.in',

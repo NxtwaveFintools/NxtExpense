@@ -1,6 +1,7 @@
 import { formatDate } from '@/lib/utils/date'
 
 import type { ClaimAvailableAction } from '@/features/claims/types'
+import type { FinanceActionType } from '@/features/finance/types'
 import type { FinanceQueueItem } from '@/features/finance/types'
 
 type FinanceClaimRowProps = {
@@ -43,7 +44,11 @@ export function FinanceClaimRow({
         <div className="flex flex-wrap gap-2">
           {item.availableActions
             .filter(
-              (action) =>
+              (
+                action
+              ): action is ClaimAvailableAction & {
+                action: FinanceActionType
+              } =>
                 action.action === 'issued' ||
                 action.action === 'finance_rejected'
             )

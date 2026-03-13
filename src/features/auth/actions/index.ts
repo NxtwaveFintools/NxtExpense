@@ -7,6 +7,11 @@ import {
   hasInvalidAzureTenantPath,
   isDevelopmentAuthEnabled,
 } from '@/lib/auth/auth-helpers'
+import {
+  appendAllowedDomainHint,
+  getAllowedCorporateEmailHint,
+  isAllowedCorporateEmail,
+} from '@/lib/auth/allowed-email-domains'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import {
@@ -67,6 +72,33 @@ export async function signInWithPasswordAction(
 
   if (errorMessage) {
     return { error: errorMessage }
+  }
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const isAllowedEmail = await isAllowedCorporateEmail(
+      supabase,
+      user?.email ?? parsedCredentials.data.email
+    )
+
+    if (!isAllowedEmail) {
+      const hint = await getAllowedCorporateEmailHint(supabase)
+      await signOutMutation(supabase)
+      return {
+        error: appendAllowedDomainHint(
+          'Only corporate emails are allowed.',
+          hint
+        ),
+      }
+    }
+  } catch {
+    await signOutMutation(supabase)
+    return {
+      error: 'Unable to validate corporate email domain. Please try again.',
+    }
   }
 
   redirect('/dashboard')

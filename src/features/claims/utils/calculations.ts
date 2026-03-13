@@ -8,6 +8,8 @@ type ClaimItemDraft = {
 
 type ClaimInput = {
   workLocation: string
+  requiresVehicleSelection?: boolean
+  requiresOutstationDetails?: boolean
   vehicleType?: string
   ownVehicleUsed?: boolean
   kmTravelled?: number
@@ -28,7 +30,7 @@ export function buildClaimItemsAndTotal(
 ): { items: ClaimItemDraft[]; total: number } {
   const items: ClaimItemDraft[] = []
 
-  if (input.workLocation === 'Field - Base Location') {
+  if (input.requiresVehicleSelection) {
     items.push({
       itemType: 'food',
       amount: rates.foodBase ?? 0,
@@ -41,7 +43,7 @@ export function buildClaimItemsAndTotal(
     })
   }
 
-  if (input.workLocation === 'Field - Outstation') {
+  if (input.requiresOutstationDetails) {
     items.push({
       itemType: 'food',
       amount: rates.foodOutstation ?? 0,

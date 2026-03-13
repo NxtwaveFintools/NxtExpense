@@ -6,8 +6,24 @@ type ClaimHistoryTimelineProps = {
   history: ClaimHistoryEntry[]
 }
 
-function formatActionLabel(action: string) {
-  return action.replaceAll('_', ' ')
+const ACTION_LABELS: Record<string, string> = {
+  submit: 'Submitted',
+  resubmit: 'Resubmitted (New Claim)',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  finance_issued: 'Payment Issued',
+  finance_rejected: 'Finance Rejected',
+  reopened: 'Reopened',
+  admin_override: 'Admin Override',
+}
+
+const LEVEL_LABELS: Record<number, string> = {
+  1: 'Level 1 — State Business Head',
+  2: 'Level 2 — HOD (Mansoor)',
+}
+
+function formatActionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action.replaceAll('_', ' ')
 }
 
 export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
@@ -30,7 +46,8 @@ export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
               </p>
               {entry.approval_level ? (
                 <p className="text-foreground/70">
-                  Level {entry.approval_level}
+                  {LEVEL_LABELS[entry.approval_level] ??
+                    `Level ${entry.approval_level}`}
                 </p>
               ) : null}
               <p className="text-foreground/70">
@@ -40,20 +57,31 @@ export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
                 {formatDatetime(entry.acted_at)}
               </p>
               {entry.rejection_notes ? (
-                <p className="mt-1">Rejection notes: {entry.rejection_notes}</p>
-              ) : null}
-              {entry.allow_resubmit !== null ? (
-                <p className="text-foreground/70">
-                  Allow resubmit: {entry.allow_resubmit ? 'Yes' : 'No'}
+                <p className="mt-1 text-red-600 dark:text-red-400">
+                  Reason: {entry.rejection_notes}
                 </p>
               ) : null}
+              {entry.allow_resubmit !== null &&
+              (entry.action === 'rejected' ||
+                entry.action === 'finance_rejected') ? (
+                entry.allow_resubmit ? (
+                  <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                    New claim allowed
+                  </p>
+                ) : (
+                  <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                    Permanently closed
+                  </p>
+                )
+              ) : null}
               {entry.bypass_reason ? (
-                <p className="mt-1">Bypass reason: {entry.bypass_reason}</p>
+                <p className="mt-1 text-foreground/60">
+                  Bypass reason: {entry.bypass_reason}
+                </p>
               ) : null}
-              {entry.reason ? (
-                <p className="mt-1">Reason: {entry.reason}</p>
+              {entry.notes && !entry.rejection_notes ? (
+                <p className="mt-1 text-foreground/70">{entry.notes}</p>
               ) : null}
-              {entry.notes ? <p className="mt-1">{entry.notes}</p> : null}
             </li>
           ))}
         </ul>

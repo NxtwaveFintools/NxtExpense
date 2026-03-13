@@ -15,6 +15,8 @@ type FilteredApprovalHistoryRpcRow = {
   work_location: string
   total_amount: number | string
   claim_status: string
+  claim_status_name: string
+  claim_status_display_color: string
   owner_name: string
   owner_designation: string
   actor_email: string
@@ -48,7 +50,8 @@ function mapHistoryRecord(
     claimDate: row.claim_date,
     workLocation: row.work_location,
     totalAmount: Number(row.total_amount),
-    claimStatus: row.claim_status,
+    claimStatusName: row.claim_status_name,
+    claimStatusDisplayColor: row.claim_status_display_color,
     ownerName: row.owner_name,
     ownerDesignation: row.owner_designation,
     actorEmail: row.actor_email,
@@ -78,8 +81,7 @@ export async function getFilteredApprovalHistoryPaginated(
     p_name_search: filters.employeeName,
     p_actor_filters:
       filters.actorFilter === 'all' ? ['all'] : [filters.actorFilter],
-    p_claim_date_from: filters.claimDateFrom,
-    p_claim_date_to: filters.claimDateTo,
+    p_claim_date: filters.claimDate,
     p_hod_approved_from: toIstDayStart(filters.hodApprovedFrom),
     p_hod_approved_to: toIstDayEnd(filters.hodApprovedTo),
     p_finance_approved_from: toIstDayStart(filters.financeApprovedFrom),

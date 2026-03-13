@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 
 import { claimSubmissionSchema } from '@/features/claims/validations'
 
@@ -13,6 +13,19 @@ describe('claimSubmissionSchema — work location branches', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Office / WFH',
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts Office / WFH claim when optional outstation fields are empty strings', () => {
+    const parsed = claimSubmissionSchema.safeParse({
+      claimDate: PAST_DATE,
+      workLocation: 'Office / WFH',
+      outstationCityId: '',
+      fromCityId: '',
+      toCityId: '',
+      vehicleType: '',
+      transportType: '',
     })
     expect(parsed.success).toBe(true)
   })
@@ -59,12 +72,12 @@ describe('claimSubmissionSchema — work location branches', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects base location without vehicle type', () => {
+  it('accepts base location without vehicle type (conditional fields validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Base Location',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   // ── Field - Outstation: Taxi (no own vehicle) ─────────────────────────────
@@ -75,7 +88,7 @@ describe('claimSubmissionSchema — work location branches', () => {
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
       transportType: 'Rapido/Uber/Ola',
-      outstationLocation: 'Bengaluru',
+      outstationCityId: 'mock-city-uuid',
       taxiAmount: 500,
     })
     expect(parsed.success).toBe(true)
@@ -87,7 +100,7 @@ describe('claimSubmissionSchema — work location branches', () => {
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
       transportType: 'Rental Vehicle',
-      outstationLocation: 'Chennai',
+      outstationCityId: 'mock-city-uuid',
       taxiAmount: 1200,
     })
     expect(parsed.success).toBe(true)
@@ -99,12 +112,12 @@ describe('claimSubmissionSchema — work location branches', () => {
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
       transportType: 'Rapido/Uber/Ola',
-      outstationLocation: 'Pune',
+      outstationCityId: 'mock-city-uuid',
     })
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects outstation taxi without outstation location', () => {
+  it('accepts outstation taxi without outstation location at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
@@ -112,17 +125,17 @@ describe('claimSubmissionSchema — work location branches', () => {
       transportType: 'Rapido/Uber/Ola',
       outstationLocation: '',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects outstation taxi without transport type', () => {
+  it('accepts outstation taxi without transport type at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
-      outstationLocation: 'Pune',
+      outstationCityId: 'mock-city-uuid',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('rejects negative taxi amount', () => {
@@ -131,7 +144,7 @@ describe('claimSubmissionSchema — work location branches', () => {
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
       transportType: 'Rapido/Uber/Ola',
-      outstationLocation: 'Pune',
+      outstationCityId: 'mock-city-uuid',
       taxiAmount: -100,
     })
     expect(parsed.success).toBe(false)
@@ -144,10 +157,10 @@ describe('claimSubmissionSchema — work location branches', () => {
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 100,
     })
     expect(parsed.success).toBe(true)
@@ -158,10 +171,10 @@ describe('claimSubmissionSchema — work location branches', () => {
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 150,
     })
     expect(parsed.success).toBe(true)
@@ -172,139 +185,128 @@ describe('claimSubmissionSchema — work location branches', () => {
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Guntur',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Four Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Guntur',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 300,
     })
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects outstation own vehicle without from city', () => {
+  it('accepts outstation own vehicle without from city at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: '',
-      toCity: 'Vijayawada',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 100,
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects outstation own vehicle without to city', () => {
+  it('accepts outstation own vehicle without to city at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: '',
+      fromCityId: 'mock-city-uuid',
       kmTravelled: 100,
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects outstation own vehicle with zero km', () => {
+  it('accepts outstation own vehicle with zero km at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 0,
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects outstation own vehicle with negative km', () => {
+  it('accepts outstation own vehicle with negative km at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: -50,
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 })
 
 describe('claimSubmissionSchema — KM limit validation (EDGE-005, EDGE-006)', () => {
-  it('rejects 2W outstation claim above 150 km (EDGE-005)', () => {
+  // KM limits are now validated server-side using max_km_round_trip from the
+  // vehicle_types DB table. Schema accepts any positive number.
+
+  it('accepts 2W outstation claim above 150 km at schema level (KM limit validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 200,
     })
-    expect(parsed.success).toBe(false)
-    if (!parsed.success) {
-      const kmIssue = parsed.error.issues.find((issue) =>
-        issue.path.includes('kmTravelled')
-      )
-      expect(kmIssue?.message).toContain('150')
-    }
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects 2W at 151 km (boundary above limit)', () => {
+  it('accepts 2W at 151 km at schema level', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 151,
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects 4W outstation claim above 300 km (EDGE-006)', () => {
+  it('accepts 4W outstation claim above 300 km at schema level (KM limit validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Guntur',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Four Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Guntur',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 350,
     })
-    expect(parsed.success).toBe(false)
-    if (!parsed.success) {
-      const kmIssue = parsed.error.issues.find((issue) =>
-        issue.path.includes('kmTravelled')
-      )
-      expect(kmIssue?.message).toContain('300')
-    }
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects 4W at 301 km (boundary above limit)', () => {
+  it('accepts 4W at 301 km at schema level', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Guntur',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Four Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Guntur',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 301,
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 })
 
@@ -359,12 +361,14 @@ describe('claimSubmissionSchema — date validation (EDGE-004)', () => {
 })
 
 describe('claimSubmissionSchema — invalid work location', () => {
-  it('rejects unknown work location', () => {
+  // Work location validity is now checked server-side via DB lookup.
+  // Schema only validates non-empty string.
+  it('accepts unknown work location at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Remote',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('rejects empty work location', () => {
@@ -382,18 +386,14 @@ describe('claimSubmissionSchema — coercion edge cases', () => {
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: '100',
     })
     expect(parsed.success).toBe(true)
-    if (
-      parsed.success &&
-      parsed.data.workLocation === 'Field - Outstation' &&
-      parsed.data.ownVehicleUsed
-    ) {
+    if (parsed.success) {
       expect(parsed.data.kmTravelled).toBe(100)
     }
   })
@@ -404,15 +404,11 @@ describe('claimSubmissionSchema — coercion edge cases', () => {
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
       transportType: 'Rapido/Uber/Ola',
-      outstationLocation: 'Bengaluru',
+      outstationCityId: 'mock-city-uuid',
       taxiAmount: '500',
     })
     expect(parsed.success).toBe(true)
-    if (
-      parsed.success &&
-      parsed.data.workLocation === 'Field - Outstation' &&
-      !parsed.data.ownVehicleUsed
-    ) {
+    if (parsed.success) {
       expect(parsed.data.taxiAmount).toBe(500)
     }
   })

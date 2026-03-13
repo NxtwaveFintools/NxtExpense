@@ -2,7 +2,7 @@ import { canAccessApprovals } from '@/features/employees/permissions'
 import {
   getEmployeeByEmail,
   hasApproverAssignments,
-} from '@/features/employees/queries'
+} from '@/lib/services/employee-service'
 import {
   getAllFilteredApprovalHistory,
   getFilteredApprovalHistoryPaginated,
@@ -28,12 +28,15 @@ async function handleExportRequest(request: Request) {
 
     const mode = getExportMode(searchParams.get('mode'))
     const historyCursor = searchParams.get('historyCursor')
+    const claimDate =
+      searchParams.get('claimDate') ??
+      searchParams.get('claimDateFrom') ??
+      searchParams.get('claimDateTo')
 
     const filters = normalizeApprovalHistoryFilters({
       employeeName: searchParams.get('employeeName') ?? undefined,
       actorFilter: searchParams.get('actorFilter') ?? undefined,
-      claimDateFrom: searchParams.get('claimDateFrom') ?? undefined,
-      claimDateTo: searchParams.get('claimDateTo') ?? undefined,
+      claimDate: claimDate ?? undefined,
       hodApprovedFrom: searchParams.get('hodApprovedFrom') ?? undefined,
       hodApprovedTo: searchParams.get('hodApprovedTo') ?? undefined,
       financeApprovedFrom: searchParams.get('financeApprovedFrom') ?? undefined,

@@ -4,7 +4,13 @@ import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
 import { copyResponseCookies } from '@/lib/utils/session-utils'
 import { refreshAuthSession } from '@/lib/supabase/middleware'
 
-const protectedRoutes = ['/dashboard', '/claims', '/approvals', '/finance']
+const protectedRoutes = [
+  '/dashboard',
+  '/claims',
+  '/approvals',
+  '/finance',
+  '/admin',
+]
 const publicAuthRoutes = ['/login']
 
 function matchesRoute(pathname: string, route: string): boolean {
@@ -52,6 +58,7 @@ export const config = {
     '/claims/:path*',
     '/approvals/:path*',
     '/finance/:path*',
+    '/admin/:path*',
     '/login',
   ],
 }

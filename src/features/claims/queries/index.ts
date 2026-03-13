@@ -11,16 +11,48 @@ import type {
   PaginatedClaims,
 } from '@/features/claims/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
+import {
+  getClaimStatusDisplayLabel,
+  VISIBLE_CLAIM_STATUS_CODES,
+} from '@/lib/utils/claim-status'
 
-const CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location, own_vehicle_used, vehicle_type, outstation_location, from_city, to_city, km_travelled, total_amount, status, current_approval_level, submitted_at, created_at, updated_at, tenant_id, resubmission_count, last_rejection_notes, last_rejected_by_email, last_rejected_at'
+export const CLAIM_COLUMNS =
+  'id, claim_number, employee_id, claim_date, work_location_id, work_locations(location_name), own_vehicle_used, vehicle_type_id, vehicle_types(vehicle_name), outstation_city_id, from_city_id, to_city_id, outstation_city:cities!outstation_city_id(city_name), from_city_data:cities!from_city_id(city_name), to_city_data:cities!to_city_id(city_name), km_travelled, total_amount, status_id, allow_resubmit, is_superseded, claim_statuses!status_id(status_code, status_name, display_color, is_terminal, is_rejection), current_approval_level, submitted_at, created_at, updated_at, resubmission_count, last_rejection_notes, last_rejected_at, accommodation_nights, food_with_principals_amount'
+
+// Maps raw Supabase FK join row to flat Claim type
+export function mapClaimRow(raw: Record<string, unknown>): Claim {
+  const r = raw as Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+  const statusInfo = Array.isArray(r.claim_statuses)
+    ? r.claim_statuses[0]
+    : r.claim_statuses
+  const statusCode = statusInfo?.status_code
+  const outstationCity = Array.isArray(r.outstation_city)
+    ? r.outstation_city[0]
+    : r.outstation_city
+  const fromCityObj = Array.isArray(r.from_city_data)
+    ? r.from_city_data[0]
+    : r.from_city_data
+  const toCityObj = Array.isArray(r.to_city_data)
+    ? r.to_city_data[0]
+    : r.to_city_data
+  return {
+    ...r,
+    statusName: getClaimStatusDisplayLabel(statusCode, statusInfo?.status_name),
+    statusDisplayColor: statusInfo?.display_color ?? 'neutral',
+    is_terminal: statusInfo?.is_terminal ?? false,
+    is_rejection: statusInfo?.is_rejection ?? false,
+    work_location: r.work_locations?.location_name ?? '',
+    vehicle_type: r.vehicle_types?.vehicle_name ?? null,
+    outstation_city_name: outstationCity?.city_name ?? null,
+    from_city_name: fromCityObj?.city_name ?? null,
+    to_city_name: toCityObj?.city_name ?? null,
+  } as Claim
+}
 
 const DEFAULT_MY_CLAIMS_FILTERS: MyClaimsFilters = {
   claimStatus: null,
   workLocation: null,
-  claimDateFrom: null,
-  claimDateTo: null,
-  resubmittedOnly: false,
+  claimDate: null,
 }
 
 export async function getMyClaimsPaginated(
@@ -46,23 +78,22 @@ export async function getMyClaimsPaginated(
   }
 
   if (filters.claimStatus) {
-    query = query.eq('status', filters.claimStatus)
+    const { data: statusRow } = await supabase
+      .from('claim_statuses')
+      .select('id')
+      .eq('status_code', filters.claimStatus)
+      .maybeSingle()
+    if (statusRow) {
+      query = query.eq('status_id', statusRow.id)
+    }
   }
 
   if (filters.workLocation) {
-    query = query.eq('work_location', filters.workLocation)
+    query = query.eq('work_location_id', filters.workLocation)
   }
 
-  if (filters.claimDateFrom) {
-    query = query.gte('claim_date', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    query = query.lte('claim_date', filters.claimDateTo)
-  }
-
-  if (filters.resubmittedOnly) {
-    query = query.gt('resubmission_count', 0)
+  if (filters.claimDate) {
+    query = query.eq('claim_date', filters.claimDate)
   }
 
   const { data, error } = await query
@@ -71,7 +102,7 @@ export async function getMyClaimsPaginated(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as Claim[]
+  const rows = (data ?? []).map(mapClaimRow)
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
 
@@ -120,7 +151,7 @@ export async function getClaimById(
   }
 
   return {
-    claim: claimData as Claim,
+    claim: mapClaimRow(claimData as Record<string, unknown>),
     items: (itemData ?? []) as ClaimItem[],
   }
 }
@@ -129,17 +160,26 @@ export async function getClaimStatusCatalog(
   supabase: SupabaseClient
 ): Promise<ClaimStatusCatalogItem[]> {
   const { data, error } = await supabase
-    .from('claim_status_catalog')
+    .from('claim_statuses')
     .select(
-      'status, display_label, is_terminal, sort_order, color_token, description'
+      'status_code, status_name, is_terminal, display_order, display_color'
     )
-    .order('sort_order', { ascending: true })
+    .eq('is_active', true)
+    .in('status_code', [...VISIBLE_CLAIM_STATUS_CODES])
+    .order('display_order', { ascending: true })
 
   if (error) {
     throw new Error(error.message)
   }
 
-  return (data ?? []) as ClaimStatusCatalogItem[]
+  return (data ?? []).map((row) => ({
+    status: row.status_code,
+    display_label: getClaimStatusDisplayLabel(row.status_code, row.status_name),
+    is_terminal: row.is_terminal,
+    sort_order: row.display_order,
+    color_token: row.display_color ?? 'neutral',
+    description: null,
+  }))
 }
 
 export async function getClaimAvailableActions(
@@ -164,7 +204,7 @@ export async function getClaimHistory(
   const { data, error } = await supabase
     .from('approval_history')
     .select(
-      'id, claim_id, approver_email, approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
+      'id, claim_id, approver_employee_id, approver:employees!approver_employee_id(employee_email, employee_name), approval_level, action, notes, rejection_notes, allow_resubmit, bypass_reason, skipped_levels, reason, acted_at'
     )
     .eq('claim_id', claimId)
     .order('acted_at', { ascending: true })
@@ -173,38 +213,42 @@ export async function getClaimHistory(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as ClaimHistoryEntry[]
+  return (data ?? []).map((row) => {
+    const r = row as Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+    return {
+      ...r,
+      approver_email: r.approver?.employee_email ?? '',
+      approver_name: r.approver?.employee_name ?? null,
+    } as ClaimHistoryEntry
+  })
+}
 
-  // Resolve display names for all unique actor emails in one batch query.
-  // Emails like system@nxt-expense.internal won't match any employee row,
-  // so approver_name stays null and the email falls back in the UI.
-  const uniqueEmails = [
-    ...new Set(
-      rows
-        .map((r) => r.approver_email?.toLowerCase())
-        .filter((e): e is string => Boolean(e))
-    ),
-  ]
+export async function getAllFilteredMyClaims(
+  supabase: SupabaseClient,
+  employeeId: string,
+  filters: MyClaimsFilters,
+  batchSize = 200
+): Promise<Claim[]> {
+  const allRows: Claim[] = []
+  let cursor: string | null = null
 
-  if (uniqueEmails.length === 0) {
-    return rows
+  for (;;) {
+    const page = await getMyClaimsPaginated(
+      supabase,
+      employeeId,
+      cursor,
+      batchSize,
+      filters
+    )
+
+    allRows.push(...page.data)
+
+    if (!page.hasNextPage || !page.nextCursor) {
+      break
+    }
+
+    cursor = page.nextCursor
   }
 
-  const { data: empData } = await supabase
-    .from('employees')
-    .select('employee_email, employee_name')
-    .in('employee_email', uniqueEmails)
-
-  const nameByEmail = new Map<string, string>(
-    (empData ?? []).map((e) => [
-      e.employee_email.toLowerCase(),
-      e.employee_name,
-    ])
-  )
-
-  return rows.map((r) => ({
-    ...r,
-    approver_name:
-      nameByEmail.get(r.approver_email?.toLowerCase() ?? '') ?? null,
-  }))
+  return allRows
 }

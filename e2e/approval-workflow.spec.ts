@@ -31,24 +31,47 @@ test.describe.serial('Approval Workflow — SRO claim through full chain', () =>
 
     const claims = new ClaimsPage(page)
 
-    // Fill a base location 2W claim for a known past date
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const yyyy = yesterday.getFullYear()
-    const mm = String(yesterday.getMonth() + 1).padStart(2, '0')
-    const dd = String(yesterday.getDate()).padStart(2, '0')
-    const dateStr = `${yyyy}-${mm}-${dd}`
+    // Find a claim date that is not already occupied for this employee.
+    let submitted = false
+    for (let daysBack = 1; daysBack <= 3650; daysBack++) {
+      const candidateDate = new Date()
+      candidateDate.setDate(candidateDate.getDate() - daysBack)
+      const yyyy = candidateDate.getFullYear()
+      const mm = String(candidateDate.getMonth() + 1).padStart(2, '0')
+      const dd = String(candidateDate.getDate()).padStart(2, '0')
+      const dateStr = `${yyyy}-${mm}-${dd}`
 
-    await claims.dateInput.fill(dateStr)
-    await claims.workLocationSelect.selectOption('Field - Base Location')
-    await claims.vehicleTypeSelect.selectOption('Two Wheeler')
-    await claims.submitButton.click()
+      await claims.dateInput.fill(dateStr)
+      await claims.workLocationSelect.selectOption('Field - Base Location')
+      await claims.vehicleTypeSelect.selectOption('Two Wheeler')
+      await claims.submitButton.click()
 
-    // Should redirect to claims list or success toast
-    await page.waitForURL('**/claims**', { timeout: 10_000 })
-    await expect(page.getByText(/submitted|success/i)).toBeVisible({
-      timeout: 5_000,
-    })
+      try {
+        await page.waitForURL((url) => new URL(url).pathname === '/claims', {
+          timeout: 3_000,
+        })
+      } catch {
+        await expect(claims.submitButton).toBeEnabled({ timeout: 15_000 })
+      }
+
+      if (new URL(page.url()).pathname === '/claims') {
+        submitted = true
+        break
+      }
+
+      const duplicateDateError =
+        (await page
+          .getByText(/already have a pending or approved claim for this date/i)
+          .count()) > 0
+
+      if (duplicateDateError) {
+        continue
+      }
+
+      throw new Error('Claim submission did not complete as expected.')
+    }
+
+    expect(submitted).toBe(true)
   })
 
   test('APPROVE-L1: SBH approves the claim at Level 1', async ({
@@ -106,11 +129,12 @@ test.describe.serial('Approval Workflow — SRO claim through full chain', () =>
     await finance.goto()
 
     await expect(finance.queueRows.first()).toBeVisible({ timeout: 10_000 })
+    const queueCountBefore = await finance.queueRows.count()
     // Issue action fires immediately inline — no secondary confirmation step
     await finance.getIssueButton().click()
 
-    await expect(page.getByText(/issued|success/i)).toBeVisible({
-      timeout: 5_000,
-    })
+    await expect
+      .poll(async () => finance.queueRows.count(), { timeout: 10_000 })
+      .toBeLessThan(queueCountBefore)
   })
 })

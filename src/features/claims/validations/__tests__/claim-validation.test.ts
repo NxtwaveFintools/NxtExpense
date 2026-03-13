@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 
 import { claimSubmissionSchema } from '@/features/claims/validations'
 
@@ -12,19 +12,33 @@ describe('claimSubmissionSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects 2W outstation claim above 150km', () => {
+  it('accepts office claim when optional outstation fields are empty strings', () => {
+    const parsed = claimSubmissionSchema.safeParse({
+      claimDate: '06/03/2026',
+      workLocation: 'Office / WFH',
+      outstationCityId: '',
+      fromCityId: '',
+      toCityId: '',
+      vehicleType: '',
+      transportType: '',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts 2W outstation claim above 150km at schema level (KM limit validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: '06/03/2026',
       workLocation: 'Field - Outstation',
       ownVehicleUsed: true,
-      outstationLocation: 'Vijayawada',
+      outstationCityId: 'mock-city-uuid',
       vehicleType: 'Two Wheeler',
-      fromCity: 'Hyderabad',
-      toCity: 'Vijayawada',
+      fromCityId: 'mock-city-uuid',
+      toCityId: 'mock-city-uuid',
       kmTravelled: 180,
     })
 
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('accepts outstation taxi flow without own vehicle', () => {
@@ -33,7 +47,7 @@ describe('claimSubmissionSchema', () => {
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
       transportType: 'Rapido/Uber/Ola',
-      outstationLocation: 'Bengaluru',
+      outstationCityId: 'mock-city-uuid',
       taxiAmount: 450,
     })
 

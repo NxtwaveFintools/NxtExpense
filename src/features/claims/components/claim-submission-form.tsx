@@ -18,15 +18,18 @@ import { formatDate } from '@/lib/utils/date'
 import type {
   ClaimFormInitialValues,
   ClaimFormValues,
+  SelectOption,
   TransportType,
   VehicleType,
   WorkLocation,
+  WorkLocationOption,
 } from '@/features/claims/types'
 
 type ClaimSubmissionFormProps = {
-  allowedVehicleTypes: readonly VehicleType[]
-  workLocationOptions: readonly WorkLocation[]
-  transportTypeOptions: readonly TransportType[]
+  allowedVehicleTypes: readonly SelectOption[]
+  workLocationOptions: readonly WorkLocationOption[]
+  transportTypeOptions: readonly SelectOption[]
+  cityOptions: readonly SelectOption[]
   claimRateSnapshot: ClaimRateSnapshot
   initialValues?: ClaimFormInitialValues | null
 }
@@ -35,17 +38,18 @@ export function ClaimSubmissionForm({
   allowedVehicleTypes,
   workLocationOptions,
   transportTypeOptions,
+  cityOptions,
   claimRateSnapshot,
   initialValues,
 }: ClaimSubmissionFormProps) {
   const isEditingReturnedClaim = Boolean(initialValues)
   const initialWorkLocation =
-    initialValues?.workLocation ?? workLocationOptions[0] ?? 'Office / WFH'
+    initialValues?.workLocation ?? workLocationOptions[0]?.id ?? ''
   const initialVehicleType =
     initialValues?.vehicleType &&
-    allowedVehicleTypes.includes(initialValues.vehicleType)
+    allowedVehicleTypes.some((vt) => vt.id === initialValues.vehicleType)
       ? initialValues.vehicleType
-      : allowedVehicleTypes[0]
+      : (allowedVehicleTypes[0]?.id ?? '')
 
   const router = useRouter()
   const [workLocation, setWorkLocation] =
@@ -59,41 +63,69 @@ export function ClaimSubmissionForm({
     initialValues?.ownVehicleUsed ?? true
   )
   const [transportType, setTransportType] = useState<TransportType>(
-    initialValues?.transportType ?? transportTypeOptions[0] ?? 'Rental Vehicle'
+    initialValues?.transportType ?? transportTypeOptions[0]?.id ?? ''
   )
-  const [outstationLocation, setOutstationLocation] = useState(
-    initialValues?.outstationLocation ?? ''
+  const [outstationCityId, setOutstationCityId] = useState(
+    initialValues?.outstationCityId ?? ''
   )
-  const [fromCity, setFromCity] = useState(initialValues?.fromCity ?? '')
-  const [toCity, setToCity] = useState(initialValues?.toCity ?? '')
+  const [fromCityId, setFromCityId] = useState(initialValues?.fromCityId ?? '')
+  const [toCityId, setToCityId] = useState(initialValues?.toCityId ?? '')
   const [kmTravelled, setKmTravelled] = useState(
     initialValues?.kmTravelled ? String(initialValues.kmTravelled) : ''
   )
   const [taxiAmount, setTaxiAmount] = useState(
     initialValues?.taxiAmount ? String(initialValues.taxiAmount) : ''
   )
+  const [accommodationNights, setAccommodationNights] = useState(
+    initialValues?.accommodationNights
+      ? String(initialValues.accommodationNights)
+      : ''
+  )
+  const [foodWithPrincipalsAmount, setFoodWithPrincipalsAmount] = useState(
+    initialValues?.foodWithPrincipalsAmount
+      ? String(initialValues.foodWithPrincipalsAmount)
+      : ''
+  )
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const todayIso = dayjs().format('YYYY-MM-DD')
 
+  const selectedLocation = useMemo(
+    () => workLocationOptions.find((wl) => wl.id === workLocation) ?? null,
+    [workLocation, workLocationOptions]
+  )
+
   const summary = useMemo(() => {
     return getClaimSummaryPreview({
       workLocation,
+      requiresVehicleSelection:
+        selectedLocation?.requires_vehicle_selection ?? false,
+      requiresOutstationDetails:
+        selectedLocation?.requires_outstation_details ?? false,
       ownVehicleUsed,
       transportType,
+      transportTypeName:
+        transportTypeOptions.find((t) => t.id === transportType)?.name ?? '',
       vehicleType,
+      vehicleTypeName:
+        allowedVehicleTypes.find((v) => v.id === vehicleType)?.name ?? '',
       kmTravelled,
       taxiAmount,
+      accommodationNights,
+      foodWithPrincipalsAmount,
       claimRateSnapshot,
     })
   }, [
     workLocation,
+    selectedLocation,
     ownVehicleUsed,
     transportType,
     kmTravelled,
     taxiAmount,
     vehicleType,
+    accommodationNights,
+    foodWithPrincipalsAmount,
     claimRateSnapshot,
   ])
 
@@ -105,10 +137,14 @@ export function ClaimSubmissionForm({
       return
     }
 
-    setFromCity('')
-    setToCity('')
+    setFromCityId('')
+    setToCityId('')
     setKmTravelled('')
   }
+
+  const showFoodWithPrincipals =
+    claimRateSnapshot.foodWithPrincipalsMax !== null &&
+    claimRateSnapshot.foodWithPrincipalsMax > 0
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -125,21 +161,54 @@ export function ClaimSubmissionForm({
 
     const kmTravelledValue = Number.parseFloat(kmTravelled)
     const taxiAmountValue = Number.parseFloat(taxiAmount)
+    const accommodationNightsValue = Number.parseInt(accommodationNights, 10)
+    const fwpAmountValue = Number.parseFloat(foodWithPrincipalsAmount)
+    const requiresOutstationDetails =
+      selectedLocation?.requires_outstation_details ?? false
+    const requiresVehicleSelection =
+      selectedLocation?.requires_vehicle_selection ?? false
+    const isOutstationOwnVehicle = requiresOutstationDetails && ownVehicleUsed
 
     const payload: ClaimFormValues = {
       claimDate: formatDate(claimDate),
       workLocation,
-      vehicleType,
-      ownVehicleUsed,
-      transportType:
-        workLocation === 'Field - Outstation' && !ownVehicleUsed
-          ? transportType
+      ownVehicleUsed: requiresOutstationDetails ? ownVehicleUsed : undefined,
+      vehicleType:
+        requiresVehicleSelection || isOutstationOwnVehicle
+          ? vehicleType || undefined
           : undefined,
-      outstationLocation,
-      fromCity,
-      toCity,
-      kmTravelled: Number.isFinite(kmTravelledValue) ? kmTravelledValue : 0,
-      taxiAmount: Number.isFinite(taxiAmountValue) ? taxiAmountValue : 0,
+      transportType:
+        requiresOutstationDetails && !ownVehicleUsed
+          ? transportType || undefined
+          : undefined,
+      outstationCityId: requiresOutstationDetails
+        ? outstationCityId || undefined
+        : undefined,
+      fromCityId: isOutstationOwnVehicle ? fromCityId || undefined : undefined,
+      toCityId: isOutstationOwnVehicle ? toCityId || undefined : undefined,
+      kmTravelled:
+        isOutstationOwnVehicle && Number.isFinite(kmTravelledValue)
+          ? kmTravelledValue
+          : undefined,
+      taxiAmount:
+        requiresOutstationDetails &&
+        !ownVehicleUsed &&
+        Number.isFinite(taxiAmountValue)
+          ? taxiAmountValue
+          : undefined,
+      accommodationNights:
+        requiresOutstationDetails &&
+        Number.isFinite(accommodationNightsValue) &&
+        accommodationNightsValue > 0
+          ? accommodationNightsValue
+          : undefined,
+      foodWithPrincipalsAmount:
+        requiresOutstationDetails &&
+        showFoodWithPrincipals &&
+        Number.isFinite(fwpAmountValue) &&
+        fwpAmountValue > 0
+          ? fwpAmountValue
+          : undefined,
     }
 
     try {
@@ -223,14 +292,14 @@ export function ClaimSubmissionForm({
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
             {workLocationOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
+              <option key={option.id} value={option.id}>
+                {option.location_name}
               </option>
             ))}
           </select>
         </label>
 
-        {workLocation === 'Field - Base Location' ? (
+        {selectedLocation?.requires_vehicle_selection ? (
           <BaseLocationFields
             vehicleType={vehicleType}
             allowedVehicleTypes={allowedVehicleTypes}
@@ -238,26 +307,32 @@ export function ClaimSubmissionForm({
           />
         ) : null}
 
-        {workLocation === 'Field - Outstation' ? (
+        {selectedLocation?.requires_outstation_details ? (
           <OutstationFields
             ownVehicleUsed={ownVehicleUsed}
             vehicleType={vehicleType}
             transportType={transportType}
-            outstationLocation={outstationLocation}
-            fromCity={fromCity}
-            toCity={toCity}
+            outstationCityId={outstationCityId}
+            fromCityId={fromCityId}
+            toCityId={toCityId}
             kmTravelled={kmTravelled}
             taxiAmount={taxiAmount}
+            accommodationNights={accommodationNights}
+            foodWithPrincipalsAmount={foodWithPrincipalsAmount}
             allowedVehicleTypes={allowedVehicleTypes}
             transportTypeOptions={transportTypeOptions}
+            cityOptions={cityOptions}
+            showFoodWithPrincipals={showFoodWithPrincipals}
             onOwnVehicleUsedChange={handleOwnVehicleUsedChange}
             onVehicleTypeChange={setVehicleType}
             onTransportTypeChange={setTransportType}
-            onOutstationLocationChange={setOutstationLocation}
-            onFromCityChange={setFromCity}
-            onToCityChange={setToCity}
+            onOutstationCityIdChange={setOutstationCityId}
+            onFromCityIdChange={setFromCityId}
+            onToCityIdChange={setToCityId}
             onKmTravelledChange={setKmTravelled}
             onTaxiAmountChange={setTaxiAmount}
+            onAccommodationNightsChange={setAccommodationNights}
+            onFoodWithPrincipalsAmountChange={setFoodWithPrincipalsAmount}
           />
         ) : null}
 

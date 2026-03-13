@@ -1,9 +1,6 @@
 import Link from 'next/link'
 
-import type {
-  ClaimStatusCatalogItem,
-  PaginatedClaims,
-} from '@/features/claims/types'
+import type { PaginatedClaims } from '@/features/claims/types'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
 import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
 import { formatDate, formatDatetime } from '@/lib/utils/date'
@@ -16,15 +13,10 @@ type ClaimListPagination = {
 
 type ClaimListProps = {
   claims: PaginatedClaims
-  statusCatalog: ClaimStatusCatalogItem[]
   pagination: ClaimListPagination
 }
 
-export function ClaimList({
-  claims,
-  statusCatalog,
-  pagination,
-}: ClaimListProps) {
+export function ClaimList({ claims, pagination }: ClaimListProps) {
   if (claims.data.length === 0) {
     return (
       <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -32,6 +24,12 @@ export function ClaimList({
         <p className="mt-2 text-sm text-foreground/70">
           No claims yet. Create your first claim to begin the workflow.
         </p>
+        <Link
+          href="/claims/new"
+          className="mt-4 inline-block rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background"
+        >
+          New Claim
+        </Link>
       </section>
     )
   }
@@ -64,7 +62,6 @@ export function ClaimList({
               <th className="px-3 py-2 font-medium">Amount</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Submitted At</th>
-              <th className="px-3 py-2 font-medium">Rework</th>
             </tr>
           </thead>
           <tbody>
@@ -85,23 +82,14 @@ export function ClaimList({
                 </td>
                 <td className="px-3 py-3">
                   <ClaimStatusBadge
-                    status={claim.status}
-                    statusCatalog={statusCatalog}
+                    statusName={claim.statusName}
+                    statusDisplayColor={claim.statusDisplayColor}
                   />
                 </td>
                 <td className="px-3 py-3">
                   {claim.submitted_at
                     ? formatDatetime(claim.submitted_at)
                     : '-'}
-                </td>
-                <td className="px-3 py-3">
-                  {claim.resubmission_count > 0 ? (
-                    <span className="rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                      Resubmitted ({claim.resubmission_count})
-                    </span>
-                  ) : (
-                    <span className="text-xs text-foreground/60">-</span>
-                  )}
                 </td>
               </tr>
             ))}

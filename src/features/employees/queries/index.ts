@@ -1,9 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { ApprovalChain, Employee } from '@/features/employees/types'
+import type { EmployeeRow } from '@/lib/services/employee-service'
+
+type ApprovalChain = {
+  level1: string | null
+  level2: string | null
+  level3: string | null
+}
 
 const EMPLOYEE_COLUMNS =
-  'id, employee_id, employee_name, employee_email, state, designation, approval_email_level_1, approval_email_level_2, approval_email_level_3, created_at'
+  'id, employee_id, employee_name, employee_email, state, designation, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, created_at'
 
 const EMPLOYEE_FETCH_MAX_RETRIES = 1
 
@@ -26,7 +32,7 @@ async function waitBeforeRetry(delayMs: number): Promise<void> {
 export async function getEmployeeByEmail(
   supabase: SupabaseClient,
   email: string
-): Promise<Employee | null> {
+): Promise<EmployeeRow | null> {
   for (let attempt = 0; attempt <= EMPLOYEE_FETCH_MAX_RETRIES; attempt += 1) {
     const { data, error } = await supabase
       .from('employees')
@@ -35,7 +41,7 @@ export async function getEmployeeByEmail(
       .maybeSingle()
 
     if (!error) {
-      return data as Employee | null
+      return data as EmployeeRow | null
     }
 
     const shouldRetry =
@@ -56,7 +62,7 @@ export async function getEmployeeByEmail(
 export async function getEmployeeById(
   supabase: SupabaseClient,
   id: string
-): Promise<Employee | null> {
+): Promise<EmployeeRow | null> {
   const { data, error } = await supabase
     .from('employees')
     .select(EMPLOYEE_COLUMNS)
@@ -67,14 +73,29 @@ export async function getEmployeeById(
     throw new Error(error.message)
   }
 
-  return data as Employee | null
+  return data as EmployeeRow | null
 }
 
 export async function hasApproverAssignments(
   supabase: SupabaseClient,
   approverEmail: string
 ): Promise<boolean> {
-  const normalizedEmail = approverEmail.toLowerCase()
+  // Look up the approver employee ID from their email first
+  const { data: approverRow, error: approverError } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('employee_email', approverEmail.toLowerCase())
+    .maybeSingle()
+
+  if (approverError) {
+    throw new Error(approverError.message)
+  }
+
+  if (!approverRow) {
+    return false
+  }
+
+  const approverId = approverRow.id
 
   // Only L1 (SBH for SRO/BOA/ABH) and L3 (Mansoor, final for all) are actual
   // approval stops in the expense claim workflow. L2 is org-hierarchy only and
@@ -83,12 +104,12 @@ export async function hasApproverAssignments(
     supabase
       .from('employees')
       .select('id')
-      .eq('approval_email_level_1', normalizedEmail)
+      .eq('approval_employee_id_level_1', approverId)
       .limit(1),
     supabase
       .from('employees')
       .select('id')
-      .eq('approval_email_level_3', normalizedEmail)
+      .eq('approval_employee_id_level_3', approverId)
       .limit(1),
   ])
 
@@ -103,10 +124,10 @@ export async function hasApproverAssignments(
   return (level1.data?.length ?? 0) > 0 || (level3.data?.length ?? 0) > 0
 }
 
-export function getEmployeeApprovalChain(employee: Employee): ApprovalChain {
+export function getEmployeeApprovalChain(employee: EmployeeRow): ApprovalChain {
   return {
-    level1: employee.approval_email_level_1,
-    level2: employee.approval_email_level_2,
-    level3: employee.approval_email_level_3,
+    level1: employee.approval_employee_id_level_1,
+    level2: employee.approval_employee_id_level_2,
+    level3: employee.approval_employee_id_level_3,
   }
 }
