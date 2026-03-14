@@ -176,8 +176,8 @@ export default async function DashboardPage() {
                 Dashboard
               </h1>
               <p className="text-sm text-foreground/70">
-                Claim submission, approvals, and finance processing in one
-                place.
+                Submit your daily field expenses and track their approval status
+                — all in one place.
               </p>
             </div>
             {dashboardAccess.canCreateClaims ? (
@@ -196,7 +196,7 @@ export default async function DashboardPage() {
                 className="size-5 text-foreground/70"
                 aria-hidden="true"
               />
-              User Information
+              Your Details
             </h2>
             <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
               <div className="space-y-1 rounded-lg border border-border bg-background p-4">
@@ -261,10 +261,10 @@ export default async function DashboardPage() {
                 </p>
                 <h2 className="mt-1 inline-flex items-center gap-2 text-lg font-semibold">
                   <Banknote className="size-4" aria-hidden="true" />
-                  Finance Queue
+                  Claims Processing
                 </h2>
                 <p className="mt-1 text-sm text-foreground/70">
-                  Issue or reject claims after final approval.
+                  Review approved claims and issue payments or rejections.
                 </p>
               </Link>
             ) : null}
@@ -316,7 +316,7 @@ export default async function DashboardPage() {
                 <table className="w-full text-sm">
                   <thead className="border-b border-border">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70">
+                      <th className="px-3 py-2 text-left font-medium text-foreground/70 whitespace-nowrap">
                         Claim #
                       </th>
                       <th className="px-3 py-2 text-left font-medium text-foreground/70">
@@ -333,7 +333,7 @@ export default async function DashboardPage() {
                   <tbody className="divide-y divide-border">
                     {recentClaims.map((c) => (
                       <tr key={c.id} className="hover:bg-muted/50">
-                        <td className="px-3 py-2 font-mono text-xs">
+                        <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">
                           {c.claim_number ?? '—'}
                         </td>
                         <td className="px-3 py-2">

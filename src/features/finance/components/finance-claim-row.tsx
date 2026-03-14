@@ -33,15 +33,9 @@ export function FinanceClaimRow({
           onChange={(event) => onToggle(item.claim.id, event.target.checked)}
         />
       </td>
-      <td className="px-3 py-3 font-medium">{item.claim.claim_number}</td>
-      <td className="px-3 py-3">{item.owner.employee_name}</td>
-      <td className="px-3 py-3">{formatDate(item.claim.claim_date)}</td>
-      <td className="px-3 py-3">{item.claim.work_location}</td>
-      <td className="px-3 py-3">
-        Rs. {Number(item.claim.total_amount).toFixed(2)}
-      </td>
-      <td className="px-3 py-3">
-        <div className="flex flex-wrap gap-2">
+      <td className="px-3 py-3 font-medium">
+        <p className="whitespace-nowrap">{item.claim.claim_number}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
           {item.availableActions
             .filter(
               (
@@ -64,6 +58,12 @@ export function FinanceClaimRow({
               </button>
             ))}
         </div>
+      </td>
+      <td className="px-3 py-3">{item.owner.employee_name}</td>
+      <td className="px-3 py-3">{formatDate(item.claim.claim_date)}</td>
+      <td className="px-3 py-3">{item.claim.work_location}</td>
+      <td className="px-3 py-3">
+        Rs. {Number(item.claim.total_amount).toFixed(2)}
       </td>
     </tr>
   )

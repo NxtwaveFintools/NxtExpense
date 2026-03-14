@@ -10,6 +10,7 @@ import { canAccessEmployeeClaimsFromRoles } from '@/lib/services/approval-servic
 import {
   getAllWorkLocations,
   getClaimStatusByCode,
+  getDesignationApprovalFlow,
 } from '@/lib/services/config-service'
 import {
   calculateBaseLocationItems,
@@ -26,8 +27,6 @@ import {
   getClaimForDate,
   insertClaim,
   insertClaimItems,
-  updateClaimDraftData,
-  replaceClaimItems,
 } from '@/features/claims/mutations'
 import { getMyClaimsPaginated } from '@/features/claims/queries'
 
@@ -38,14 +37,49 @@ type ClaimActionResult = {
   claimNumber?: string
 }
 
-async function moveClaimIntoWorkflow(
-  claimId: string,
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
-) {
-  return supabase.rpc('resubmit_claim_after_rejection_atomic', {
-    p_claim_id: claimId,
-    p_notes: null,
-  })
+type InitialWorkflowState = {
+  statusId: string
+  currentApprovalLevel: number | null
+}
+
+const INITIAL_WORKFLOW_STATUS_BY_LEVEL: Record<
+  number,
+  { statusCode: string; currentApprovalLevel: number | null }
+> = {
+  1: { statusCode: 'L1_PENDING', currentApprovalLevel: 1 },
+  2: { statusCode: 'L2_PENDING', currentApprovalLevel: 2 },
+  3: { statusCode: 'L3_PENDING_FINANCE_REVIEW', currentApprovalLevel: null },
+}
+
+async function resolveInitialWorkflowState(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  designationId: string | null
+): Promise<InitialWorkflowState> {
+  if (!designationId) {
+    throw new Error('Employee designation is required to submit claims.')
+  }
+
+  const approvalFlow = await getDesignationApprovalFlow(supabase, designationId)
+  const firstLevel = approvalFlow.required_approval_levels?.[0]
+  const initialWorkflowState = firstLevel
+    ? INITIAL_WORKFLOW_STATUS_BY_LEVEL[firstLevel]
+    : undefined
+
+  if (!initialWorkflowState) {
+    throw new Error(
+      `Unsupported first approval level configured for employee: ${firstLevel ?? 'none'}.`
+    )
+  }
+
+  const status = await getClaimStatusByCode(
+    supabase,
+    initialWorkflowState.statusCode
+  )
+
+  return {
+    statusId: status.id,
+    currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
+  }
 }
 
 export async function submitClaimAction(
@@ -87,28 +121,6 @@ export async function submitClaimAction(
   )
 
   if (existingClaim && !existingClaim.is_rejection) {
-    const isStuckSubmittedClaim =
-      existingClaim.status_code === 'SUBMITTED' &&
-      existingClaim.current_approval_level === null
-
-    if (isStuckSubmittedClaim) {
-      const { error: workflowError } = await moveClaimIntoWorkflow(
-        existingClaim.id,
-        supabase
-      )
-
-      if (workflowError) {
-        return { ok: false, error: workflowError.message }
-      }
-
-      return {
-        ok: true,
-        error: null,
-        claimId: existingClaim.id,
-        claimNumber: existingClaim.claim_number,
-      }
-    }
-
     return {
       ok: false,
       error: `You already have a pending or approved claim for this date (${existingClaim.claim_number}). Please wait for it to be processed.`,
@@ -271,8 +283,19 @@ export async function submitClaimAction(
     }
   }
 
-  // Resolve status ID by code
-  const submittedStatus = await getClaimStatusByCode(supabase, 'SUBMITTED')
+  let initialWorkflowState: InitialWorkflowState
+  try {
+    initialWorkflowState = await resolveInitialWorkflowState(
+      supabase,
+      employee.designation_id
+    )
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error ? error.message : 'Unable to start workflow.',
+    }
+  }
 
   const isOutstation = wlFlags.requires_outstation_details
   const isBaseLocation = wlFlags.requires_vehicle_selection
@@ -328,8 +351,8 @@ export async function submitClaimAction(
       toCityId: hasOwnVehicle ? (outstation?.toCityId ?? null) : null,
       kmTravelled: hasOwnVehicle ? (outstation?.kmTravelled ?? null) : null,
       totalAmount: draft.total,
-      statusId: submittedStatus.id,
-      currentApprovalLevel: null,
+      statusId: initialWorkflowState.statusId,
+      currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
       submittedAt: new Date().toISOString(),
       designationId: employee.designation_id,
       accommodationNights: isOutstation
@@ -350,14 +373,6 @@ export async function submitClaimAction(
       }))
     )
 
-    const { error: workflowError } = await moveClaimIntoWorkflow(
-      newClaim.id,
-      supabase
-    )
-    if (workflowError) {
-      return { ok: false, error: workflowError.message }
-    }
-
     return {
       ok: true,
       error: null,
@@ -377,8 +392,8 @@ export async function submitClaimAction(
     toCityId: hasOwnVehicle ? (outstation?.toCityId ?? null) : null,
     kmTravelled: hasOwnVehicle ? (outstation?.kmTravelled ?? null) : null,
     totalAmount: draft.total,
-    statusId: submittedStatus.id,
-    currentApprovalLevel: null,
+    statusId: initialWorkflowState.statusId,
+    currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
     submittedAt: new Date().toISOString(),
     designationId: employee.designation_id,
     accommodationNights: isOutstation
@@ -398,14 +413,6 @@ export async function submitClaimAction(
       description: item.description,
     }))
   )
-
-  const { error: workflowError } = await moveClaimIntoWorkflow(
-    claim.id,
-    supabase
-  )
-  if (workflowError) {
-    return { ok: false, error: workflowError.message }
-  }
 
   return {
     ok: true,

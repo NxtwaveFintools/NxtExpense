@@ -26,9 +26,9 @@ describe('normalizeMyClaimsFilters', () => {
 
   it('normalizes claimStatus to trimmed string', () => {
     const result = normalizeMyClaimsFilters({
-      claimStatus: '  finance_rejected  ',
+      claimStatus: '  REJECTED  ',
     })
-    expect(result.claimStatus).toBe('finance_rejected')
+    expect(result.claimStatus).toBe('REJECTED')
   })
 
   it('applies valid workLocation filter', () => {
@@ -40,11 +40,11 @@ describe('normalizeMyClaimsFilters', () => {
 
   it('applies all filters simultaneously', () => {
     const result = normalizeMyClaimsFilters({
-      claimStatus: 'submitted',
+      claimStatus: 'L1_PENDING',
       workLocation: 'Field - Outstation',
       claimDate: '2026-03-01',
     })
-    expect(result.claimStatus).toBe('submitted')
+    expect(result.claimStatus).toBe('L1_PENDING')
     expect(result.workLocation).toBe('Field - Outstation')
     expect(result.claimDate).toBe('2026-03-01')
   })
@@ -74,7 +74,7 @@ describe('normalizeMyClaimsFilters', () => {
     // the entire schema parse to fail and ALL filters to be reset.
     expect(() =>
       normalizeMyClaimsFilters({
-        claimStatus: 'finance_rejected',
+        claimStatus: 'REJECTED',
         workLocation: '',
       })
     ).not.toThrow()
@@ -82,13 +82,13 @@ describe('normalizeMyClaimsFilters', () => {
 
   it('preserves claimStatus when workLocation is empty string (CLAIMS-001 regression)', () => {
     // This is the exact scenario from the CLAIMS-001 bug report:
-    // form submits claimStatus=finance_rejected&workLocation=&claimDate=
+    // form submits claimStatus=REJECTED&workLocation=&claimDate=
     const result = normalizeMyClaimsFilters({
-      claimStatus: 'finance_rejected',
+      claimStatus: 'REJECTED',
       workLocation: '',
       claimDate: '',
     })
-    expect(result.claimStatus).toBe('finance_rejected')
+    expect(result.claimStatus).toBe('REJECTED')
     expect(result.workLocation).toBeNull()
     expect(result.claimDate).toBeNull()
   })
@@ -147,9 +147,9 @@ describe('addMyClaimsFiltersToParams', () => {
   it('adds claimStatus param when set', () => {
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
       ...emptyFilters,
-      claimStatus: 'finance_rejected',
+      claimStatus: 'REJECTED',
     })
-    expect(params.get('claimStatus')).toBe('finance_rejected')
+    expect(params.get('claimStatus')).toBe('REJECTED')
   })
 
   it('adds workLocation param when set', () => {
@@ -170,11 +170,11 @@ describe('addMyClaimsFiltersToParams', () => {
 
   it('adds multiple active filters simultaneously', () => {
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
-      claimStatus: 'submitted',
+      claimStatus: 'L1_PENDING',
       workLocation: 'Office / WFH',
       claimDate: '2026-03-01',
     })
-    expect(params.get('claimStatus')).toBe('submitted')
+    expect(params.get('claimStatus')).toBe('L1_PENDING')
     expect(params.get('workLocation')).toBe('Office / WFH')
     expect(params.get('claimDate')).toBe('2026-03-01')
   })
@@ -182,13 +182,13 @@ describe('addMyClaimsFiltersToParams', () => {
   it('round-trip: normalize then add to params preserves filters', () => {
     // Simulates the full page flow: form submit → normalize → build canonical URL
     const normalized = normalizeMyClaimsFilters({
-      claimStatus: 'finance_rejected',
+      claimStatus: 'REJECTED',
       workLocation: '', // empty from form
       claimDate: '',
     })
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), normalized)
-    // claimStatus=finance_rejected should be in params, workLocation should NOT
-    expect(params.get('claimStatus')).toBe('finance_rejected')
+    // claimStatus=REJECTED should be in params, workLocation should NOT
+    expect(params.get('claimStatus')).toBe('REJECTED')
     expect(params.has('workLocation')).toBe(false)
   })
 })

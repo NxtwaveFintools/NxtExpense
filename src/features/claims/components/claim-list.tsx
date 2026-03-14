@@ -56,7 +56,9 @@ export function ClaimList({ claims, pagination }: ClaimListProps) {
         <table className="w-full min-w-230 border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-foreground/70">
-              <th className="px-3 py-2 font-medium">Claim ID</th>
+              <th className="px-3 py-2 font-medium whitespace-nowrap">
+                Claim ID
+              </th>
               <th className="px-3 py-2 font-medium">Date</th>
               <th className="px-3 py-2 font-medium">Location</th>
               <th className="px-3 py-2 font-medium">Amount</th>
@@ -67,10 +69,10 @@ export function ClaimList({ claims, pagination }: ClaimListProps) {
           <tbody>
             {claims.data.map((claim) => (
               <tr key={claim.id} className="border-b border-border/70">
-                <td className="px-3 py-3 font-medium">
+                <td className="px-3 py-3 font-medium whitespace-nowrap">
                   <Link
                     href={`/claims/${claim.id}`}
-                    className="underline decoration-border underline-offset-4 hover:decoration-foreground"
+                    className="inline-block whitespace-nowrap underline decoration-border underline-offset-4 hover:decoration-foreground"
                   >
                     {claim.claim_number}
                   </Link>
