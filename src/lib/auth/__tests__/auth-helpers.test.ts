@@ -262,6 +262,12 @@ describe('getLoginErrorMessage', () => {
     expect(typeof msg).toBe('string')
   })
 
+  it('returns the correct message for auth_verification_failed', () => {
+    const msg = getLoginErrorMessage('auth_verification_failed')
+    expect(msg).toBeTruthy()
+    expect(typeof msg).toBe('string')
+  })
+
   it('returns a fallback message for unknown error codes', () => {
     const msg = getLoginErrorMessage('some_unknown_code')
     expect(msg).toBeTruthy()

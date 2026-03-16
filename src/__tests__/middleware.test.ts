@@ -72,4 +72,29 @@ describe('middleware', () => {
       'http://localhost:3000/login?message=session_reset'
     )
   })
+
+  it('redirects protected routes to login when session refresh fails', async () => {
+    refreshAuthSessionMock.mockRejectedValue(
+      new Error('Missing environment variable')
+    )
+
+    const request = new NextRequest('http://localhost:3000/dashboard')
+    const response = await middleware(request)
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/login?error=auth_verification_failed'
+    )
+  })
+
+  it('keeps public auth routes reachable when session refresh fails', async () => {
+    refreshAuthSessionMock.mockRejectedValue(
+      new Error('Missing environment variable')
+    )
+
+    const request = new NextRequest('http://localhost:3000/login')
+    const response = await middleware(request)
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+  })
 })

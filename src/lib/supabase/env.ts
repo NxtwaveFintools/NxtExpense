@@ -15,16 +15,35 @@ function requireEnv(name: string, value: string | undefined): string {
   return value
 }
 
+function requireOneOfEnvs(
+  envEntries: Array<[name: string, value: string | undefined]>
+): string {
+  for (const [, value] of envEntries) {
+    if (value) {
+      return value
+    }
+  }
+
+  const envNames = envEntries.map(([name]) => name).join(' or ')
+  throw new Error(`Missing environment variable: ${envNames}`)
+}
+
 export function getSupabasePublicEnv(): SupabasePublicEnv {
   return {
     url: requireEnv(
       'NEXT_PUBLIC_SUPABASE_URL',
       process.env.NEXT_PUBLIC_SUPABASE_URL
     ),
-    publishableKey: requireEnv(
-      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    ),
+    publishableKey: requireOneOfEnvs([
+      [
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      ],
+      [
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      ],
+    ]),
   }
 }
 

@@ -8,6 +8,8 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
     'Azure Tenant URL is invalid in Supabase. Set it to https://login.microsoftonline.com/<tenant-id> (without /v2.0) or leave it empty.',
   email_domain_not_allowed:
     'Your email domain is not authorized. Please use a corporate email.',
+  auth_verification_failed:
+    'Unable to verify your session right now. Please try again.',
 }
 
 export function isDevelopmentAuthEnabled(): boolean {
