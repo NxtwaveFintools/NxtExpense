@@ -23,7 +23,7 @@ export function ApprovalFiltersBar({
       <form
         action="/approvals"
         method="get"
-        className="mt-4 grid gap-3 md:grid-cols-4"
+        className="mt-4 grid gap-3 md:grid-cols-3"
       >
         <label className="space-y-1 text-sm">
           <span className="text-foreground/80">Status</span>
@@ -52,20 +52,6 @@ export function ApprovalFiltersBar({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="text-foreground/80">Actor Bucket</span>
-          <select
-            name="actorFilter"
-            defaultValue={filters.actorFilter}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2"
-          >
-            <option value="all">Select All</option>
-            <option value="sbh">State Business Head</option>
-            <option value="hod">HOD (Final-Level Approver)</option>
-            <option value="finance">Finance Team</option>
-          </select>
-        </label>
-
-        <label className="space-y-1 text-sm">
           <span className="text-foreground/80">Claim Date</span>
           <input
             name="claimDate"
@@ -75,7 +61,7 @@ export function ApprovalFiltersBar({
           />
         </label>
 
-        <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-1">
+        <div className="md:col-span-3 flex flex-wrap items-center gap-2 pt-1">
           <button
             type="submit"
             className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background"

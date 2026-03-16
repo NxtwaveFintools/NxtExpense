@@ -38,7 +38,6 @@ type ApprovalsPageProps = {
     historyTrail?: string
     claimStatus?: string
     employeeName?: string
-    actorFilter?: string
     claimDate?: string
     claimDateFrom?: string
     claimDateTo?: string
@@ -79,7 +78,6 @@ export default async function ApprovalsPage({
   const rawFilters = {
     claimStatus: resolvedSearch?.claimStatus,
     employeeName: resolvedSearch?.employeeName,
-    actorFilter: resolvedSearch?.actorFilter,
     claimDate: resolvedSearch?.claimDate ?? legacyClaimDate,
     hodApprovedFrom: resolvedSearch?.hodApprovedFrom,
     hodApprovedTo: resolvedSearch?.hodApprovedTo,
@@ -106,7 +104,6 @@ export default async function ApprovalsPage({
   const normalizedFilterParams = {
     claimStatus: normalizedFilters.claimStatus ?? undefined,
     employeeName: normalizedFilters.employeeName ?? undefined,
-    actorFilter: normalizedFilters.actorFilter,
     claimDate: normalizedFilters.claimDate ?? undefined,
     hodApprovedFrom: normalizedFilters.hodApprovedFrom ?? undefined,
     hodApprovedTo: normalizedFilters.hodApprovedTo ?? undefined,

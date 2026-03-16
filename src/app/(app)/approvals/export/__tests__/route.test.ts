@@ -92,12 +92,17 @@ describe('approvals export route', () => {
 
   it('exports current page CSV via GET mode=page', async () => {
     const response = await GET(
-      new Request('http://localhost:3000/approvals/export?mode=page')
+      new Request(
+        'http://localhost:3000/approvals/export?mode=page&actorFilter=finance'
+      )
     )
 
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toContain('text/csv')
     expect(await response.text()).toBe('col1,col2\nval1,val2')
+    const normalizeInput =
+      mocks.normalizeApprovalHistoryFilters.mock.calls[0]?.[0]
+    expect(normalizeInput.actorFilter).toBeUndefined()
     expect(mocks.getFilteredApprovalHistoryPaginated).toHaveBeenCalledWith(
       expect.anything(),
       null,
