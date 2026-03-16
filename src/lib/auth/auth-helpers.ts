@@ -91,6 +91,9 @@ export async function getRequestOrigin(): Promise<string> {
     parseFirstHeaderValue(requestHeaders.get('host')) ??
     parseFirstHeaderValue(requestHeaders.get('x-forwarded-host'))
   const isNonProduction = process.env.NODE_ENV !== 'production'
+  const vercelEnvironment = process.env.VERCEL_ENV?.trim().toLowerCase()
+  const isPreviewDeployment =
+    vercelEnvironment === 'preview' || vercelEnvironment === 'development'
   const isLocalhostRequest = Boolean(
     (host && isLocalhostHost(host)) ||
     (requestOrigin && isLocalhostHost(new URL(requestOrigin).host))
@@ -110,6 +113,11 @@ export async function getRequestOrigin(): Promise<string> {
 
   if (host && (isNonProduction || isLocalhostRequest)) {
     return `${protocol}://${host}`
+  }
+
+  if (isPreviewDeployment) {
+    if (requestOrigin) return requestOrigin
+    if (host) return `${protocol}://${host}`
   }
 
   const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()

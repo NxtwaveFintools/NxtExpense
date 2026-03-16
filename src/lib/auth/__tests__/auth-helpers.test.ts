@@ -97,10 +97,16 @@ describe('isDevelopmentAuthEnabled', () => {
 describe('request origin helpers', () => {
   const originalNodeEnv = process.env.NODE_ENV
   const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL
+  const originalVercelEnv = process.env.VERCEL_ENV
 
   afterEach(() => {
     vi.clearAllMocks()
     vi.stubEnv('NODE_ENV', originalNodeEnv)
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV
+    } else {
+      vi.stubEnv('VERCEL_ENV', originalVercelEnv)
+    }
 
     if (originalAppUrl === undefined) {
       delete process.env.NEXT_PUBLIC_APP_URL
@@ -156,6 +162,7 @@ describe('request origin helpers', () => {
   it('uses configured app URL in production for non-local hosts', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.nxtexpense.com/')
+    delete process.env.VERCEL_ENV
     mocks.headers.mockResolvedValue(
       new Headers([
         ['x-forwarded-host', 'preview.nxtexpense.com'],
@@ -164,6 +171,25 @@ describe('request origin helpers', () => {
     )
 
     await expect(getRequestOrigin()).resolves.toBe('https://app.nxtexpense.com')
+  })
+
+  it('uses request host on Vercel preview deployments', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.nxtexpense.com')
+    mocks.headers.mockResolvedValue(
+      new Headers([
+        [
+          'host',
+          'nxt-expense-git-development-fintools-nxtwaves-projects.vercel.app',
+        ],
+        ['x-forwarded-proto', 'https'],
+      ])
+    )
+
+    await expect(getRequestOrigin()).resolves.toBe(
+      'https://nxt-expense-git-development-fintools-nxtwaves-projects.vercel.app'
+    )
   })
 
   it('falls back to forwarded request origin when app URL is missing', async () => {
