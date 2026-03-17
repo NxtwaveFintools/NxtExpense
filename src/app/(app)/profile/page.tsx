@@ -6,6 +6,7 @@ import {
   getEmployeeByEmail,
   getEmployeeNameMapByIds,
 } from '@/lib/services/employee-service'
+import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import { getAllClaimStatuses } from '@/lib/services/config-service'
 import { redirect } from 'next/navigation'
 import { formatDate } from '@/lib/utils/date'
@@ -86,8 +87,12 @@ export default async function ProfilePage() {
     employee.approval_employee_id_level_3,
   ].filter((id): id is string => id !== null)
 
+  const canViewClaimSummary = await canAccessEmployeeClaims(supabase, employee)
+
   const [stats, approverNameMap] = await Promise.all([
-    getClaimStats(supabase, employee.id),
+    canViewClaimSummary
+      ? getClaimStats(supabase, employee.id)
+      : Promise.resolve<ClaimStats | null>(null),
     getEmployeeNameMapByIds(supabase, approverIds),
   ])
 
@@ -106,43 +111,45 @@ export default async function ProfilePage() {
     },
   ]
 
-  const statCards = [
-    {
-      label: 'Total Claims',
-      value: stats.total,
-      color: 'text-foreground',
-      bgIcon: 'bg-primary/10',
-      iconColor: 'text-primary',
-    },
-    {
-      label: 'Pending',
-      value: stats.pending,
-      color: 'text-amber-600 dark:text-amber-400',
-      bgIcon: 'bg-amber-500/10',
-      iconColor: 'text-amber-600',
-    },
-    {
-      label: 'Finance Approved',
-      value: stats.approved,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bgIcon: 'bg-emerald-500/10',
-      iconColor: 'text-emerald-600',
-    },
-    {
-      label: 'Rejected',
-      value: stats.rejected,
-      color: 'text-rose-600 dark:text-rose-400',
-      bgIcon: 'bg-rose-500/10',
-      iconColor: 'text-rose-600',
-    },
-    {
-      label: 'Issued',
-      value: stats.issued,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgIcon: 'bg-blue-500/10',
-      iconColor: 'text-blue-600',
-    },
-  ]
+  const statCards = stats
+    ? [
+        {
+          label: 'Total Claims',
+          value: stats.total,
+          color: 'text-foreground',
+          bgIcon: 'bg-primary/10',
+          iconColor: 'text-primary',
+        },
+        {
+          label: 'Pending',
+          value: stats.pending,
+          color: 'text-amber-600 dark:text-amber-400',
+          bgIcon: 'bg-amber-500/10',
+          iconColor: 'text-amber-600',
+        },
+        {
+          label: 'Finance Approved',
+          value: stats.approved,
+          color: 'text-emerald-600 dark:text-emerald-400',
+          bgIcon: 'bg-emerald-500/10',
+          iconColor: 'text-emerald-600',
+        },
+        {
+          label: 'Rejected',
+          value: stats.rejected,
+          color: 'text-rose-600 dark:text-rose-400',
+          bgIcon: 'bg-rose-500/10',
+          iconColor: 'text-rose-600',
+        },
+        {
+          label: 'Issued',
+          value: stats.issued,
+          color: 'text-blue-600 dark:text-blue-400',
+          bgIcon: 'bg-blue-500/10',
+          iconColor: 'text-blue-600',
+        },
+      ]
+    : []
 
   const initials = employee.employee_name
     .split(' ')
@@ -221,34 +228,38 @@ export default async function ProfilePage() {
         </section>
 
         {/* Claim Stats */}
-        <section className="rounded-lg border border-border bg-surface p-6">
-          <h2 className="flex items-center gap-2.5 text-lg font-semibold">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-              <Building2 className="size-4 text-primary" aria-hidden="true" />
-            </div>
-            Claim Summary
-          </h2>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {statCards.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-md border border-border bg-background p-4 text-center"
-              >
-                <div className="mx-auto flex size-8 items-center justify-center rounded-lg mb-2">
-                  <div
-                    className={`flex size-8 items-center justify-center rounded-lg ${s.bgIcon}`}
-                  >
-                    <TrendingUp className={`size-3.5 ${s.iconColor}`} />
-                  </div>
-                </div>
-                <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  {s.label}
-                </p>
+        {canViewClaimSummary ? (
+          <section className="rounded-lg border border-border bg-surface p-6">
+            <h2 className="flex items-center gap-2.5 text-lg font-semibold">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                <Building2 className="size-4 text-primary" aria-hidden="true" />
               </div>
-            ))}
-          </div>
-        </section>
+              Claim Summary
+            </h2>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {statCards.map((s) => (
+                <div
+                  key={s.label}
+                  className="rounded-md border border-border bg-background p-4 text-center"
+                >
+                  <div className="mx-auto mb-2 flex size-8 items-center justify-center rounded-lg">
+                    <div
+                      className={`flex size-8 items-center justify-center rounded-lg ${s.bgIcon}`}
+                    >
+                      <TrendingUp className={`size-3.5 ${s.iconColor}`} />
+                    </div>
+                  </div>
+                  <p className={`text-2xl font-semibold ${s.color}`}>
+                    {s.value}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">
+                    {s.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   )

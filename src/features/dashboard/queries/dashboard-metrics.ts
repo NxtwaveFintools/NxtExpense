@@ -1,11 +1,16 @@
 import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+export type ClaimMetricSummary = {
+  count: number
+  amount: number
+}
+
 export type DashboardClaimStats = {
-  total: number
-  pending: number
-  approved: number
-  rejected: number
+  total: ClaimMetricSummary
+  pending: ClaimMetricSummary
+  approved: ClaimMetricSummary
+  rejected: ClaimMetricSummary
 }
 
 export type DashboardRecentClaim = {
@@ -21,80 +26,123 @@ type DashboardSupabaseClient = Awaited<
   ReturnType<typeof createSupabaseServerClient>
 >
 
-function isRejectedStatus(
-  statusCode: string | null,
-  statusName: string | null
-): boolean {
-  const normalizedCode = (statusCode ?? '').toUpperCase()
-  const normalizedName = (statusName ?? '').toLowerCase()
-
-  return (
-    normalizedCode.includes('REJECTED') || normalizedName.includes('rejected')
-  )
+type ClaimStatusRow = {
+  id: string
+  status_code: string
+  is_rejection: boolean
+  is_payment_issued: boolean
 }
 
-function isFinanceApprovedStatus(
-  statusCode: string | null,
-  statusName: string | null
-): boolean {
-  const normalizedCode = (statusCode ?? '').toUpperCase()
-  const normalizedName = (statusName ?? '').toLowerCase()
+type EmployeeClaimSummaryRow = {
+  id: string
+  created_at: string
+  status_id: string
+  total_amount: number | string
+}
 
-  return (
-    normalizedCode === 'APPROVED' ||
-    normalizedCode.includes('ISSUED') ||
-    normalizedName === 'approved' ||
-    normalizedName === 'finance approved' ||
-    normalizedName.includes('issued')
-  )
+function createMetricSummary(): ClaimMetricSummary {
+  return { count: 0, amount: 0 }
+}
+
+function addToMetric(metric: ClaimMetricSummary, amount: number) {
+  metric.count += 1
+  metric.amount += amount
 }
 
 export async function getEmployeeClaimStats(
   supabase: DashboardSupabaseClient,
   employeeId: string
 ): Promise<DashboardClaimStats> {
-  const { data, error } = await supabase
-    .from('expense_claims')
-    .select('id, claim_statuses!status_id(status_code, status_name)')
-    .eq('employee_id', employeeId)
+  const { data: statusRows, error: statusError } = await supabase
+    .from('claim_statuses')
+    .select('id, status_code, is_rejection, is_payment_issued')
+    .eq('is_active', true)
 
-  if (error) {
-    throw new Error(error.message)
+  if (statusError) {
+    throw new Error(statusError.message)
   }
 
-  const rows = data ?? []
+  const rejectedStatusIds = new Set(
+    ((statusRows ?? []) as ClaimStatusRow[])
+      .filter((status) => status.is_rejection)
+      .map((status) => status.id)
+  )
 
-  let pending = 0
-  let rejected = 0
-  let approved = 0
+  const approvedStatusIds = new Set(
+    ((statusRows ?? []) as ClaimStatusRow[])
+      .filter(
+        (status) =>
+          status.is_payment_issued ||
+          status.status_code.toUpperCase() === 'APPROVED'
+      )
+      .map((status) => status.id)
+  )
 
-  for (const row of rows) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const statusInfo = Array.isArray((row as any).claim_statuses)
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (row as any).claim_statuses[0]
-      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (row as any).claim_statuses
-
-    const statusCode =
-      (statusInfo?.status_code as string | null | undefined) ?? null
-    const statusName =
-      (statusInfo?.status_name as string | null | undefined) ?? null
-
-    if (isRejectedStatus(statusCode, statusName)) {
-      rejected++
-      continue
-    }
-
-    if (isFinanceApprovedStatus(statusCode, statusName)) {
-      approved++
-      continue
-    }
-
-    pending++
+  const stats: DashboardClaimStats = {
+    total: createMetricSummary(),
+    pending: createMetricSummary(),
+    approved: createMetricSummary(),
+    rejected: createMetricSummary(),
   }
 
-  return { total: rows.length, pending, approved, rejected }
+  const pageSize = 500
+  let lastCursor: { createdAt: string; id: string } | null = null
+
+  for (;;) {
+    let query = supabase
+      .from('expense_claims')
+      .select('id, created_at, status_id, total_amount')
+      .eq('employee_id', employeeId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(pageSize)
+
+    if (lastCursor) {
+      query = query.or(
+        `created_at.lt.${lastCursor.createdAt},and(created_at.eq.${lastCursor.createdAt},id.lt.${lastCursor.id})`
+      )
+    }
+
+    const { data: rows, error } = await query
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const claimRows = (rows ?? []) as EmployeeClaimSummaryRow[]
+    if (claimRows.length === 0) {
+      break
+    }
+
+    for (const row of claimRows) {
+      const amount = Number(row.total_amount ?? 0)
+      addToMetric(stats.total, amount)
+
+      if (rejectedStatusIds.has(row.status_id)) {
+        addToMetric(stats.rejected, amount)
+        continue
+      }
+
+      if (approvedStatusIds.has(row.status_id)) {
+        addToMetric(stats.approved, amount)
+        continue
+      }
+
+      addToMetric(stats.pending, amount)
+    }
+
+    if (claimRows.length < pageSize) {
+      break
+    }
+
+    const lastRow = claimRows[claimRows.length - 1]
+    lastCursor = {
+      createdAt: lastRow.created_at,
+      id: lastRow.id,
+    }
+  }
+
+  return stats
 }
 
 export async function getRecentClaims(

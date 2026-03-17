@@ -26,7 +26,11 @@ type ApprovalListTableProps = {
   processingClaimId: string | null
   processingAction: string | null
   onToggleOne: (claimId: string, checked: boolean) => void
-  onRunSingleAction: (claimId: string, action: ClaimAvailableAction) => void
+  onRunSingleAction: (
+    claimId: string,
+    action: ClaimAvailableAction,
+    allowReclaim: boolean
+  ) => void
 }
 
 export function ApprovalListTable({
@@ -62,6 +66,12 @@ export function ApprovalListTable({
             const isSelectable = item.availableActions.some(
               (action) =>
                 action.action === 'approved' || action.action === 'rejected'
+            )
+            const approvedAction = item.availableActions.find(
+              (action) => action.action === 'approved'
+            )
+            const rejectedAction = item.availableActions.find(
+              (action) => action.action === 'rejected'
             )
             const isRowProcessing =
               isProcessing && processingClaimId === item.claim.id
@@ -133,35 +143,69 @@ export function ApprovalListTable({
                 </td>
                 <td className={getDataTableCellClass({ align: 'right' })}>
                   <div className="flex items-center justify-end gap-2">
-                    {item.availableActions
-                      .filter(
-                        (action: ClaimAvailableAction) =>
-                          action.action === 'approved' ||
-                          action.action === 'rejected'
-                      )
-                      .map((action: ClaimAvailableAction) => (
-                        <button
-                          key={`${item.claim.id}-${action.action}`}
-                          type="button"
-                          disabled={isProcessing}
-                          onClick={() =>
-                            onRunSingleAction(item.claim.id, action)
-                          }
-                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-50 ${
-                            action.action === 'approved'
-                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                              : 'bg-rose-600 text-white hover:bg-rose-700'
-                          }`}
-                        >
-                          {isRowProcessing &&
-                          processingAction === action.action ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : null}
-                          {isRowProcessing && processingAction === action.action
-                            ? 'Processing...'
-                            : action.display_label}
-                        </button>
-                      ))}
+                    {approvedAction ? (
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() =>
+                          onRunSingleAction(
+                            item.claim.id,
+                            approvedAction,
+                            false
+                          )
+                        }
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {isRowProcessing && processingAction === 'approved' ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : null}
+                        {isRowProcessing && processingAction === 'approved'
+                          ? 'Processing...'
+                          : approvedAction.display_label}
+                      </button>
+                    ) : null}
+
+                    {rejectedAction ? (
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() =>
+                          onRunSingleAction(
+                            item.claim.id,
+                            rejectedAction,
+                            false
+                          )
+                        }
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
+                      >
+                        {isRowProcessing && processingAction === 'rejected' ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : null}
+                        {isRowProcessing && processingAction === 'rejected'
+                          ? 'Processing...'
+                          : rejectedAction.display_label}
+                      </button>
+                    ) : null}
+
+                    {rejectedAction ? (
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() =>
+                          onRunSingleAction(item.claim.id, rejectedAction, true)
+                        }
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {isRowProcessing &&
+                        processingAction === 'rejected_allow_reclaim' ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : null}
+                        {isRowProcessing &&
+                        processingAction === 'rejected_allow_reclaim'
+                          ? 'Processing...'
+                          : 'Reject & Allow Reclaim'}
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>

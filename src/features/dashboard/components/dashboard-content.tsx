@@ -16,6 +16,7 @@ import {
   getDataTableCellClass,
   getDataTableHeadCellClass,
 } from '@/components/ui/data-table-tokens'
+import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
 import type {
   DashboardClaimStats,
@@ -201,49 +202,36 @@ export function DashboardContent({
           ) : null}
         </section>
 
-        {access.canViewClaims && stats.total > 0 ? (
-          <section className="grid grid-cols-2 gap-4 sm:grid-cols-4 animate-slide-up stagger-4">
-            {[
+        {access.canViewClaims && stats.total.count > 0 ? (
+          <ClaimAnalyticsCards
+            className="animate-slide-up stagger-4"
+            cards={[
               {
                 label: 'Total Claims',
-                value: stats.total,
-                color: 'text-foreground',
-                accent: 'border-l-primary',
+                count: stats.total.count,
+                amount: stats.total.amount,
+                tone: 'neutral',
               },
               {
                 label: 'Pending',
-                value: stats.pending,
-                color: 'text-amber-600 dark:text-amber-400',
-                accent: 'border-l-amber-500',
+                count: stats.pending.count,
+                amount: stats.pending.amount,
+                tone: 'pending',
               },
               {
                 label: 'Finance Approved',
-                value: stats.approved,
-                color: 'text-emerald-600 dark:text-emerald-400',
-                accent: 'border-l-emerald-500',
+                count: stats.approved.count,
+                amount: stats.approved.amount,
+                tone: 'approved',
               },
               {
                 label: 'Rejected',
-                value: stats.rejected,
-                color: 'text-rose-600 dark:text-rose-400',
-                accent: 'border-l-rose-500',
+                count: stats.rejected.count,
+                amount: stats.rejected.amount,
+                tone: 'rejected',
               },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className={`rounded-lg border border-border border-l-[3px] ${stat.accent} bg-surface p-5`}
-              >
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {stat.label}
-                </p>
-                <p
-                  className={`mt-2 text-2xl font-semibold tabular-nums ${stat.color}`}
-                >
-                  {stat.value}
-                </p>
-              </div>
-            ))}
-          </section>
+            ]}
+          />
         ) : null}
 
         {access.canViewClaims && recentClaims.length > 0 ? (

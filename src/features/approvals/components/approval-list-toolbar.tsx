@@ -5,14 +5,14 @@ type ApprovalListToolbarProps = {
   selectedCount: number
   selectableCount: number
   notes: string
-  allowResubmit: boolean
+  canRejectAllowReclaim: boolean
   isProcessing: boolean
   processingAction: string | null
   onToggleSelectAll: (checked: boolean) => void
   onNotesChange: (value: string) => void
-  onAllowResubmitChange: (checked: boolean) => void
   onApproveSelected: () => void
   onRejectSelected: () => void
+  onRejectAllowReclaimSelected: () => void
 }
 
 export function ApprovalListToolbar({
@@ -20,14 +20,14 @@ export function ApprovalListToolbar({
   selectedCount,
   selectableCount,
   notes,
-  allowResubmit,
+  canRejectAllowReclaim,
   isProcessing,
   processingAction,
   onToggleSelectAll,
   onNotesChange,
-  onAllowResubmitChange,
   onApproveSelected,
   onRejectSelected,
+  onRejectAllowReclaimSelected,
 }: ApprovalListToolbarProps) {
   return (
     <div className="border-b border-border bg-muted/30 px-6 py-3">
@@ -46,20 +46,10 @@ export function ApprovalListToolbar({
         <textarea
           value={notes}
           onChange={(event) => onNotesChange(event.target.value)}
-          placeholder="Approval notes (optional)..."
+          placeholder="Reason (required for rejection actions)..."
           className="min-h-9 w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-xs transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           rows={1}
         />
-
-        <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={allowResubmit}
-            onChange={(event) => onAllowResubmitChange(event.target.checked)}
-            className="size-3.5 rounded border-border accent-primary"
-          />
-          Allow resubmit on reject
-        </label>
 
         <div className="ml-auto flex items-center gap-2">
           <button
@@ -84,6 +74,19 @@ export function ApprovalListToolbar({
             ) : null}
             Reject Selected
           </button>
+          {canRejectAllowReclaim ? (
+            <button
+              type="button"
+              onClick={onRejectAllowReclaimSelected}
+              disabled={isProcessing || selectedCount === 0}
+              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
+            >
+              {isProcessing && processingAction === 'rejected_allow_reclaim' ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : null}
+              Reject & Allow Reclaim
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

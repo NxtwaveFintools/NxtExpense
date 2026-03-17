@@ -15,10 +15,12 @@ import {
   getFinanceQueueAction,
 } from '@/features/finance/actions'
 import { getFinanceFilterOptions } from '@/features/finance/queries'
+import { getFinanceQueueAnalytics } from '@/features/finance/queries/analytics'
 import {
   addFinanceFiltersToParams,
   normalizeFinanceFilters,
 } from '@/features/finance/utils/filters'
+import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 import { FinanceFiltersBar } from '@/features/finance/components/finance-filters-bar'
 import { FinanceQueue } from '@/features/finance/components/finance-queue'
 import { FinanceHistoryList } from '@/features/finance/components/finance-history-list'
@@ -160,10 +162,11 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [queue, history, filterOptions] = await Promise.all([
+  const [queue, history, filterOptions, analytics] = await Promise.all([
     getFinanceQueueAction(queueCursor, 10, normalizedFilterParams),
     getFinanceHistoryAction(historyCursor, 10, normalizedFilterParams),
     getFinanceFilterOptions(supabase),
+    getFinanceQueueAnalytics(supabase, normalizedFilters),
   ])
 
   const queuePagination = buildCursorNavigationLinks({
@@ -214,6 +217,34 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
               options={filterOptions}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}
+            />
+            <ClaimAnalyticsCards
+              cards={[
+                {
+                  label: 'Total Claims',
+                  count: analytics.total.count,
+                  amount: analytics.total.amount,
+                  tone: 'neutral',
+                },
+                {
+                  label: 'Pending Finance Queue',
+                  count: analytics.pendingFinanceQueue.count,
+                  amount: analytics.pendingFinanceQueue.amount,
+                  tone: 'finance',
+                },
+                {
+                  label: 'Finance Approved',
+                  count: analytics.approved.count,
+                  amount: analytics.approved.amount,
+                  tone: 'approved',
+                },
+                {
+                  label: 'Rejected',
+                  count: analytics.rejected.count,
+                  amount: analytics.rejected.amount,
+                  tone: 'rejected',
+                },
+              ]}
             />
             <FinanceQueue queue={queue} pagination={queuePagination} />
             <FinanceHistoryList

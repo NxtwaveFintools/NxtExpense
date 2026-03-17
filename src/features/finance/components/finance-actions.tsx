@@ -2,64 +2,78 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { submitApprovalAction } from '@/features/approvals/actions'
+import { submitFinanceAction } from '@/features/finance/actions'
 import type { ClaimAvailableAction } from '@/features/claims/types'
 
-type ApprovalActionsProps = {
+type FinanceActionsProps = {
   claimId: string
   availableActions: ClaimAvailableAction[]
 }
 
-export function ApprovalActions({
+type FinanceActionIntent =
+  | 'issued'
+  | 'finance_rejected'
+  | 'finance_rejected_allow_reclaim'
+
+export function FinanceActions({
   claimId,
   availableActions,
-}: ApprovalActionsProps) {
+}: FinanceActionsProps) {
   const router = useRouter()
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] =
+    useState<FinanceActionIntent | null>(null)
 
   const actions = useMemo(
     () =>
       availableActions.filter(
-        (action) => action.action === 'approved' || action.action === 'rejected'
+        (action) =>
+          action.action === 'issued' || action.action === 'finance_rejected'
       ),
     [availableActions]
   )
 
+  const issuedAction = actions.find((action) => action.action === 'issued')
+  const rejectedAction = actions.find(
+    (action) => action.action === 'finance_rejected'
+  )
+
   async function handleAction(
-    action: 'approved' | 'rejected',
+    action: 'issued' | 'finance_rejected',
     allowReclaim = false
   ) {
-    const intent =
-      action === 'rejected' && allowReclaim ? 'rejected_allow_reclaim' : action
+    const intent: FinanceActionIntent =
+      action === 'finance_rejected' && allowReclaim
+        ? 'finance_rejected_allow_reclaim'
+        : action
 
     setIsSubmitting(true)
     setPendingAction(intent)
     setError(null)
 
     try {
-      const result = await submitApprovalAction({
+      const result = await submitFinanceAction({
         claimId,
         action,
         notes,
-        allowResubmit: action === 'rejected' ? allowReclaim : false,
+        allowResubmit: action === 'finance_rejected' ? allowReclaim : false,
       })
 
       if (!result.ok) {
         setError(result.error)
-        toast.error(result.error ?? 'Unable to submit approval action.')
+        toast.error(result.error ?? 'Unable to submit finance action.')
         return
       }
 
-      toast.success('Approval action submitted successfully.')
-      router.push('/approvals')
+      toast.success('Finance action submitted successfully.')
+      router.push('/finance')
     } catch {
-      const message = 'Unexpected error while submitting approval action.'
+      const message = 'Unexpected error while submitting finance action.'
       setError(message)
       toast.error(message)
     } finally {
@@ -67,9 +81,6 @@ export function ApprovalActions({
       setPendingAction(null)
     }
   }
-
-  const approvedAction = actions.find((action) => action.action === 'approved')
-  const rejectedAction = actions.find((action) => action.action === 'rejected')
 
   return (
     <section className="rounded-lg border border-border bg-surface p-6">
@@ -80,17 +91,17 @@ export function ApprovalActions({
           No workflow actions are available for this claim.
         </p>
       ) : (
-        <>
-          <label className="mt-4 block space-y-1.5 text-sm">
-            <span className="font-medium text-foreground">Notes</span>
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              className="min-h-24 w-full rounded-md border border-border bg-background px-4 py-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
-              placeholder="Add notes for your decision (required for rejection actions)..."
-            />
-          </label>
-        </>
+        <label className="mt-4 block space-y-1.5 text-sm">
+          <span className="font-medium text-foreground">
+            Notes (required for rejection actions)
+          </span>
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            className="min-h-24 w-full rounded-md border border-border bg-background px-4 py-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
+            placeholder="Add notes for your decision..."
+          />
+        </label>
       )}
 
       {error ? (
@@ -99,21 +110,20 @@ export function ApprovalActions({
         </p>
       ) : null}
 
-      <div className="mt-5 flex gap-2.5">
-        {approvedAction ? (
+      <div className="mt-5 flex flex-wrap gap-2.5">
+        {issuedAction ? (
           <button
-            key={`${approvedAction.action}-${approvedAction.display_label}`}
             type="button"
             disabled={isSubmitting}
-            onClick={() => handleAction('approved', false)}
+            onClick={() => handleAction('issued')}
             className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
           >
-            {isSubmitting && pendingAction === 'approved' ? (
+            {isSubmitting && pendingAction === 'issued' ? (
               <Loader2 className="size-4 animate-spin" />
             ) : null}
-            {isSubmitting && pendingAction === 'approved'
+            {isSubmitting && pendingAction === 'issued'
               ? 'Submitting...'
-              : approvedAction.display_label}
+              : issuedAction.display_label}
           </button>
         ) : null}
 
@@ -121,13 +131,13 @@ export function ApprovalActions({
           <button
             type="button"
             disabled={isSubmitting}
-            onClick={() => handleAction('rejected', false)}
+            onClick={() => handleAction('finance_rejected', false)}
             className="inline-flex items-center gap-2 rounded-md bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
           >
-            {isSubmitting && pendingAction === 'rejected' ? (
+            {isSubmitting && pendingAction === 'finance_rejected' ? (
               <Loader2 className="size-4 animate-spin" />
             ) : null}
-            {isSubmitting && pendingAction === 'rejected'
+            {isSubmitting && pendingAction === 'finance_rejected'
               ? 'Submitting...'
               : rejectedAction.display_label}
           </button>
@@ -137,13 +147,14 @@ export function ApprovalActions({
           <button
             type="button"
             disabled={isSubmitting}
-            onClick={() => handleAction('rejected', true)}
+            onClick={() => handleAction('finance_rejected', true)}
             className="inline-flex items-center gap-2 rounded-md bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
           >
-            {isSubmitting && pendingAction === 'rejected_allow_reclaim' ? (
+            {isSubmitting &&
+            pendingAction === 'finance_rejected_allow_reclaim' ? (
               <Loader2 className="size-4 animate-spin" />
             ) : null}
-            {isSubmitting && pendingAction === 'rejected_allow_reclaim'
+            {isSubmitting && pendingAction === 'finance_rejected_allow_reclaim'
               ? 'Submitting...'
               : 'Reject & Allow Reclaim'}
           </button>

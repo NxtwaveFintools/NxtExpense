@@ -5,13 +5,20 @@ import { requireCurrentUser } from '@/features/auth/queries'
 import { ClaimDetail } from '@/features/claims/components/claim-detail'
 import { ClaimHistoryTimeline } from '@/features/claims/components/claim-history-timeline'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
-import { getClaimById, getClaimHistory } from '@/features/claims/queries'
+import {
+  getClaimAvailableActions,
+  getClaimById,
+  getClaimHistory,
+} from '@/features/claims/queries'
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import {
   getEmployeeByEmail,
   getEmployeeById,
 } from '@/lib/services/employee-service'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { ApprovalActions } from '@/features/approvals/components/approval-actions'
+import { FinanceActions } from '@/features/finance/components/finance-actions'
+import { withSubmittedHistoryFallback } from '@/features/claims/utils/history'
 
 type ClaimDetailPageProps = {
   params: Promise<{
@@ -68,7 +75,22 @@ export default async function ClaimDetailPage({
     backLabel = hasClaimAccess ? 'Back to My Claims' : 'Back to Dashboard'
   }
 
-  const [history] = await Promise.all([getClaimHistory(supabase, id)])
+  const [history, availableActions] = await Promise.all([
+    getClaimHistory(supabase, id),
+    getClaimAvailableActions(supabase, id),
+  ])
+
+  const timelineHistory = withSubmittedHistoryFallback({
+    claimId: claimWithItems.claim.id,
+    history,
+    submittedAt: claimWithItems.claim.submitted_at,
+    createdAt: claimWithItems.claim.created_at,
+    ownerEmail: owner.employee_email,
+    ownerName: owner.employee_name,
+  })
+
+  const showApprovalActions = from === 'approvals'
+  const showFinanceActions = from === 'finance'
 
   return (
     <>
@@ -102,7 +124,22 @@ export default async function ClaimDetailPage({
                   />
                 </div>
               </section>
-              <ClaimHistoryTimeline history={history} />
+
+              {showApprovalActions ? (
+                <ApprovalActions
+                  claimId={claimWithItems.claim.id}
+                  availableActions={availableActions}
+                />
+              ) : null}
+
+              {showFinanceActions ? (
+                <FinanceActions
+                  claimId={claimWithItems.claim.id}
+                  availableActions={availableActions}
+                />
+              ) : null}
+
+              <ClaimHistoryTimeline history={timelineHistory} />
             </div>
           </div>
         </div>

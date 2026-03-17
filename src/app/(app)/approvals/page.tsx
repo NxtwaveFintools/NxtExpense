@@ -27,9 +27,11 @@ import {
   getApprovalHistoryAction,
   getPendingApprovalsAction,
 } from '@/features/approvals/actions'
+import { getPendingApprovalsSummary } from '@/features/approvals/queries/pending-summary'
 import { ApprovalList } from '@/features/approvals/components/approval-list'
 import { ApprovalFiltersBar } from '@/features/approvals/components/approval-filters-bar'
 import { ApprovalHistoryList } from '@/features/approvals/components/approval-history-list'
+import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 
 type ApprovalsPageProps = {
   searchParams?: Promise<{
@@ -143,11 +145,18 @@ export default async function ApprovalsPage({
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [approvals, history, statusCatalog] = await Promise.all([
-    getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
-    getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
-    getClaimStatusCatalog(supabase),
-  ])
+  const [approvals, history, statusCatalog, pendingSummary] = await Promise.all(
+    [
+      getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
+      getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
+      getClaimStatusCatalog(supabase),
+      getPendingApprovalsSummary(supabase, user.email ?? '', {
+        employeeName: normalizedFilters.employeeName,
+        actorFilter: normalizedFilters.actorFilter,
+        claimStatus: normalizedFilters.claimStatus,
+      }),
+    ]
+  )
 
   const showHistoryAmountColumn = canViewApprovalHistoryAmount(
     employee.designations?.designation_name
@@ -201,6 +210,17 @@ export default async function ApprovalsPage({
               statusCatalog={statusCatalog}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}
+            />
+            <ClaimAnalyticsCards
+              columnsClassName="grid grid-cols-1"
+              cards={[
+                {
+                  label: 'Pending Approvals',
+                  count: pendingSummary.count,
+                  amount: pendingSummary.amount,
+                  tone: 'pending',
+                },
+              ]}
             />
             <ApprovalList
               approvals={approvals}

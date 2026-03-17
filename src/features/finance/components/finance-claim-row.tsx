@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
 
 import {
   DATA_TABLE_ROW_CLASS,
@@ -7,8 +6,6 @@ import {
 } from '@/components/ui/data-table-tokens'
 import { formatDate } from '@/lib/utils/date'
 
-import type { ClaimAvailableAction } from '@/features/claims/types'
-import type { FinanceActionType } from '@/features/finance/types'
 import type { FinanceQueueItem } from '@/features/finance/types'
 
 type FinanceClaimRowProps = {
@@ -16,19 +13,15 @@ type FinanceClaimRowProps = {
   checked: boolean
   disabled: boolean
   selectable: boolean
-  isProcessingRow: boolean
   onToggle: (claimId: string, checked: boolean) => void
-  onRunAction: (claimId: string, action: ClaimAvailableAction) => void
 }
 
 export function FinanceClaimRow({
   item,
   checked,
   disabled,
-  isProcessingRow,
   selectable,
   onToggle,
-  onRunAction,
 }: FinanceClaimRowProps) {
   return (
     <tr className={DATA_TABLE_ROW_CLASS}>
@@ -58,42 +51,8 @@ export function FinanceClaimRow({
       <td className={getDataTableCellClass({ muted: true, nowrap: true })}>
         {item.claim.work_location}
       </td>
-      <td className={getDataTableCellClass()}>
-        <div className="flex items-center justify-between gap-3">
-          <span className="whitespace-nowrap font-mono font-medium">
-            Rs. {Number(item.claim.total_amount).toFixed(2)}
-          </span>
-          <div className="flex flex-wrap justify-end gap-1.5">
-            {item.availableActions
-              .filter(
-                (
-                  action
-                ): action is ClaimAvailableAction & {
-                  action: FinanceActionType
-                } =>
-                  action.action === 'issued' ||
-                  action.action === 'finance_rejected'
-              )
-              .map((action) => (
-                <button
-                  key={`${item.claim.id}-${action.action}-${action.display_label}`}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onRunAction(item.claim.id, action)}
-                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all disabled:opacity-50 ${
-                    action.action === 'issued'
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      : 'bg-rose-600 text-white hover:bg-rose-700'
-                  }`}
-                >
-                  {isProcessingRow ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : null}
-                  {isProcessingRow ? 'Processing...' : action.display_label}
-                </button>
-              ))}
-          </div>
-        </div>
+      <td className={getDataTableCellClass({ mono: true, weight: 'medium' })}>
+        Rs. {Number(item.claim.total_amount).toFixed(2)}
       </td>
     </tr>
   )
