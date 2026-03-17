@@ -37,7 +37,7 @@ export function MicrosoftLoginButton() {
       type="button"
       onClick={handleMicrosoftSignIn}
       disabled={isPending}
-      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary-hover hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus-ring"
     >
       {isPending ? (
         <>

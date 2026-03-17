@@ -24,14 +24,17 @@ type OutstationFieldsProps = {
 
 export function OutstationFields(props: OutstationFieldsProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="space-y-2">
         <label
           htmlFor="outstationStateId"
-          className="text-sm font-medium text-foreground/80"
+          className="text-sm font-medium text-foreground"
         >
           <span className="inline-flex items-center gap-2">
-            <MapPin className="size-4" aria-hidden="true" />
+            <MapPin
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             State
           </span>
         </label>
@@ -42,7 +45,7 @@ export function OutstationFields(props: OutstationFieldsProps) {
           onChange={(event) =>
             props.onOutstationStateIdChange(event.target.value)
           }
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="h-10 w-full rounded-md border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
         >
           <option value="">Select state...</option>
           {props.stateOptions.map((state) => (
@@ -54,14 +57,14 @@ export function OutstationFields(props: OutstationFieldsProps) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm font-medium text-foreground/80">
+        <label className="space-y-2 text-sm font-medium text-foreground">
           <span>From City</span>
           <select
             name="fromCityId"
             value={props.fromCityId}
             onChange={(event) => props.onFromCityIdChange(event.target.value)}
             disabled={!props.outstationStateId}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className="h-10 w-full rounded-md border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-60"
           >
             <option value="">
               {props.outstationStateId
@@ -75,14 +78,14 @@ export function OutstationFields(props: OutstationFieldsProps) {
             ))}
           </select>
         </label>
-        <label className="space-y-2 text-sm font-medium text-foreground/80">
+        <label className="space-y-2 text-sm font-medium text-foreground">
           <span>To City</span>
           <select
             name="toCityId"
             value={props.toCityId}
             onChange={(event) => props.onToCityIdChange(event.target.value)}
             disabled={!props.outstationStateId}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className="h-10 w-full rounded-md border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-60"
           >
             <option value="">
               {props.outstationStateId
@@ -98,18 +101,18 @@ export function OutstationFields(props: OutstationFieldsProps) {
         </label>
       </div>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-foreground/80">
+      <fieldset className="space-y-2.5">
+        <legend className="text-sm font-medium text-foreground">
           Own vehicle used?
         </legend>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => props.onOwnVehicleUsedChange(true)}
-            className={`rounded-lg border px-3 py-2 text-sm ${
+            className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
               props.ownVehicleUsed
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border bg-background'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-background text-foreground hover:bg-muted'
             }`}
           >
             Yes
@@ -117,10 +120,10 @@ export function OutstationFields(props: OutstationFieldsProps) {
           <button
             type="button"
             onClick={() => props.onOwnVehicleUsedChange(false)}
-            className={`rounded-lg border px-3 py-2 text-sm ${
+            className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
               !props.ownVehicleUsed
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border bg-background'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-background text-foreground hover:bg-muted'
             }`}
           >
             No
@@ -133,10 +136,13 @@ export function OutstationFields(props: OutstationFieldsProps) {
           <div className="space-y-2">
             <label
               htmlFor="vehicleTypeOutstation"
-              className="text-sm font-medium text-foreground/80"
+              className="text-sm font-medium text-foreground"
             >
               <span className="inline-flex items-center gap-2">
-                <Car className="size-4" aria-hidden="true" />
+                <Car
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
                 Vehicle Type
               </span>
             </label>
@@ -147,7 +153,7 @@ export function OutstationFields(props: OutstationFieldsProps) {
               onChange={(event) =>
                 props.onVehicleTypeChange(event.target.value as VehicleType)
               }
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className="h-10 w-full rounded-md border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
             >
               {props.allowedVehicleTypes.map((type) => (
                 <option key={type.id} value={type.id}>
@@ -157,9 +163,12 @@ export function OutstationFields(props: OutstationFieldsProps) {
             </select>
           </div>
 
-          <label className="space-y-2 text-sm font-medium text-foreground/80">
+          <label className="block space-y-2 text-sm font-medium text-foreground">
             <span className="inline-flex items-center gap-2">
-              <Route className="size-4" aria-hidden="true" />
+              <Route
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               KM Travelled
             </span>
             <input
@@ -172,12 +181,10 @@ export function OutstationFields(props: OutstationFieldsProps) {
               onChange={(event) =>
                 props.onKmTravelledChange(event.target.value)
               }
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className="h-10 w-full rounded-md border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
             />
             {props.kmValidationMessage ? (
-              <p className="text-xs text-red-600 dark:text-red-300">
-                {props.kmValidationMessage}
-              </p>
+              <p className="text-xs text-error">{props.kmValidationMessage}</p>
             ) : null}
           </label>
         </>

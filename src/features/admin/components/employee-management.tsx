@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { Search, Loader2 } from 'lucide-react'
 
 import {
   searchEmployeesAction,
@@ -75,76 +76,100 @@ export function EmployeeManagement() {
     handleSearch()
   }
 
+  const inputCls =
+    'h-10 w-full rounded-md border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground'
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Search bar */}
       <div className="flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Search by name, email, or employee ID..."
-          className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        />
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search by name, email, or employee ID..."
+            className={`${inputCls} pl-10`}
+          />
+        </div>
         <button
           onClick={handleSearch}
           disabled={isSearching || !query.trim()}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-all duration-150 hover:bg-primary-hover hover:shadow-md disabled:opacity-50"
         >
+          {isSearching ? <Loader2 className="size-4 animate-spin" /> : null}
           {isSearching ? 'Searching...' : 'Search'}
         </button>
       </div>
 
-      {searchError && <p className="text-sm text-red-600">{searchError}</p>}
+      {searchError && (
+        <p className="rounded-md border border-error/20 bg-error-light px-4 py-3 text-sm text-error">
+          {searchError}
+        </p>
+      )}
 
       {/* Results table */}
       {employees.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-muted">
+            <thead className="border-b border-border bg-muted/50">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-foreground/70">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide text-muted-foreground">
                   Employee ID
                 </th>
-                <th className="px-3 py-2 text-left font-medium text-foreground/70">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide text-muted-foreground">
                   Name
                 </th>
-                <th className="px-3 py-2 text-left font-medium text-foreground/70">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide text-muted-foreground">
                   Designation
                 </th>
-                <th className="px-3 py-2 text-left font-medium text-foreground/70">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide text-muted-foreground">
                   State
                 </th>
-                <th className="px-3 py-2 text-left font-medium text-foreground/70">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide text-muted-foreground">
                   L1 Approver
                 </th>
-                <th className="px-3 py-2 text-center font-medium text-foreground/70">
+                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide text-muted-foreground">
                   Action
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {employees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-muted/50">
-                  <td className="px-3 py-2 font-mono text-xs">
+                <tr
+                  key={emp.id}
+                  className="transition-colors hover:bg-muted/50"
+                >
+                  <td className="px-4 py-3 font-mono text-xs">
                     {emp.employee_id}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <p className="font-medium">{emp.employee_name}</p>
-                    <p className="text-xs text-foreground/50">
+                    <p className="text-xs text-muted-foreground">
                       {emp.employee_email}
                     </p>
                   </td>
-                  <td className="px-3 py-2">{emp.designation}</td>
-                  <td className="px-3 py-2">{emp.state}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {emp.approval_employee_id_level_1 ? 'L1 Assigned' : '—'}
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {emp.designation}
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {emp.state}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {emp.approval_employee_id_level_1 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        Assigned
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
                     <button
                       onClick={() => selectEmployee(emp)}
-                      className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                      className="rounded-md border border-primary/30 bg-primary/5 px-3.5 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/10"
                     >
                       Reassign
                     </button>
@@ -158,19 +183,19 @@ export function EmployeeManagement() {
 
       {/* Reassign form */}
       {selectedEmployee && (
-        <div className="rounded-lg border border-blue-300 bg-blue-50 p-4 dark:border-blue-600 dark:bg-blue-900/20">
-          <h3 className="font-semibold text-blue-800 dark:text-blue-300">
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 dark:border-primary/10 dark:bg-primary/5">
+          <h3 className="font-semibold text-primary">
             Reassign Approvers: {selectedEmployee.employee_name}
           </h3>
-          <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             {selectedEmployee.designation} — {selectedEmployee.state}
           </p>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <div>
               <label
                 htmlFor="level1-email"
-                className="block text-xs font-medium text-blue-800 dark:text-blue-300"
+                className="block text-xs font-semibold text-foreground mb-1.5"
               >
                 Level 1 Approver Email
               </label>
@@ -180,13 +205,13 @@ export function EmployeeManagement() {
                 value={level1}
                 onChange={(e) => setLevel1(e.target.value)}
                 placeholder="level1@example.com"
-                className="mt-1 w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none dark:border-blue-600 dark:bg-surface"
+                className={inputCls}
               />
             </div>
             <div>
               <label
                 htmlFor="level2-email"
-                className="block text-xs font-medium text-blue-800 dark:text-blue-300"
+                className="block text-xs font-semibold text-foreground mb-1.5"
               >
                 Level 2 Approver Email
               </label>
@@ -196,13 +221,13 @@ export function EmployeeManagement() {
                 value={level2}
                 onChange={(e) => setLevel2(e.target.value)}
                 placeholder="level2@example.com"
-                className="mt-1 w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none dark:border-blue-600 dark:bg-surface"
+                className={inputCls}
               />
             </div>
             <div>
               <label
                 htmlFor="level3-email"
-                className="block text-xs font-medium text-blue-800 dark:text-blue-300"
+                className="block text-xs font-semibold text-foreground mb-1.5"
               >
                 Level 3 Approver Email
               </label>
@@ -212,15 +237,15 @@ export function EmployeeManagement() {
                 value={level3}
                 onChange={(e) => setLevel3(e.target.value)}
                 placeholder="level3@example.com"
-                className="mt-1 w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none dark:border-blue-600 dark:bg-surface"
+                className={inputCls}
               />
             </div>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-4">
             <label
               htmlFor="reassign-reason"
-              className="block text-sm font-medium text-blue-800 dark:text-blue-300"
+              className="block text-sm font-semibold text-foreground mb-1.5"
             >
               Reason (required)
             </label>
@@ -231,16 +256,19 @@ export function EmployeeManagement() {
               rows={3}
               maxLength={500}
               placeholder="Explain why the approval chain is being reassigned..."
-              className="mt-1 w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none dark:border-blue-600 dark:bg-surface"
+              className="min-h-20 w-full rounded-md border border-border bg-background px-4 py-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
             />
           </div>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex gap-2.5">
             <button
               onClick={handleReassign}
               disabled={isReassigning || !reassignReason.trim()}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary-hover disabled:opacity-50"
             >
+              {isReassigning ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
               {isReassigning ? 'Reassigning...' : 'Confirm Reassignment'}
             </button>
             <button
@@ -248,7 +276,7 @@ export function EmployeeManagement() {
                 setSelectedEmployee(null)
                 setReassignReason('')
               }}
-              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-medium shadow-xs transition-all hover:bg-muted"
             >
               Cancel
             </button>
@@ -258,7 +286,7 @@ export function EmployeeManagement() {
 
       {/* Empty state */}
       {employees.length === 0 && !isSearching && query && !searchError && (
-        <p className="text-center text-sm text-foreground/50">
+        <p className="text-center text-sm text-muted-foreground py-8">
           No employees found matching &ldquo;{query}&rdquo;.
         </p>
       )}

@@ -18,4 +18,13 @@ describe('canViewApprovalHistoryAmount', () => {
   it('returns false for non-HOD designations', () => {
     expect(canViewApprovalHistoryAmount('Area Business Head')).toBe(false)
   })
+
+  it('returns true for valid designation with mixed casing and spaces', () => {
+    expect(canViewApprovalHistoryAmount('  Head Of Department  ')).toBe(true)
+  })
+
+  it('returns false for null and undefined designation values', () => {
+    expect(canViewApprovalHistoryAmount(null)).toBe(false)
+    expect(canViewApprovalHistoryAmount(undefined)).toBe(false)
+  })
 })

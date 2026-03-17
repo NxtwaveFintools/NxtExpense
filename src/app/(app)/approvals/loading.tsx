@@ -38,7 +38,7 @@ export default function ApprovalsLoading() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <section className="rounded-lg border border-border bg-surface p-6">
             <Skeleton className="mb-4 h-7 w-44" />
             <div className="overflow-x-auto">
               <table className="w-full min-w-195 border-collapse text-sm">
@@ -71,7 +71,7 @@ export default function ApprovalsLoading() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <section className="rounded-lg border border-border bg-surface p-6">
             <Skeleton className="mb-4 h-7 w-44" />
             <div className="overflow-x-auto">
               <TableSkeleton columns={6} />

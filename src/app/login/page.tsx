@@ -52,6 +52,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <AuthMessageToast message={messageCode ?? null} />
+
+      {/* Decorative background pattern */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-48 -right-48 size-96 rounded-full bg-primary/5" />
+        <div className="absolute -bottom-48 -left-48 size-96 rounded-full bg-primary/5" />
+      </div>
+
       <div className="absolute right-4 top-4 md:right-8 md:top-8">
         <ThemeToggle />
       </div>

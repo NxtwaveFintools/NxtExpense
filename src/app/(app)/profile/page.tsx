@@ -1,4 +1,4 @@
-import { UserCircle, Building2, ShieldCheck } from 'lucide-react'
+import { UserCircle, Building2, ShieldCheck, TrendingUp } from 'lucide-react'
 
 import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -107,32 +107,78 @@ export default async function ProfilePage() {
   ]
 
   const statCards = [
-    { label: 'Total Claims', value: stats.total, color: 'text-foreground' },
-    { label: 'Pending', value: stats.pending, color: 'text-yellow-600' },
+    {
+      label: 'Total Claims',
+      value: stats.total,
+      color: 'text-foreground',
+      bgIcon: 'bg-primary/10',
+      iconColor: 'text-primary',
+    },
+    {
+      label: 'Pending',
+      value: stats.pending,
+      color: 'text-amber-600 dark:text-amber-400',
+      bgIcon: 'bg-amber-500/10',
+      iconColor: 'text-amber-600',
+    },
     {
       label: 'Finance Approved',
       value: stats.approved,
-      color: 'text-green-600',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgIcon: 'bg-emerald-500/10',
+      iconColor: 'text-emerald-600',
     },
-    { label: 'Rejected', value: stats.rejected, color: 'text-red-600' },
-    { label: 'Issued', value: stats.issued, color: 'text-blue-600' },
+    {
+      label: 'Rejected',
+      value: stats.rejected,
+      color: 'text-rose-600 dark:text-rose-400',
+      bgIcon: 'bg-rose-500/10',
+      iconColor: 'text-rose-600',
+    },
+    {
+      label: 'Issued',
+      value: stats.issued,
+      color: 'text-blue-600 dark:text-blue-400',
+      bgIcon: 'bg-blue-500/10',
+      iconColor: 'text-blue-600',
+    },
   ]
 
-  return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
+  const initials = employee.employee_name
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
-        {/* Employee Info */}
-        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-medium">
-            <UserCircle
-              className="size-5 text-foreground/70"
-              aria-hidden="true"
-            />
+  return (
+    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 animate-fade-in">
+        {/* Profile Header */}
+        <div className="flex items-center gap-4">
+          <div className="flex size-16 items-center justify-center rounded-lg bg-primary/10 text-xl font-semibold text-primary ring-1 ring-primary">
+            {initials}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {employee.employee_name}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {employee.designations?.designation_name ?? ''} ·{' '}
+              {employee.employee_email}
+            </p>
+          </div>
+        </div>
+
+        {/* Employee Details */}
+        <section className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="flex items-center gap-2.5 text-lg font-semibold">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <UserCircle className="size-4 text-primary" aria-hidden="true" />
+            </div>
             Employee Details
           </h2>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+          <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
             <InfoCard label="Name" value={employee.employee_name} />
             <InfoCard label="Employee Code" value={employee.employee_id} />
             <InfoCard label="Email" value={employee.employee_email} />
@@ -152,15 +198,14 @@ export default async function ProfilePage() {
         </section>
 
         {/* Approval Chain */}
-        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-medium">
-            <ShieldCheck
-              className="size-5 text-foreground/70"
-              aria-hidden="true"
-            />
+        <section className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="flex items-center gap-2.5 text-lg font-semibold">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+            </div>
             Approval Chain
           </h2>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+          <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
             {approvalChain.map((a) => (
               <InfoCard
                 key={a.level}
@@ -176,22 +221,30 @@ export default async function ProfilePage() {
         </section>
 
         {/* Claim Stats */}
-        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-medium">
-            <Building2
-              className="size-5 text-foreground/70"
-              aria-hidden="true"
-            />
+        <section className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="flex items-center gap-2.5 text-lg font-semibold">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <Building2 className="size-4 text-primary" aria-hidden="true" />
+            </div>
             Claim Summary
           </h2>
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {statCards.map((s) => (
               <div
                 key={s.label}
-                className="rounded-lg border border-border bg-background p-4 text-center"
+                className="rounded-md border border-border bg-background p-4 text-center"
               >
-                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="mt-1 text-xs text-foreground/60">{s.label}</p>
+                <div className="mx-auto flex size-8 items-center justify-center rounded-lg mb-2">
+                  <div
+                    className={`flex size-8 items-center justify-center rounded-lg ${s.bgIcon}`}
+                  >
+                    <TrendingUp className={`size-3.5 ${s.iconColor}`} />
+                  </div>
+                </div>
+                <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                  {s.label}
+                </p>
               </div>
             ))}
           </div>
@@ -203,9 +256,11 @@ export default async function ProfilePage() {
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1 rounded-lg border border-border bg-background p-4">
-      <dt className="text-foreground/60">{label}</dt>
-      <dd className="break-all">{value}</dd>
+    <div className="space-y-1 rounded-md border border-border bg-background p-4">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="font-medium break-all">{value}</dd>
     </div>
   )
 }

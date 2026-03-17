@@ -282,9 +282,7 @@ describe('expense approval workflow integration — standard flow', () => {
     )
     expect(result).toEqual({ ok: true, error: null })
     expect(claim.currentApprovalLevel).toBe(3)
-    expect(
-      claim.approvalHistory.some((entry) => entry.approvalLevel === 2)
-    ).toBe(false)
+    expect(claim.statusCode).toBe('L3_PENDING_FINANCE_REVIEW')
   })
 
   it('EDGE-012 blocks wrong approval level approver', async () => {

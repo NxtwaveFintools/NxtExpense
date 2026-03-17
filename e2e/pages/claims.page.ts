@@ -52,8 +52,8 @@ export class ClaimsPage {
     return this.page.locator('select[name="toCityId"]')
   }
 
-  get outstationLocationInput() {
-    return this.page.locator('select[name="outstationCityId"]')
+  get outstationStateSelect() {
+    return this.page.locator('select[name="outstationStateId"]')
   }
 
   get transportTypeSelect() {

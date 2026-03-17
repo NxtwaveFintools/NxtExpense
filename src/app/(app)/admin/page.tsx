@@ -52,7 +52,7 @@ export default async function AdminPage() {
             className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-primary/30 hover:bg-muted"
           >
             <p className="text-sm text-foreground/60">{card.label}</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">
+            <p className="mt-1 text-2xl font-semibold text-foreground">
               {card.value}
             </p>
           </Link>

@@ -24,33 +24,35 @@ export function PasswordLoginForm() {
   return (
     <form
       action={formAction}
-      className="flex w-full flex-col gap-3"
+      className="flex w-full flex-col gap-4"
       onSubmit={() => toast.info('Signing in...')}
     >
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-foreground/80">Email</span>
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-foreground">Email</span>
         <input
           type="email"
           name="email"
           required
-          className="rounded-lg border border-border bg-background px-3 py-2 outline-none transition focus:border-foreground/40 focus:ring-2 focus:ring-foreground/15"
+          className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
           autoComplete="email"
+          placeholder="you@company.com"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-foreground/80">Password</span>
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-foreground">Password</span>
         <input
           type="password"
           name="password"
           required
-          className="rounded-lg border border-border bg-background px-3 py-2 outline-none transition focus:border-foreground/40 focus:ring-2 focus:ring-foreground/15"
+          className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
           autoComplete="current-password"
+          placeholder="••••••••"
         />
       </label>
 
       {state.error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+        <p className="text-sm text-error" role="alert">
           {state.error}
         </p>
       ) : null}
@@ -58,7 +60,7 @@ export function PasswordLoginForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-5 text-sm font-semibold text-foreground shadow-xs transition-all duration-150 hover:bg-muted hover:shadow-sm active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus-ring"
       >
         {isPending ? (
           <>

@@ -21,14 +21,15 @@ export function LogoutButton() {
       type="button"
       disabled={isPending}
       onClick={handleLogout}
-      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-xs transition-all duration-150 hover:bg-error-light hover:text-error hover:border-error/20 disabled:cursor-not-allowed disabled:opacity-60 focus-ring"
+      aria-label={isPending ? 'Logging out...' : 'Logout'}
+      title={isPending ? 'Logging out...' : 'Logout'}
     >
       {isPending ? (
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
       ) : (
         <LogOut className="size-4" aria-hidden="true" />
       )}
-      {isPending ? 'Logging out...' : 'Logout'}
     </button>
   )
 }

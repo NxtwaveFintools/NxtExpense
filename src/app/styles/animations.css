@@ -1,0 +1,297 @@
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scale-up {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes blur-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--primary);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes spin-smooth {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s var(--ease-spring) both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s var(--ease-spring) both;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.4s var(--ease-spring) both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.5s var(--ease-spring) both;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.5s var(--ease-spring) both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.35s var(--ease-spring) both;
+}
+
+.animate-scale-up {
+  animation: scale-up 0.45s var(--ease-spring) both;
+}
+
+.animate-blur-in {
+  animation: blur-in 0.5s var(--ease-spring) both;
+}
+
+.animate-page-enter {
+  animation: page-enter 0.24s var(--ease-smooth) both;
+}
+
+.animate-pop-in {
+  animation: pop-in 0.35s var(--ease-bounce) both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-spin-smooth {
+  animation: spin-smooth 0.8s linear infinite;
+}
+
+.stagger-1 {
+  animation-delay: 0ms;
+}
+
+.stagger-2 {
+  animation-delay: 60ms;
+}
+
+.stagger-3 {
+  animation-delay: 120ms;
+}
+
+.stagger-4 {
+  animation-delay: 180ms;
+}
+
+.stagger-5 {
+  animation-delay: 240ms;
+}
+
+.stagger-6 {
+  animation-delay: 300ms;
+}
+
+.stagger-7 {
+  animation-delay: 360ms;
+}
+
+.stagger-8 {
+  animation-delay: 420ms;
+}
+
+.stagger-fast-1 {
+  animation-delay: 0ms;
+}
+
+.stagger-fast-2 {
+  animation-delay: 30ms;
+}
+
+.stagger-fast-3 {
+  animation-delay: 60ms;
+}
+
+.stagger-fast-4 {
+  animation-delay: 90ms;
+}
+
+.stagger-fast-5 {
+  animation-delay: 120ms;
+}
+
+.stagger-fast-6 {
+  animation-delay: 150ms;
+}
+
+.stagger-fast-7 {
+  animation-delay: 180ms;
+}
+
+.stagger-fast-8 {
+  animation-delay: 210ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-slide-in-right,
+  .animate-slide-in-left,
+  .animate-scale-in,
+  .animate-scale-up,
+  .animate-blur-in,
+  .animate-page-enter,
+  .animate-pop-in,
+  .animate-pulse-glow,
+  .animate-spin-smooth {
+    animation: none !important;
+  }
+
+  .stagger-1,
+  .stagger-2,
+  .stagger-3,
+  .stagger-4,
+  .stagger-5,
+  .stagger-6,
+  .stagger-7,
+  .stagger-8,
+  .stagger-fast-1,
+  .stagger-fast-2,
+  .stagger-fast-3,
+  .stagger-fast-4,
+  .stagger-fast-5,
+  .stagger-fast-6,
+  .stagger-fast-7,
+  .stagger-fast-8 {
+    animation-delay: 0ms !important;
+  }
+}

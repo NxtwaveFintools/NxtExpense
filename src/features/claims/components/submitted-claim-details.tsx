@@ -73,17 +73,19 @@ export function SubmittedClaimDetails({ claim }: SubmittedClaimDetailsProps) {
 
   return (
     <>
-      <h3 className="mt-5 text-sm font-semibold uppercase tracking-[0.12em] text-foreground/70">
+      <h3 className="mt-6 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
         Submitted Details
       </h3>
       <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
         {submittedFields.map((field) => (
           <div
             key={field.label}
-            className="rounded-lg border border-border bg-background p-3"
+            className="space-y-1 rounded-md border border-border bg-background p-4"
           >
-            <dt className="text-foreground/60">{field.label}</dt>
-            <dd>{field.value}</dd>
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {field.label}
+            </dt>
+            <dd className="font-medium">{field.value}</dd>
           </div>
         ))}
       </dl>

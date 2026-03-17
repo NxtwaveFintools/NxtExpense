@@ -28,7 +28,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(nextTheme)}
       disabled={!hasResolvedTheme}
-      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground shadow-sm transition hover:bg-muted"
+      className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-xs transition-all duration-150 hover:bg-muted hover:text-foreground focus-ring"
       aria-label={`Switch to ${label}`}
       title={`Switch to ${label}`}
     >
@@ -39,7 +39,6 @@ export function ThemeToggle() {
       ) : (
         <Moon className="size-4" />
       )}
-      <span>{label}</span>
     </button>
   )
 }

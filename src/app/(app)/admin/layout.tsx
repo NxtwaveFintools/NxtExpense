@@ -1,38 +1,49 @@
 import { redirect } from 'next/navigation'
+import { Shield } from 'lucide-react'
 
+import { AdminNav } from '@/features/admin/components/admin-nav'
 import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getEmployeeByEmail } from '@/lib/services/employee-service'
-import { isAdminUser } from '@/features/admin/permissions'
-import { AdminNav } from '@/features/admin/components/admin-nav'
+import {
+  getEmployeeByEmail,
+  getEmployeeRoles,
+} from '@/lib/services/employee-service'
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const user = await requireCurrentUser()
+  const user = await requireCurrentUser('/login')
   const supabase = await createSupabaseServerClient()
-  const employee = await getEmployeeByEmail(supabase, user.email!)
+  const employee = await getEmployeeByEmail(supabase, user.email ?? '')
+  if (!employee) redirect('/login')
 
-  if (!employee || !(await isAdminUser(supabase, employee))) {
-    redirect('/dashboard')
-  }
+  const roles = await getEmployeeRoles(supabase, employee.id)
+  const isAdmin = roles.some((role) => role.is_admin_role)
+  if (!isAdmin) redirect('/dashboard')
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
-        <p className="mt-1 text-sm text-foreground/60">
-          Manage system configuration, employee data, and claim operations.
-        </p>
+    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-md bg-primary/10">
+            <Shield className="size-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold">Admin Panel</h1>
+            <p className="text-xs text-muted-foreground">
+              Manage system configuration and employees
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="rounded-lg border border-border bg-surface p-3 self-start md:sticky md:top-24">
+            <AdminNav />
+          </aside>
+          <section className="animate-fade-in">{children}</section>
+        </div>
       </div>
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <aside className="w-full shrink-0 lg:w-56">
-          <AdminNav />
-        </aside>
-        <main className="min-w-0 flex-1">{children}</main>
-      </div>
-    </div>
+    </main>
   )
 }

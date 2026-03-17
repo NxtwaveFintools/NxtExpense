@@ -1,26 +1,20 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import dayjs from 'dayjs'
-import { Calendar, Loader2, MapPin } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { Calendar, Loader2, MapPin, Send } from 'lucide-react'
 
-import { submitClaimAction } from '@/features/claims/actions'
 import { BaseLocationFields } from '@/features/claims/components/base-location-fields'
 import { OutstationFields } from '@/features/claims/components/outstation-fields'
 import { ClaimSummaryCard } from '@/features/claims/components/claim-summary-card'
 import {
-  getClaimSummaryPreview,
-  type ClaimRateSnapshot,
-} from '@/features/claims/components/claim-summary-preview'
-import { formatDate } from '@/lib/utils/date'
+  KM_UI_LIMIT,
+  useClaimSubmissionForm,
+} from '@/features/claims/components/use-claim-submission-form'
+
+import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summary-preview'
 import type {
   CityOption,
   ClaimFormInitialValues,
-  ClaimFormValues,
   SelectOption,
-  VehicleType,
   WorkLocation,
   WorkLocationOption,
 } from '@/features/claims/types'
@@ -42,202 +36,53 @@ export function ClaimSubmissionForm({
   claimRateSnapshot,
   initialValues,
 }: ClaimSubmissionFormProps) {
-  const isEditingReturnedClaim = Boolean(initialValues)
-  const initialWorkLocation =
-    initialValues?.workLocation ?? workLocationOptions[0]?.id ?? ''
-  const initialVehicleType =
-    initialValues?.vehicleType &&
-    allowedVehicleTypes.some((vt) => vt.id === initialValues.vehicleType)
-      ? initialValues.vehicleType
-      : (allowedVehicleTypes[0]?.id ?? '')
-
-  const router = useRouter()
-  const [workLocation, setWorkLocation] =
-    useState<WorkLocation>(initialWorkLocation)
-  const [claimDate, setClaimDate] = useState(
-    initialValues?.claimDateIso ?? dayjs().format('YYYY-MM-DD')
-  )
-  const [vehicleType, setVehicleType] =
-    useState<VehicleType>(initialVehicleType)
-  const [ownVehicleUsed, setOwnVehicleUsed] = useState(
-    initialValues?.ownVehicleUsed ?? true
-  )
-  const [outstationStateId, setOutstationStateId] = useState(
-    initialValues?.outstationStateId ?? ''
-  )
-  const [fromCityId, setFromCityId] = useState(initialValues?.fromCityId ?? '')
-  const [toCityId, setToCityId] = useState(initialValues?.toCityId ?? '')
-  const [kmTravelled, setKmTravelled] = useState(
-    initialValues?.kmTravelled ? String(initialValues.kmTravelled) : ''
-  )
-  const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const todayIso = dayjs().format('YYYY-MM-DD')
-
-  const KM_UI_LIMIT = 150
-
-  const selectedLocation = useMemo(
-    () => workLocationOptions.find((wl) => wl.id === workLocation) ?? null,
-    [workLocation, workLocationOptions]
-  )
-
-  const filteredCityOptions = useMemo(() => {
-    if (!outstationStateId) {
-      return []
-    }
-
-    return cityOptions.filter((city) => city.stateId === outstationStateId)
-  }, [cityOptions, outstationStateId])
-
-  const kmValidationMessage = useMemo(() => {
-    const kmValue = Number.parseFloat(kmTravelled)
-    const requiresOutstationDetails =
-      selectedLocation?.requires_outstation_details ?? false
-
-    if (
-      !requiresOutstationDetails ||
-      !ownVehicleUsed ||
-      !Number.isFinite(kmValue)
-    ) {
-      return null
-    }
-
-    if (kmValue > KM_UI_LIMIT) {
-      return `KM travelled cannot exceed ${KM_UI_LIMIT}.`
-    }
-
-    return null
-  }, [kmTravelled, ownVehicleUsed, selectedLocation])
-
-  const summary = useMemo(() => {
-    return getClaimSummaryPreview({
-      workLocation,
-      requiresVehicleSelection:
-        selectedLocation?.requires_vehicle_selection ?? false,
-      requiresOutstationDetails:
-        selectedLocation?.requires_outstation_details ?? false,
-      ownVehicleUsed,
-      transportType: '',
-      transportTypeName: 'Taxi',
-      vehicleType,
-      vehicleTypeName:
-        allowedVehicleTypes.find((v) => v.id === vehicleType)?.name ?? '',
-      kmTravelled,
-      taxiAmount: '',
-      foodWithPrincipalsAmount: '',
-      claimRateSnapshot,
-    })
-  }, [
+  const {
+    isEditingReturnedClaim,
     workLocation,
-    selectedLocation,
-    ownVehicleUsed,
-    kmTravelled,
+    claimDate,
     vehicleType,
+    ownVehicleUsed,
+    outstationStateId,
+    fromCityId,
+    toCityId,
+    kmTravelled,
+    error,
+    isSubmitting,
+    todayIso,
+    selectedLocation,
+    filteredCityOptions,
+    kmValidationMessage,
+    summary,
+    setWorkLocation,
+    setClaimDate,
+    setVehicleType,
+    setFromCityId,
+    setToCityId,
+    setKmTravelled,
+    handleOwnVehicleUsedChange,
+    handleOutstationStateChange,
+    handleSubmit,
+  } = useClaimSubmissionForm({
     allowedVehicleTypes,
+    workLocationOptions,
+    cityOptions,
     claimRateSnapshot,
-  ])
-
-  function handleOwnVehicleUsedChange(value: boolean) {
-    setOwnVehicleUsed(value)
-
-    if (!value) {
-      setFromCityId('')
-      setToCityId('')
-      setKmTravelled('')
-    }
-  }
-
-  function handleOutstationStateChange(value: string) {
-    setOutstationStateId(value)
-    setFromCityId('')
-    setToCityId('')
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!claimDate) {
-      const message = 'Claim date is required.'
-      setError(message)
-      toast.error(message)
-      return
-    }
-
-    if (kmValidationMessage) {
-      setError(kmValidationMessage)
-      toast.error(kmValidationMessage)
-      return
-    }
-
-    setIsSubmitting(true)
-    setError(null)
-
-    const kmTravelledValue = Number.parseFloat(kmTravelled)
-    const requiresOutstationDetails =
-      selectedLocation?.requires_outstation_details ?? false
-    const requiresVehicleSelection =
-      selectedLocation?.requires_vehicle_selection ?? false
-    const isOutstationOwnVehicle = requiresOutstationDetails && ownVehicleUsed
-
-    const payload: ClaimFormValues = {
-      claimDate: formatDate(claimDate),
-      workLocation,
-      ownVehicleUsed: requiresOutstationDetails ? ownVehicleUsed : undefined,
-      vehicleType:
-        requiresVehicleSelection || isOutstationOwnVehicle
-          ? vehicleType || undefined
-          : undefined,
-      outstationStateId: requiresOutstationDetails
-        ? outstationStateId || undefined
-        : undefined,
-      fromCityId: requiresOutstationDetails
-        ? fromCityId || undefined
-        : undefined,
-      toCityId: requiresOutstationDetails ? toCityId || undefined : undefined,
-      kmTravelled:
-        isOutstationOwnVehicle && Number.isFinite(kmTravelledValue)
-          ? kmTravelledValue
-          : undefined,
-    }
-
-    try {
-      const result = await submitClaimAction(payload)
-
-      if (!result.ok) {
-        setError(result.error)
-        toast.error(result.error ?? 'Unable to submit claim.')
-        return
-      }
-
-      toast.success(
-        result.claimNumber
-          ? `Claim submitted successfully (${result.claimNumber}).`
-          : 'Claim submitted successfully.'
-      )
-      router.replace('/claims')
-    } catch {
-      const message = 'Unexpected error while submitting claim.'
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+    initialValues,
+  })
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]"
+      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
     >
-      <section className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+      <section className="space-y-5 rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <header className="space-y-1">
-          <h1 className="text-xl font-semibold">
+          <h1 className="font-display text-xl font-bold">
             {isEditingReturnedClaim
               ? 'Modify And Resubmit Claim'
               : 'Submit Daily Expense Claim'}
           </h1>
-          <p className="text-sm text-foreground/70">
+          <p className="text-sm text-muted-foreground">
             {isEditingReturnedClaim
               ? 'Update this returned claim and submit it again for approval.'
               : 'One claim must be submitted per calendar date.'}
@@ -245,14 +90,17 @@ export function ClaimSubmissionForm({
         </header>
 
         {error ? (
-          <p className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+          <p className="rounded-xl border border-error/20 bg-error-light px-4 py-3 text-sm text-error">
             {error}
           </p>
         ) : null}
 
-        <label className="space-y-2 text-sm font-medium text-foreground/80">
-          <span className="inline-flex items-center gap-2">
-            <Calendar className="size-4" aria-hidden="true" />
+        <label className="block space-y-2 text-sm">
+          <span className="inline-flex items-center gap-2 font-medium text-foreground">
+            <Calendar
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             Claim Date
           </span>
           <input
@@ -262,14 +110,17 @@ export function ClaimSubmissionForm({
             onChange={(event) => setClaimDate(event.target.value)}
             max={todayIso}
             disabled={isEditingReturnedClaim}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-60"
             required
           />
         </label>
 
-        <label className="space-y-2 text-sm font-medium text-foreground/80">
-          <span className="inline-flex items-center gap-2">
-            <MapPin className="size-4" aria-hidden="true" />
+        <label className="block space-y-2 text-sm">
+          <span className="inline-flex items-center gap-2 font-medium text-foreground">
+            <MapPin
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             Work Location
           </span>
           <select
@@ -278,7 +129,7 @@ export function ClaimSubmissionForm({
             onChange={(event) =>
               setWorkLocation(event.target.value as WorkLocation)
             }
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           >
             {workLocationOptions.map((option) => (
               <option key={option.id} value={option.id}>
@@ -318,21 +169,22 @@ export function ClaimSubmissionForm({
           />
         ) : null}
 
-        <div className="border-t border-border pt-2">
+        <div className="border-t border-border pt-4">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary-hover hover:shadow-md active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                 Submitting...
               </>
-            ) : isEditingReturnedClaim ? (
-              'Resubmit Claim'
             ) : (
-              'Submit Claim'
+              <>
+                <Send className="size-4" aria-hidden="true" />
+                {isEditingReturnedClaim ? 'Resubmit Claim' : 'Submit Claim'}
+              </>
             )}
           </button>
         </div>

@@ -10,6 +10,14 @@ test.describe('Authorization Boundaries', () => {
   test('unauthenticated user is redirected to /login from protected routes', async ({
     page,
   }) => {
+    await page.context().clearCookies()
+    await page.goto('/login')
+    await page.evaluate(() => {
+      window.localStorage.clear()
+      window.sessionStorage.clear()
+    })
+    await page.context().clearCookies()
+
     await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
     expect(page.url()).toContain('/login')

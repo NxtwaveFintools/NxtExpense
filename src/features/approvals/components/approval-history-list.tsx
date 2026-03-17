@@ -1,103 +1,144 @@
 import Link from 'next/link'
 
-import { formatDate } from '@/lib/utils/date'
+import { formatDate, formatDatetime } from '@/lib/utils/date'
 import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
-
-import { getApprovalHistoryAction } from '@/features/approvals/actions'
+import {
+  DATA_TABLE_BODY_CLASS,
+  DATA_TABLE_CLASS,
+  DATA_TABLE_HEAD_ROW_CLASS,
+  DATA_TABLE_HEADER_BAR_CLASS,
+  DATA_TABLE_PAGINATION_SLOT_CLASS,
+  DATA_TABLE_ROW_CLASS,
+  DATA_TABLE_SCROLL_WRAPPER_CLASS,
+  getDataTableCellClass,
+  getDataTableHeadCellClass,
+} from '@/components/ui/data-table-tokens'
 import { ClaimStatusBadge } from '@/features/claims/components/claim-status-badge'
 
-type ApprovalHistoryPayload = Awaited<
-  ReturnType<typeof getApprovalHistoryAction>
->
+import type {
+  ApprovalHistoryRecord,
+  PaginatedApprovalHistoryRecords,
+} from '@/features/approvals/types'
 
 type ApprovalHistoryListProps = {
-  history: ApprovalHistoryPayload
-  showAmountColumn: boolean
+  history: PaginatedApprovalHistoryRecords
   pagination: {
     backHref: string | null
     nextHref: string | null
     pageNumber: number
   }
+  showAmountColumn?: boolean
 }
 
 export function ApprovalHistoryList({
   history,
-  showAmountColumn,
   pagination,
+  showAmountColumn = true,
 }: ApprovalHistoryListProps) {
   if (history.data.length === 0) {
     return (
-      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+      <section className="rounded-lg border border-border bg-surface p-8 text-center">
         <h2 className="text-lg font-semibold">Approval History</h2>
-        <p className="mt-2 text-sm text-foreground/70">
-          No past approval actions found for your role.
+        <p className="mt-2 text-sm text-muted-foreground">
+          No past approvals found.
         </p>
       </section>
     )
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold">Approval History</h2>
-      <p className="mb-4 text-xs text-foreground/60">
-        Each row shows one update made on a claim, along with the key approval
-        milestone dates.
-      </p>
+    <section className="rounded-lg border border-border bg-surface">
+      <div className={DATA_TABLE_HEADER_BAR_CLASS}>
+        <h2 className="text-lg font-semibold">Approval History</h2>
+      </div>
 
-      <CursorPaginationControls
-        backHref={pagination.backHref}
-        nextHref={pagination.nextHref}
-        pageNumber={pagination.pageNumber}
-      />
+      <div className={DATA_TABLE_PAGINATION_SLOT_CLASS}>
+        <CursorPaginationControls
+          backHref={pagination.backHref}
+          nextHref={pagination.nextHref}
+          pageNumber={pagination.pageNumber}
+        />
+      </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-240 border-collapse text-sm">
+      <div className={DATA_TABLE_SCROLL_WRAPPER_CLASS}>
+        <table className={`${DATA_TABLE_CLASS} min-w-210`}>
           <thead>
-            <tr className="border-b border-border text-left text-foreground/70">
-              <th className="px-3 py-2 font-medium whitespace-nowrap">
+            <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
+              <th className={getDataTableHeadCellClass({ nowrap: true })}>
                 Claim ID
               </th>
-              <th className="px-3 py-2 font-medium">Employee</th>
-              <th className="px-3 py-2 font-medium">Role</th>
-              <th className="px-3 py-2 font-medium">Claim Date</th>
+              <th className={getDataTableHeadCellClass()}>Employee</th>
+              <th className={getDataTableHeadCellClass()}>Claim Date</th>
               {showAmountColumn ? (
-                <th className="px-3 py-2 font-medium">Amount</th>
+                <th className={getDataTableHeadCellClass()}>Amount</th>
               ) : null}
-              <th className="px-3 py-2 font-medium">HOD Approved Date</th>
-              <th className="px-3 py-2 font-medium">Finance Approved Date</th>
-              <th className="px-3 py-2 font-medium">Current Status</th>
+              <th className={getDataTableHeadCellClass()}>HOD Approved</th>
+              <th className={getDataTableHeadCellClass()}>Finance Date</th>
+              <th className={getDataTableHeadCellClass()}>Status</th>
             </tr>
           </thead>
-          <tbody>
-            {history.data.map((row) => (
-              <tr key={row.actionId} className="border-b border-border/70">
-                <td className="px-3 py-3 font-medium whitespace-nowrap">
+          <tbody className={DATA_TABLE_BODY_CLASS}>
+            {history.data.map((row: ApprovalHistoryRecord) => (
+              <tr key={row.actionId} className={DATA_TABLE_ROW_CLASS}>
+                <td
+                  className={getDataTableCellClass({
+                    weight: 'medium',
+                    nowrap: true,
+                  })}
+                >
                   <Link
                     href={`/claims/${row.claimId}?from=approvals`}
-                    className="inline-block whitespace-nowrap underline decoration-border underline-offset-4 hover:decoration-foreground"
+                    className="text-primary font-semibold hover:text-primary-hover transition-colors"
                   >
                     {row.claimNumber}
                   </Link>
                 </td>
-                <td className="px-3 py-3">{row.ownerName}</td>
-                <td className="px-3 py-3 text-xs text-foreground/70">
-                  {row.ownerDesignation}
+                <td
+                  className={getDataTableCellClass({
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {row.ownerName}
                 </td>
-                <td className="px-3 py-3">{formatDate(row.claimDate)}</td>
+                <td
+                  className={getDataTableCellClass({
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {formatDate(row.claimDate)}
+                </td>
                 {showAmountColumn ? (
-                  <td className="px-3 py-3">
-                    Rs. {Number(row.totalAmount).toFixed(2)}
+                  <td
+                    className={getDataTableCellClass({
+                      mono: true,
+                      weight: 'medium',
+                      nowrap: true,
+                    })}
+                  >
+                    Rs. {row.totalAmount.toFixed(2)}
                   </td>
                 ) : null}
-                <td className="px-3 py-3">
-                  {row.hodApprovedAt ? formatDate(row.hodApprovedAt) : '-'}
+                <td
+                  className={getDataTableCellClass({
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {row.hodApprovedAt ? formatDatetime(row.hodApprovedAt) : '-'}
                 </td>
-                <td className="px-3 py-3">
+                <td
+                  className={getDataTableCellClass({
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
                   {row.financeApprovedAt
-                    ? formatDate(row.financeApprovedAt)
+                    ? formatDatetime(row.financeApprovedAt)
                     : '-'}
                 </td>
-                <td className="px-3 py-3">
+                <td className={getDataTableCellClass()}>
                   <ClaimStatusBadge
                     statusName={row.claimStatusName}
                     statusDisplayColor={row.claimStatusDisplayColor}

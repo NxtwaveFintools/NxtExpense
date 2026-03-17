@@ -94,8 +94,8 @@ export function WorkLocationTable({ workLocations }: Props) {
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     wl.is_active
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300'
+                      : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
                   }`}
                 >
                   {wl.is_active ? 'Active' : 'Inactive'}

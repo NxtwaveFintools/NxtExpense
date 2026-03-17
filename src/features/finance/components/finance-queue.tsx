@@ -14,6 +14,13 @@ import {
   submitFinanceAction,
 } from '@/features/finance/actions'
 import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
+import {
+  DATA_TABLE_BODY_CLASS,
+  DATA_TABLE_CLASS,
+  DATA_TABLE_HEAD_ROW_CLASS,
+  DATA_TABLE_SCROLL_WRAPPER_CLASS,
+  getDataTableHeadCellClass,
+} from '@/components/ui/data-table-tokens'
 import { FinanceClaimRow } from '@/features/finance/components/finance-claim-row'
 import { FinanceQueueToolbar } from '@/features/finance/components/finance-queue-toolbar'
 
@@ -173,7 +180,7 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
 
   if (queue.data.length === 0) {
     return (
-      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+      <section className="rounded-lg border border-border bg-surface p-6">
         <h2 className="text-lg font-semibold">Finance Queue</h2>
         <p className="mt-2 text-sm text-foreground/70">
           No claims are waiting for finance action.
@@ -183,7 +190,7 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+    <section className="rounded-lg border border-border bg-surface p-6">
       <h2 className="text-lg font-semibold">Finance Queue</h2>
 
       <CursorPaginationControls
@@ -233,21 +240,21 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
           processingAction={pendingBulkAction}
         />
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-185 border-collapse text-sm">
+        <div className={DATA_TABLE_SCROLL_WRAPPER_CLASS}>
+          <table className={`${DATA_TABLE_CLASS} min-w-185 border-collapse`}>
             <thead>
-              <tr className="border-b border-border text-left text-foreground/70">
-                <th className="px-3 py-2 font-medium">Select</th>
-                <th className="px-3 py-2 font-medium whitespace-nowrap">
+              <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
+                <th className={getDataTableHeadCellClass()}>Select</th>
+                <th className={getDataTableHeadCellClass({ nowrap: true })}>
                   Claim ID
                 </th>
-                <th className="px-3 py-2 font-medium">Employee</th>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Location</th>
-                <th className="px-3 py-2 font-medium">Amount</th>
+                <th className={getDataTableHeadCellClass()}>Employee</th>
+                <th className={getDataTableHeadCellClass()}>Date</th>
+                <th className={getDataTableHeadCellClass()}>Location</th>
+                <th className={getDataTableHeadCellClass()}>Amount</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={DATA_TABLE_BODY_CLASS}>
               {queue.data.map((item) => (
                 <FinanceClaimRow
                   key={item.claim.id}

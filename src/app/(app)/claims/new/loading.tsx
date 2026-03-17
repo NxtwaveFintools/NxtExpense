@@ -9,7 +9,7 @@ export default function NewClaimLoading() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <section className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <section className="space-y-4 rounded-lg border border-border bg-surface p-6">
             <header className="space-y-2">
               <Skeleton className="h-8 w-60" />
               <Skeleton className="h-4 w-80" />
@@ -49,7 +49,7 @@ export default function NewClaimLoading() {
             </div>
           </section>
 
-          <aside className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <aside className="rounded-lg border border-border bg-surface p-4">
             <Skeleton className="h-4 w-32" />
             <div className="mt-3 space-y-2">
               <Skeleton className="h-4 w-full" />

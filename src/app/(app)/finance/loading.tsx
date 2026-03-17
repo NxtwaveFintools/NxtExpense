@@ -12,7 +12,7 @@ export default function FinanceLoading() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <section className="rounded-lg border border-border bg-surface p-6">
             <Skeleton className="h-7 w-32" />
             <Skeleton className="mt-3 h-4 w-12" />
             <Skeleton className="mt-2 min-h-20 w-full rounded-lg" />
@@ -66,7 +66,7 @@ export default function FinanceLoading() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <section className="rounded-lg border border-border bg-surface p-6">
             <Skeleton className="mb-4 h-7 w-36" />
 
             <div className="overflow-x-auto">

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 import { submitApprovalAction } from '@/features/approvals/actions'
 import type { ClaimAvailableAction } from '@/features/claims/types'
@@ -71,41 +72,45 @@ export function ApprovalActions({
   const rejectedAction = actions.find((action) => action.action === 'rejected')
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+    <section className="rounded-lg border border-border bg-surface p-6">
       <h3 className="text-base font-semibold">Take Action</h3>
 
       {actions.length === 0 ? (
-        <p className="mt-3 text-sm text-foreground/70">
+        <p className="mt-3 text-sm text-muted-foreground">
           No workflow actions are available for this claim.
         </p>
       ) : (
         <>
-          <label className="mt-3 block space-y-2 text-sm">
-            <span className="text-foreground/80">Notes</span>
+          <label className="mt-4 block space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Notes</span>
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2"
+              className="min-h-24 w-full rounded-md border border-border bg-background px-4 py-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
+              placeholder="Add notes for your decision (optional)..."
             />
           </label>
         </>
       )}
 
       {error ? (
-        <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+        <p className="mt-3 rounded-md border border-error/20 bg-error-light px-4 py-3 text-sm text-error">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-5 flex gap-2.5">
         {approvedAction ? (
           <button
             key={`${approvedAction.action}-${approvedAction.display_label}`}
             type="button"
             disabled={isSubmitting}
             onClick={() => handleAction('approved')}
-            className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
           >
+            {isSubmitting && pendingAction === approvedAction.action ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
             {isSubmitting && pendingAction === approvedAction.action
               ? 'Submitting...'
               : approvedAction.display_label}
@@ -117,7 +122,7 @@ export function ApprovalActions({
             type="button"
             disabled={isSubmitting}
             onClick={() => setShowRejectConfirmation(true)}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-60"
+            className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-medium shadow-xs transition-all hover:bg-muted disabled:opacity-50"
           >
             {rejectedAction.display_label}
           </button>
@@ -125,24 +130,27 @@ export function ApprovalActions({
 
         {rejectedAction && showRejectConfirmation ? (
           <>
-            <label className="mt-4 flex cursor-pointer items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
+            <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-md border border-amber-200 bg-warning-light px-4 py-3 text-sm dark:border-amber-500/20">
               <input
                 type="checkbox"
                 checked={allowResubmit}
                 onChange={(e) => setAllowResubmit(e.target.checked)}
-                className="h-4 w-4 rounded"
+                className="size-4 rounded accent-primary"
               />
-              <span className="text-amber-700 dark:text-amber-400">
+              <span className="text-amber-700 dark:text-amber-400 font-medium">
                 Allow employee to raise a new claim for this date
               </span>
             </label>
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex gap-2.5">
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => handleAction('rejected')}
-                className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
               >
+                {isSubmitting && pendingAction === rejectedAction.action ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
                 {isSubmitting && pendingAction === rejectedAction.action
                   ? 'Submitting...'
                   : 'Confirm Reject'}
@@ -154,7 +162,7 @@ export function ApprovalActions({
                   setShowRejectConfirmation(false)
                   setAllowResubmit(false)
                 }}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-60"
+                className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-medium shadow-xs transition-all hover:bg-muted disabled:opacity-50"
               >
                 Cancel
               </button>

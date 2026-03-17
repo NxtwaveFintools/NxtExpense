@@ -40,39 +40,58 @@ export async function AppHeader() {
     ...(access.canViewAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ]
 
+  const initials = employee.employee_name
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-surface/95 shadow-sm backdrop-blur-sm">
-      <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-4">
+    <header
+      role="banner"
+      className="sticky top-0 z-30 border-b border-border bg-surface shadow-xs"
+    >
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-6">
+        <div className="flex items-center gap-5">
           <Link
             href="/dashboard"
-            className="text-xs font-bold uppercase tracking-[0.15em] text-foreground/50 hover:text-foreground/80 transition-colors"
+            className="font-display text-base font-extrabold tracking-tight text-primary transition-colors hover:text-primary-hover"
           >
             NxtExpense
           </Link>
-          <div className="hidden sm:block w-px h-5 bg-border" />
+          <div className="hidden sm:block w-px h-6 bg-border" />
           <div className="hidden sm:block">
             <AppNavLinks links={navLinks} />
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="hidden text-right text-sm sm:block mr-1">
-            <Link href="/profile" className="hover:underline">
-              <p className="font-medium leading-tight text-foreground">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/profile"
+            aria-label="Open profile"
+            title="Profile"
+            className="hidden sm:flex items-center gap-3 rounded-xl px-3 py-1.5 transition-colors hover:bg-muted group"
+          >
+            <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary ring-1 ring-primary/20">
+              {initials}
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold leading-tight text-foreground group-hover:text-foreground">
                 {employee.employee_name}
               </p>
-              <p className="text-xs text-foreground/55 leading-tight">
+              <p className="text-xs text-muted-foreground leading-tight">
                 {employee.designations?.designation_name ?? ''}
               </p>
-            </Link>
-          </div>
+            </div>
+          </Link>
+          <div className="hidden sm:block w-px h-6 bg-border" />
           <ThemeToggle />
           <LogoutButton />
         </div>
       </div>
 
-      {/* Mobile nav — shown below the main header row */}
+      {/* Mobile nav */}
       <div className="sm:hidden border-t border-border px-4 py-2">
         <AppNavLinks links={navLinks} />
       </div>

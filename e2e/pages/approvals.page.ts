@@ -23,7 +23,7 @@ export class ApprovalsPage {
   // Navigate into the first pending claim's detail page
   get reviewFirstClaim() {
     return this.page
-      .locator('table:first-of-type tbody tr a[href^="/approvals/"]')
+      .locator('table:first-of-type tbody tr a[href*="/claims/"]')
       .first()
   }
 

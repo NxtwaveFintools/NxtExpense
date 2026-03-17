@@ -53,13 +53,23 @@ test.describe('Edge Cases', () => {
 
     await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
     await claims.workLocationSelect.selectOption('Field - Outstation')
-    await claims.outstationLocationInput.selectOption({ label: 'Hyderabad' })
+    await claims.outstationStateSelect.selectOption({ index: 1 })
 
     // "Own vehicle used?" is a Yes/No button group — click Yes to confirm own-vehicle path
     await claims.ownVehicleYesButton.click()
     await claims.vehicleTypeSelect.selectOption('Two Wheeler')
-    await claims.fromCityInput.selectOption({ label: 'Hyderabad' })
-    await claims.toCityInput.selectOption({ label: 'Vijayawada' })
+    await expect
+      .poll(async () => claims.fromCityInput.locator('option').count())
+      .toBeGreaterThan(1)
+    await claims.fromCityInput.selectOption({ index: 1 })
+
+    await expect
+      .poll(async () => claims.toCityInput.locator('option').count())
+      .toBeGreaterThan(1)
+    const toCityOptionCount = await claims.toCityInput.locator('option').count()
+    await claims.toCityInput.selectOption({
+      index: toCityOptionCount > 2 ? 2 : 1,
+    })
 
     let kmLimitErrorVisible = false
     for (let daysBack = 1; daysBack <= 3650; daysBack++) {

@@ -4,34 +4,34 @@ const TABLE_ROW_COUNT = 6
 
 export default function ClaimsLoading() {
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
+    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-4">
-          <Skeleton className="h-9 w-36 rounded-lg" />
+        <div className="mb-6">
+          <Skeleton className="h-9 w-36 rounded-md" />
         </div>
 
-        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+        <section className="rounded-lg border border-border bg-surface">
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <Skeleton className="h-7 w-28" />
-            <Skeleton className="h-9 w-24 rounded-lg" />
+            <Skeleton className="h-10 w-28 rounded-md" />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-230 border-collapse text-sm">
+          <div className="overflow-x-auto px-2 pb-2">
+            <table className="w-full min-w-230 text-sm">
               <thead>
-                <tr className="border-b border-border text-left">
-                  {Array.from({ length: 7 }).map((_, index) => (
-                    <th key={index} className="px-3 py-2">
+                <tr className="border-b border-border">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <th key={index} className="px-4 py-3">
                       <Skeleton className="h-4 w-20" />
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {Array.from({ length: TABLE_ROW_COUNT }).map((_, rowIndex) => (
-                  <tr key={rowIndex} className="border-b border-border/70">
-                    {Array.from({ length: 7 }).map((__, cellIndex) => (
-                      <td key={cellIndex} className="px-3 py-3">
+                  <tr key={rowIndex}>
+                    {Array.from({ length: 6 }).map((__, cellIndex) => (
+                      <td key={cellIndex} className="px-4 py-3.5">
                         <Skeleton className="h-4 w-full max-w-28" />
                       </td>
                     ))}
@@ -39,10 +39,6 @@ export default function ClaimsLoading() {
                 ))}
               </tbody>
             </table>
-          </div>
-
-          <div className="mt-4 flex items-center justify-end">
-            <Skeleton className="h-8 w-24 rounded-lg" />
           </div>
         </section>
       </div>

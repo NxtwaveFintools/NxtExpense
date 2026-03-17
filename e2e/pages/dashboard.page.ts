@@ -9,7 +9,7 @@ export class DashboardPage {
   }
 
   get heading() {
-    return this.page.getByRole('heading', { name: /dashboard/i })
+    return this.page.getByRole('heading', { level: 1 }).first()
   }
 
   get newClaimLink() {
