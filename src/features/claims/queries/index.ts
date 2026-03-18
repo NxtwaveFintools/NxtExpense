@@ -11,10 +11,7 @@ import type {
   PaginatedClaims,
 } from '@/features/claims/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
-import {
-  getClaimStatusDisplayLabel,
-  VISIBLE_CLAIM_STATUS_CODES,
-} from '@/lib/utils/claim-status'
+import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
 
 export const CLAIM_COLUMNS =
   'id, claim_number, employee_id, claim_date, work_location_id, work_locations(location_name), own_vehicle_used, vehicle_type_id, vehicle_types(vehicle_name), outstation_state_id, outstation_city_id, from_city_id, to_city_id, outstation_state:states!outstation_state_id(state_name), outstation_city:cities!outstation_city_id(city_name), from_city_data:cities!from_city_id(city_name), to_city_data:cities!to_city_id(city_name), km_travelled, total_amount, status_id, allow_resubmit, is_superseded, claim_statuses!status_id(status_code, status_name, display_color, is_terminal, is_rejection), current_approval_level, submitted_at, created_at, updated_at, resubmission_count, last_rejection_notes, last_rejected_at, accommodation_nights, food_with_principals_amount'
@@ -82,14 +79,7 @@ export async function getMyClaimsPaginated(
   }
 
   if (filters.claimStatus) {
-    const { data: statusRow } = await supabase
-      .from('claim_statuses')
-      .select('id')
-      .eq('status_code', filters.claimStatus)
-      .maybeSingle()
-    if (statusRow) {
-      query = query.eq('status_id', statusRow.id)
-    }
+    query = query.eq('status_id', filters.claimStatus)
   }
 
   if (filters.workLocation) {
@@ -166,10 +156,9 @@ export async function getClaimStatusCatalog(
   const { data, error } = await supabase
     .from('claim_statuses')
     .select(
-      'status_code, status_name, is_terminal, display_order, display_color'
+      'id, status_code, status_name, is_terminal, display_order, display_color'
     )
     .eq('is_active', true)
-    .in('status_code', [...VISIBLE_CLAIM_STATUS_CODES])
     .order('display_order', { ascending: true })
 
   if (error) {
@@ -177,7 +166,7 @@ export async function getClaimStatusCatalog(
   }
 
   return (data ?? []).map((row) => ({
-    status: row.status_code,
+    status_id: row.id,
     display_label: getClaimStatusDisplayLabel(row.status_code, row.status_name),
     is_terminal: row.is_terminal,
     sort_order: row.display_order,

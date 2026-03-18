@@ -2,11 +2,9 @@ import type { Claim, ClaimAvailableAction } from '@/features/claims/types'
 import type { EmployeeRow } from '@/lib/services/employee-service'
 import type { PaginatedResult } from '@/lib/utils/pagination'
 
-// These type aliases mirror the `finance_action_type` PostgreSQL enum.
-// Single source of truth for all finance action string comparisons.
-export type FinanceActionType = 'issued' | 'finance_rejected'
+export type FinanceActionType = string
 
-export type FinanceActionFilter = 'all' | FinanceActionType
+export type FinanceActionFilter = string | null
 
 export type FinanceDateFilterField = 'claim_date' | 'finance_approved_date'
 
@@ -15,7 +13,7 @@ export type FinanceAction = {
   claim_id: string
   actor_email: string
   actor_name: string | null
-  action: FinanceActionType
+  action: string
   notes: string | null
   acted_at: string
 }
@@ -59,4 +57,5 @@ export type FinanceFilterOptions = {
   hodApprovers: FinanceFilterOption[]
   claimStatuses: FinanceFilterOption[]
   workLocations: FinanceFilterOption[]
+  financeActions: FinanceFilterOption[]
 }

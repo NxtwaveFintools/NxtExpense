@@ -53,28 +53,23 @@ describe('approvalActionSchema', () => {
     }
   })
 
-  // ── Rejection without notes (MUST fail) ───────────────────────────────────
+  // ── Rejection without notes (allowed; DB validates workflow rules) ────────
 
-  it('requires notes for rejection', () => {
+  it('accepts rejection without notes at schema level', () => {
     const parsed = approvalActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'rejected',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('requires non-empty notes for rejection (whitespace-only fails)', () => {
+  it('accepts whitespace-only notes (trimmed) at schema level', () => {
     const parsed = approvalActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'rejected',
       notes: '   ',
     })
-    expect(parsed.success).toBe(false)
-    if (!parsed.success) {
-      expect(parsed.error.issues[0]?.message).toBe(
-        'Rejection notes are required.'
-      )
-    }
+    expect(parsed.success).toBe(true)
   })
 
   // ── Invalid inputs ────────────────────────────────────────────────────────
@@ -87,12 +82,12 @@ describe('approvalActionSchema', () => {
     expect(parsed.success).toBe(false)
   })
 
-  it('rejects invalid action type', () => {
+  it('accepts any non-empty action code', () => {
     const parsed = approvalActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'issued',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('rejects notes exceeding 500 characters', () => {
@@ -131,12 +126,12 @@ describe('bulkApprovalActionSchema', () => {
     expect(parsed.success).toBe(false)
   })
 
-  it('requires notes for bulk rejection', () => {
+  it('accepts bulk rejection without notes at schema level', () => {
     const parsed = bulkApprovalActionSchema.safeParse({
       claimIds: [VALID_UUID],
       action: 'rejected',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('accepts bulk rejection with notes', () => {
@@ -162,36 +157,18 @@ describe('approvalHistoryFiltersSchema', () => {
     const parsed = approvalHistoryFiltersSchema.safeParse({})
     expect(parsed.success).toBe(true)
     if (parsed.success) {
-      expect(parsed.data.actorFilter).toBe('all')
       expect(parsed.data.claimStatus).toBeUndefined()
     }
   })
 
   it('accepts claimStatus filter', () => {
     const parsed = approvalHistoryFiltersSchema.safeParse({
-      claimStatus: 'L1_PENDING',
+      claimStatus: VALID_UUID,
     })
 
     expect(parsed.success).toBe(true)
     if (parsed.success) {
-      expect(parsed.data.claimStatus).toBe('L1_PENDING')
-    }
-  })
-
-  it('accepts valid actorFilter values', () => {
-    for (const filter of ['all', 'sbh', 'hod', 'finance'] as const) {
-      const parsed = approvalHistoryFiltersSchema.safeParse({
-        actorFilter: filter,
-      })
-      expect(parsed.success).toBe(true)
-    }
-  })
-
-  it('treats empty string actorFilter as default "all"', () => {
-    const parsed = approvalHistoryFiltersSchema.safeParse({ actorFilter: '' })
-    expect(parsed.success).toBe(true)
-    if (parsed.success) {
-      expect(parsed.data.actorFilter).toBe('all')
+      expect(parsed.data.claimStatus).toBe(VALID_UUID)
     }
   })
 

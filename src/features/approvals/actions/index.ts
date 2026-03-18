@@ -29,7 +29,7 @@ type ApprovalActionResult = {
 
 export async function submitApprovalAction(payload: {
   claimId: string
-  action: 'approved' | 'rejected'
+  action: string
   notes?: string
   allowResubmit?: boolean
 }): Promise<ApprovalActionResult> {
@@ -61,16 +61,28 @@ export async function submitApprovalAction(payload: {
     return { ok: false, error: 'Claim not found.' }
   }
 
+  const availableActions = await getClaimAvailableActions(
+    supabase,
+    claimWithOwner.claim.id
+  )
+  const canRunAction = availableActions.some(
+    (action) => action.action === parsed.data.action
+  )
+
+  if (!canRunAction) {
+    return {
+      ok: false,
+      error: 'This workflow action is not available for the claim state.',
+    }
+  }
+
   const { error: approvalError } = await supabase.rpc(
     'submit_approval_action_atomic',
     {
       p_claim_id: claimWithOwner.claim.id,
       p_action: parsed.data.action,
       p_notes: parsed.data.notes ?? null,
-      p_allow_resubmit:
-        parsed.data.action === 'rejected'
-          ? Boolean(parsed.data.allowResubmit)
-          : false,
+      p_allow_resubmit: Boolean(parsed.data.allowResubmit),
     }
   )
 
@@ -94,7 +106,6 @@ function getPendingFilters(
 ): PendingApprovalsFilters {
   return {
     employeeName: normalizedFilters.employeeName,
-    actorFilter: normalizedFilters.actorFilter,
     claimStatus: normalizedFilters.claimStatus,
   }
 }
@@ -148,7 +159,7 @@ export async function getApprovalHistoryAction(
 
 export async function submitBulkApprovalAction(payload: {
   claimIds: string[]
-  action: 'approved' | 'rejected'
+  action: string
   notes?: string
   allowResubmit?: boolean
 }): Promise<BulkApprovalActionResult> {
@@ -205,14 +216,26 @@ export async function submitBulkApprovalAction(payload: {
   }
 
   for (const claimId of parsed.data.claimIds) {
+    const availableActions = await getClaimAvailableActions(supabase, claimId)
+    const canRunAction = availableActions.some(
+      (action) => action.action === parsed.data.action
+    )
+
+    if (!canRunAction) {
+      result.ok = false
+      result.failed += 1
+      result.errors.push({
+        claimId,
+        message: 'This workflow action is not available for the claim state.',
+      })
+      continue
+    }
+
     const { error } = await supabase.rpc('submit_approval_action_atomic', {
       p_claim_id: claimId,
       p_action: parsed.data.action,
       p_notes: parsed.data.notes ?? null,
-      p_allow_resubmit:
-        parsed.data.action === 'rejected'
-          ? Boolean(parsed.data.allowResubmit)
-          : false,
+      p_allow_resubmit: Boolean(parsed.data.allowResubmit),
     })
 
     if (error) {

@@ -85,7 +85,6 @@ export default async function ApprovalsPage({
       return {
         claimStatus: null,
         employeeName: null,
-        actorFilter: 'all' as const,
         claimDate: null,
         hodApprovedFrom: null,
         hodApprovedTo: null,
@@ -143,7 +142,6 @@ export default async function ApprovalsPage({
       getClaimStatusCatalog(supabase),
       getPendingApprovalsSummary(supabase, user.email ?? '', {
         employeeName: normalizedFilters.employeeName,
-        actorFilter: normalizedFilters.actorFilter,
         claimStatus: normalizedFilters.claimStatus,
       }),
     ]

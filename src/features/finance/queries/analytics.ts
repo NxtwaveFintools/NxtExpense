@@ -16,7 +16,7 @@ const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
   hodApproverEmployeeId: null,
   claimStatus: null,
   workLocation: null,
-  actionFilter: 'all',
+  actionFilter: null,
   dateFilterField: 'claim_date',
   dateFrom: null,
   dateTo: null,
@@ -31,7 +31,6 @@ type FinanceQueueAnalytics = {
 
 type ClaimStatusRow = {
   id: string
-  status_code: string
   approval_level: number | null
   is_approval: boolean
   is_rejection: boolean
@@ -74,7 +73,7 @@ function hasActiveAnalyticsFilters(filters: FinanceFilters): boolean {
     filters.workLocation ||
     filters.dateFrom ||
     filters.dateTo ||
-    filters.actionFilter !== 'all'
+    filters.actionFilter
   )
 }
 
@@ -104,7 +103,7 @@ export async function getFinanceQueueAnalytics(
   const { data: statusRows, error: statusError } = await supabase
     .from('claim_statuses')
     .select(
-      'id, status_code, approval_level, is_approval, is_rejection, is_terminal, is_payment_issued'
+      'id, approval_level, is_approval, is_rejection, is_terminal, is_payment_issued'
     )
     .eq('is_active', true)
 
@@ -128,11 +127,7 @@ export async function getFinanceQueueAnalytics(
 
   const approvedStatusIds = new Set(
     activeStatuses
-      .filter(
-        (status) =>
-          status.is_payment_issued ||
-          status.status_code.toUpperCase() === 'APPROVED'
-      )
+      .filter((status) => status.is_payment_issued)
       .map((status) => status.id)
   )
 
@@ -161,7 +156,7 @@ export async function getFinanceQueueAnalytics(
 
     scopedClaimIds = filteredClaimIds
 
-    if (filters.actionFilter !== 'all' && !filterByApprovedDate) {
+    if (filters.actionFilter && !filterByApprovedDate) {
       let financeActionQuery = supabase
         .from('finance_actions')
         .select('claim_id')

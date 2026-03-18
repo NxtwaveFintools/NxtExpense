@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  getClaimStatusDisplayLabel,
-  VISIBLE_CLAIM_STATUS_CODES,
-} from '@/lib/utils/claim-status'
+import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
 
 describe('claim status helpers', () => {
   it('returns provided status name for approved status code', () => {
@@ -30,11 +27,5 @@ describe('claim status helpers', () => {
 
   it('returns empty string when both status code and name are missing', () => {
     expect(getClaimStatusDisplayLabel(null, undefined)).toBe('')
-  })
-
-  it('exposes the status codes visible in claim tables', () => {
-    expect(VISIBLE_CLAIM_STATUS_CODES).toContain('L1_PENDING')
-    expect(VISIBLE_CLAIM_STATUS_CODES).toContain('APPROVED')
-    expect(VISIBLE_CLAIM_STATUS_CODES).toHaveLength(5)
   })
 })

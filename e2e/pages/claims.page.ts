@@ -74,8 +74,37 @@ export class ClaimsPage {
     return this.page.locator('table tbody tr, [data-testid="claim-row"]')
   }
 
+  get claimNumberLinks() {
+    return this.page.locator(
+      'table tbody tr td:first-child a[href*="/claims/"]'
+    )
+  }
+
   get emptyState() {
     return this.page.getByText(/no claims|no records/i)
+  }
+
+  getClaimRowByNumber(claimNumber: string) {
+    return this.claimRows.filter({ hasText: claimNumber }).first()
+  }
+
+  async openClaimByNumber(claimNumber: string) {
+    const claimRow = this.getClaimRowByNumber(claimNumber)
+    await claimRow.locator('a[href*="/claims/"]').first().click()
+    await this.page.waitForURL(/\/claims\//)
+    await this.page.waitForLoadState('networkidle')
+  }
+
+  async getLatestClaimNumber(timeoutMs = 10_000): Promise<string> {
+    const firstClaimLink = this.claimNumberLinks.first()
+    await firstClaimLink.waitFor({ state: 'visible', timeout: timeoutMs })
+
+    const claimNumber = (await firstClaimLink.textContent())?.trim()
+    if (!claimNumber) {
+      throw new Error('Unable to resolve latest claim number from claims list.')
+    }
+
+    return claimNumber
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────

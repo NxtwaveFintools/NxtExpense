@@ -12,8 +12,31 @@ export class ApprovalsPage {
 
   get pendingRows() {
     return this.page.locator(
-      '[data-testid="pending-row"], table:first-of-type tbody tr'
+      '[data-testid="pending-row"], table:has(th:has-text("Actions")) tbody tr'
     )
+  }
+
+  getPendingRowByClaimNumber(claimNumber: string) {
+    return this.pendingRows.filter({ hasText: claimNumber }).first()
+  }
+
+  getPendingRowByEmployeeName(employeeName: string) {
+    return this.pendingRows.filter({ hasText: employeeName }).first()
+  }
+
+  async openPendingClaimByNumber(claimNumber: string) {
+    const claimRow = this.getPendingRowByClaimNumber(claimNumber)
+    const claimLink = claimRow.locator('a[href*="/claims/"]').first()
+    await claimLink.waitFor({ state: 'visible', timeout: 20_000 })
+
+    const claimHref = await claimLink.getAttribute('href')
+    if (!claimHref) {
+      throw new Error(`Unable to resolve claim detail link for ${claimNumber}.`)
+    }
+
+    await this.page.goto(claimHref)
+    await this.page.waitForURL(/\/claims\//)
+    await this.page.waitForLoadState('networkidle')
   }
 
   get emptyPendingState() {
@@ -37,6 +60,12 @@ export class ApprovalsPage {
     }
     // Exact match to avoid resolving to the disabled "Bulk Approve" button on the list page
     return this.page.getByRole('button', { name: /^Approve$/i })
+  }
+
+  getApproveButtonForClaimNumber(claimNumber: string) {
+    return this.getPendingRowByClaimNumber(claimNumber).getByRole('button', {
+      name: /^Approve$/i,
+    })
   }
 
   getRejectButton(claimId?: string) {

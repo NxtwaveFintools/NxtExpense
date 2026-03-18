@@ -4,12 +4,10 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-import type {
-  FinanceActionType,
-  PaginatedFinanceQueue,
-} from '@/features/finance/types'
+import type { PaginatedFinanceQueue } from '@/features/finance/types'
 import { bulkFinanceClaimsAction } from '@/features/finance/actions'
 import {
+  buildFinanceActionIntents,
   getFinanceSuccessLabel,
   supportsFinanceIntent,
   type FinanceActionIntent,
@@ -39,37 +37,43 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [processingAction, setProcessingAction] =
-    useState<FinanceActionIntent | null>(null)
+  const [processingAction, setProcessingAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const selectableClaimIds = useMemo(
     () =>
       queue.data
-        .filter((item) =>
-          item.availableActions.some(
-            (action) =>
-              action.action === 'issued' || action.action === 'finance_rejected'
-          )
-        )
+        .filter((item) => item.availableActions.length > 0)
         .map((item) => item.claim.id),
     [queue.data]
   )
 
-  const hasRejectAllowReclaimAction = useMemo(() => {
+  const bulkActionIntents = useMemo(() => {
     const selectedSet = new Set(selectedIds)
     const selectedItems = queue.data.filter((item) =>
       selectedSet.has(item.claim.id)
     )
     const sourceItems = selectedItems.length > 0 ? selectedItems : queue.data
+    const intents = new Map<string, FinanceActionIntent>()
 
-    return sourceItems.some((item) =>
-      item.availableActions.some(
-        (action) => action.action === 'finance_rejected'
-      )
-    )
+    for (const item of sourceItems) {
+      for (const action of item.availableActions) {
+        for (const intent of buildFinanceActionIntents(action)) {
+          if (!intents.has(intent.key)) {
+            intents.set(intent.key, intent)
+          }
+        }
+      }
+    }
+
+    return Array.from(intents.values())
   }, [queue.data, selectedIds])
+
+  const bulkActionIntentMap = useMemo(
+    () => new Map(bulkActionIntents.map((intent) => [intent.key, intent])),
+    [bulkActionIntents]
+  )
 
   const allSelected =
     selectableClaimIds.length > 0 &&
@@ -118,20 +122,16 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
       )
     }
 
-    const action: FinanceActionType =
-      intent === 'issued' ? 'issued' : 'finance_rejected'
-    const allowResubmit = intent === 'finance_rejected_allow_reclaim'
-
     setIsSubmitting(true)
-    setProcessingAction(intent)
+    setProcessingAction(intent.key)
     setError(null)
 
     try {
       const result = await bulkFinanceClaimsAction({
         claimIds: eligibleIds,
-        action,
+        action: intent.actionCode,
         notes,
-        allowResubmit: action === 'finance_rejected' ? allowResubmit : false,
+        allowResubmit: intent.allowResubmit ? true : undefined,
       })
 
       if (!result.ok) {
@@ -183,7 +183,7 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
 
       <label className="mt-3 block space-y-2 text-sm">
         <span className="text-foreground/80">
-          Notes (required for rejection actions)
+          Notes for the selected workflow action
         </span>
         <textarea
           value={notes}
@@ -202,13 +202,20 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
           allSelected={allSelected}
           partiallySelected={partiallySelected}
           totalCount={selectableClaimIds.length}
-          canRejectAllowReclaim={hasRejectAllowReclaimAction}
+          bulkActions={bulkActionIntents.map((intent) => ({
+            key: intent.key,
+            label: intent.label,
+          }))}
           onToggleSelectAll={toggleSelectAll}
-          onIssueSelected={() => handleBulkAction('issued')}
-          onRejectSelected={() => handleBulkAction('finance_rejected')}
-          onRejectAllowReclaimSelected={() =>
-            handleBulkAction('finance_rejected_allow_reclaim')
-          }
+          onRunBulkAction={(actionKey) => {
+            const intent = bulkActionIntentMap.get(actionKey)
+            if (!intent) {
+              toast.error('Selected workflow action is unavailable.')
+              return
+            }
+
+            void handleBulkAction(intent)
+          }}
           disabled={isSubmitting}
           processingAction={processingAction}
         />

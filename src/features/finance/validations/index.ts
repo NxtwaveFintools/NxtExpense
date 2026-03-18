@@ -2,10 +2,6 @@ import { z } from 'zod'
 
 import { parseDateDDMMYYYY, toISODate } from '@/lib/utils/date'
 
-// These values mirror the `finance_action_type` PostgreSQL enum.
-// They can only change via a DB migration — single source of truth is the DB schema.
-const FINANCE_ACTION_VALUES = ['issued', 'finance_rejected'] as const
-const FINANCE_FILTER_VALUES = ['all', 'issued', 'finance_rejected'] as const
 const FINANCE_DATE_FILTER_FIELD_VALUES = [
   'claim_date',
   'finance_approved_date',
@@ -39,47 +35,27 @@ function optionalDateField(label: string) {
     })
 }
 
-export const financeActionSchema = z
-  .object({
-    claimId: z.string().uuid('Invalid claim identifier.'),
-    action: z.enum(FINANCE_ACTION_VALUES),
-    notes: z
-      .string()
-      .trim()
-      .max(500, 'Notes cannot exceed 500 characters.')
-      .optional(),
-    allowResubmit: z.boolean().optional(),
-  })
-  .superRefine((value, context) => {
-    if (value.action === 'finance_rejected' && !value.notes?.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['notes'],
-        message: 'Notes are required for this finance action.',
-      })
-    }
-  })
+export const financeActionSchema = z.object({
+  claimId: z.string().uuid('Invalid claim identifier.'),
+  action: z.string().trim().min(1, 'Action is required.'),
+  notes: z
+    .string()
+    .trim()
+    .max(500, 'Notes cannot exceed 500 characters.')
+    .optional(),
+  allowResubmit: z.boolean().optional(),
+})
 
-export const bulkFinanceActionSchema = z
-  .object({
-    claimIds: z.array(z.string().uuid('Invalid claim identifier.')).min(1),
-    action: z.enum(FINANCE_ACTION_VALUES),
-    notes: z
-      .string()
-      .trim()
-      .max(500, 'Notes cannot exceed 500 characters.')
-      .optional(),
-    allowResubmit: z.boolean().optional(),
-  })
-  .superRefine((value, context) => {
-    if (value.action === 'finance_rejected' && !value.notes?.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['notes'],
-        message: 'Rejection notes are required for bulk reject.',
-      })
-    }
-  })
+export const bulkFinanceActionSchema = z.object({
+  claimIds: z.array(z.string().uuid('Invalid claim identifier.')).min(1),
+  action: z.string().trim().min(1, 'Action is required.'),
+  notes: z
+    .string()
+    .trim()
+    .max(500, 'Notes cannot exceed 500 characters.')
+    .optional(),
+  allowResubmit: z.boolean().optional(),
+})
 
 export const financeFiltersSchema = z
   .object({
@@ -92,11 +68,14 @@ export const financeFiltersSchema = z
       (val) => (val === '' ? undefined : val),
       z.string().trim().uuid().optional()
     ),
-    claimStatus: z.string().trim().max(100).optional(),
+    claimStatus: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().trim().uuid().optional()
+    ),
     workLocation: z.string().trim().max(100).optional(),
     actionFilter: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.enum(FINANCE_FILTER_VALUES).default('all')
+      z.string().trim().min(1).optional()
     ),
     dateFilterField: z.preprocess(
       (val) => (val === '' ? undefined : val),

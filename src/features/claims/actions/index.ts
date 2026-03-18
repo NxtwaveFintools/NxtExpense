@@ -9,7 +9,6 @@ import {
 import { canAccessEmployeeClaimsFromRoles } from '@/lib/services/approval-service'
 import {
   getAllWorkLocations,
-  getClaimStatusByCode,
   getDesignationApprovalFlow,
 } from '@/lib/services/config-service'
 import {
@@ -42,15 +41,6 @@ type InitialWorkflowState = {
   currentApprovalLevel: number | null
 }
 
-const INITIAL_WORKFLOW_STATUS_BY_LEVEL: Record<
-  number,
-  { statusCode: string; currentApprovalLevel: number | null }
-> = {
-  1: { statusCode: 'L1_PENDING', currentApprovalLevel: 1 },
-  2: { statusCode: 'L2_PENDING', currentApprovalLevel: 2 },
-  3: { statusCode: 'L3_PENDING_FINANCE_REVIEW', currentApprovalLevel: null },
-}
-
 async function resolveInitialWorkflowState(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   designationId: string | null
@@ -61,24 +51,39 @@ async function resolveInitialWorkflowState(
 
   const approvalFlow = await getDesignationApprovalFlow(supabase, designationId)
   const firstLevel = approvalFlow.required_approval_levels?.[0]
-  const initialWorkflowState = firstLevel
-    ? INITIAL_WORKFLOW_STATUS_BY_LEVEL[firstLevel]
-    : undefined
 
-  if (!initialWorkflowState) {
+  if (!firstLevel) {
     throw new Error(
       `Unsupported first approval level configured for employee: ${firstLevel ?? 'none'}.`
     )
   }
 
-  const status = await getClaimStatusByCode(
-    supabase,
-    initialWorkflowState.statusCode
-  )
+  const { data: status, error } = await supabase
+    .from('claim_statuses')
+    .select('id')
+    .eq('approval_level', firstLevel)
+    .eq('is_approval', false)
+    .eq('is_rejection', false)
+    .eq('is_terminal', false)
+    .eq('is_active', true)
+    .order('display_order', { ascending: true })
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(
+      `Failed to resolve initial claim workflow state: ${error.message}`
+    )
+  }
+
+  if (!status) {
+    throw new Error(
+      `No active pending claim status found for approval level ${firstLevel}.`
+    )
+  }
 
   return {
     statusId: status.id,
-    currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
+    currentApprovalLevel: firstLevel >= 3 ? null : firstLevel,
   }
 }
 

@@ -18,6 +18,10 @@ import type {
   PaginatedPendingApprovals,
 } from '@/features/approvals/types'
 import type { ClaimAvailableAction } from '@/features/claims/types'
+import {
+  getWorkflowActionAllowReclaimLabel,
+  getWorkflowActionCtaLabel,
+} from '@/lib/utils/workflow-action-labels'
 
 type ApprovalListTableProps = {
   approvals: PaginatedPendingApprovals
@@ -29,8 +33,22 @@ type ApprovalListTableProps = {
   onRunSingleAction: (
     claimId: string,
     action: ClaimAvailableAction,
-    allowReclaim: boolean
+    allowResubmit: boolean
   ) => void
+}
+
+const ROW_ACTION_BUTTON_CLASSES = [
+  'bg-emerald-600 hover:bg-emerald-700',
+  'bg-rose-600 hover:bg-rose-700',
+  'bg-amber-600 hover:bg-amber-700',
+  'bg-sky-600 hover:bg-sky-700',
+] as const
+
+function getActionIntentKey(
+  actionCode: string,
+  allowResubmit: boolean
+): string {
+  return `${actionCode}:${allowResubmit ? 'allow_resubmit' : 'default'}`
 }
 
 export function ApprovalListTable({
@@ -63,16 +81,7 @@ export function ApprovalListTable({
         </thead>
         <tbody className={DATA_TABLE_BODY_CLASS}>
           {approvals.data.map((item: PendingApproval) => {
-            const isSelectable = item.availableActions.some(
-              (action) =>
-                action.action === 'approved' || action.action === 'rejected'
-            )
-            const approvedAction = item.availableActions.find(
-              (action) => action.action === 'approved'
-            )
-            const rejectedAction = item.availableActions.find(
-              (action) => action.action === 'rejected'
-            )
+            const isSelectable = item.availableActions.length > 0
             const isRowProcessing =
               isProcessing && processingClaimId === item.claim.id
 
@@ -143,69 +152,66 @@ export function ApprovalListTable({
                 </td>
                 <td className={getDataTableCellClass({ align: 'right' })}>
                   <div className="flex items-center justify-end gap-2">
-                    {approvedAction ? (
-                      <button
-                        type="button"
-                        disabled={isProcessing}
-                        onClick={() =>
-                          onRunSingleAction(
-                            item.claim.id,
-                            approvedAction,
-                            false
-                          )
-                        }
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {isRowProcessing && processingAction === 'approved' ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : null}
-                        {isRowProcessing && processingAction === 'approved'
-                          ? 'Processing...'
-                          : approvedAction.display_label}
-                      </button>
-                    ) : null}
+                    {item.availableActions.map((action, index) => {
+                      const baseIntentKey = getActionIntentKey(
+                        action.action,
+                        false
+                      )
+                      const toneClass =
+                        ROW_ACTION_BUTTON_CLASSES[
+                          index % ROW_ACTION_BUTTON_CLASSES.length
+                        ]
 
-                    {rejectedAction ? (
-                      <button
-                        type="button"
-                        disabled={isProcessing}
-                        onClick={() =>
-                          onRunSingleAction(
-                            item.claim.id,
-                            rejectedAction,
-                            false
-                          )
-                        }
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
-                      >
-                        {isRowProcessing && processingAction === 'rejected' ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : null}
-                        {isRowProcessing && processingAction === 'rejected'
-                          ? 'Processing...'
-                          : rejectedAction.display_label}
-                      </button>
-                    ) : null}
+                      return (
+                        <button
+                          key={baseIntentKey}
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() =>
+                            onRunSingleAction(item.claim.id, action, false)
+                          }
+                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-all disabled:opacity-50 ${toneClass}`}
+                        >
+                          {isRowProcessing &&
+                          processingAction === baseIntentKey ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : null}
+                          {isRowProcessing && processingAction === baseIntentKey
+                            ? 'Processing...'
+                            : getWorkflowActionCtaLabel(action)}
+                        </button>
+                      )
+                    })}
 
-                    {rejectedAction ? (
-                      <button
-                        type="button"
-                        disabled={isProcessing}
-                        onClick={() =>
-                          onRunSingleAction(item.claim.id, rejectedAction, true)
-                        }
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
-                      >
-                        {isRowProcessing &&
-                        processingAction === 'rejected_allow_reclaim' ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : null}
-                        {isRowProcessing &&
-                        processingAction === 'rejected_allow_reclaim'
-                          ? 'Processing...'
-                          : 'Reject & Allow Reclaim'}
-                      </button>
-                    ) : null}
+                    {item.availableActions
+                      .filter((action) => action.supports_allow_resubmit)
+                      .map((action) => {
+                        const allowIntentKey = getActionIntentKey(
+                          action.action,
+                          true
+                        )
+
+                        return (
+                          <button
+                            key={allowIntentKey}
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() =>
+                              onRunSingleAction(item.claim.id, action, true)
+                            }
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
+                          >
+                            {isRowProcessing &&
+                            processingAction === allowIntentKey ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : null}
+                            {isRowProcessing &&
+                            processingAction === allowIntentKey
+                              ? 'Processing...'
+                              : getWorkflowActionAllowReclaimLabel(action)}
+                          </button>
+                        )
+                      })}
                   </div>
                 </td>
               </tr>

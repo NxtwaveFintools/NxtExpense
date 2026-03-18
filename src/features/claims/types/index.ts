@@ -4,7 +4,7 @@ import type { WorkLocation as ConfigWorkLocation } from '@/lib/services/config-s
 export type WorkLocation = string
 export type VehicleType = string
 export type TransportType = string
-export type ClaimStatus = string // used for catalog/filter values (status_code)
+export type ClaimStatusId = string
 export type ExpenseItemType = string
 
 /** A simple { id, name } option for select dropdowns */
@@ -99,7 +99,7 @@ export type ClaimFormInitialValues = {
 }
 
 export type ClaimStatusCatalogItem = {
-  status: ClaimStatus
+  status_id: ClaimStatusId
   display_label: string
   is_terminal: boolean
   sort_order: number
@@ -134,7 +134,7 @@ export type ClaimHistoryEntry = {
 export type PaginatedClaims = PaginatedResult<Claim>
 
 export type MyClaimsFilters = {
-  claimStatus: ClaimStatus | null
+  claimStatus: ClaimStatusId | null
   workLocation: string | null
   claimDate: string | null
 }

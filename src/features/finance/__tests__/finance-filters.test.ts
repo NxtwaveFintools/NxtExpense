@@ -7,6 +7,8 @@ import {
   toIstDayStart,
 } from '@/features/finance/utils/filters'
 
+const VALID_STATUS_ID = '3ae9b558-c006-427d-8ce6-13057d438d17'
+
 describe('finance filter utilities', () => {
   it('normalizes finance filter inputs from query params', () => {
     const normalized = normalizeFinanceFilters({
@@ -14,7 +16,7 @@ describe('finance filter utilities', () => {
       claimNumber: ' CLAIM-001 ',
       ownerDesignation: 'Program Manager',
       hodApproverEmployeeId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-      claimStatus: 'finance_review',
+      claimStatus: VALID_STATUS_ID,
       workLocation: 'Field - Base Location',
       actionFilter: 'finance_rejected',
       dateFilterField: 'finance_approved_date',
@@ -27,7 +29,7 @@ describe('finance filter utilities', () => {
       claimNumber: 'CLAIM-001',
       ownerDesignation: 'Program Manager',
       hodApproverEmployeeId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-      claimStatus: 'finance_review',
+      claimStatus: VALID_STATUS_ID,
       workLocation: 'Field - Base Location',
       actionFilter: 'finance_rejected',
       dateFilterField: 'finance_approved_date',

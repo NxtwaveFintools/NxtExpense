@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   isFinanceTeamMember: vi.fn(),
   getFinanceQueuePaginated: vi.fn(),
   getFinanceHistoryPaginated: vi.fn(),
+  getClaimAvailableActions: vi.fn(),
   normalizeFinanceFilters: vi.fn(),
 }))
 
@@ -31,6 +32,10 @@ vi.mock('@/features/finance/permissions', () => ({
 vi.mock('@/features/finance/queries', () => ({
   getFinanceQueuePaginated: mocks.getFinanceQueuePaginated,
   getFinanceHistoryPaginated: mocks.getFinanceHistoryPaginated,
+}))
+
+vi.mock('@/features/claims/queries', () => ({
+  getClaimAvailableActions: mocks.getClaimAvailableActions,
 }))
 
 vi.mock('@/features/finance/utils/filters', () => ({
@@ -77,11 +82,28 @@ describe('finance actions workflow integration', () => {
       hodApproverEmployeeId: null,
       claimStatus: null,
       workLocation: null,
-      actionFilter: 'all',
+      actionFilter: null,
       dateFilterField: 'claim_date',
       dateFrom: null,
       dateTo: null,
     })
+
+    mocks.getClaimAvailableActions.mockResolvedValue([
+      {
+        action: 'issued',
+        display_label: 'Issue Payment',
+        require_notes: false,
+        supports_allow_resubmit: false,
+        actor_scope: 'finance',
+      },
+      {
+        action: 'finance_rejected',
+        display_label: 'Reject',
+        require_notes: true,
+        supports_allow_resubmit: true,
+        actor_scope: 'finance',
+      },
+    ])
 
     mocks.getFinanceQueuePaginated.mockResolvedValue({
       data: [],
@@ -332,7 +354,7 @@ describe('finance actions workflow integration', () => {
     // Arrange
     const rawFilters = {
       employeeName: 'Yohan',
-      claimStatus: 'finance_review',
+      claimStatus: '3ae9b558-c006-427d-8ce6-13057d438d17',
     }
 
     // Act
@@ -351,7 +373,7 @@ describe('finance actions workflow integration', () => {
         hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        actionFilter: 'all',
+        actionFilter: null,
         dateFilterField: 'claim_date',
         dateFrom: null,
         dateTo: null,
@@ -377,7 +399,7 @@ describe('finance actions workflow integration', () => {
         hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        actionFilter: 'all',
+        actionFilter: null,
         dateFilterField: 'claim_date',
         dateFrom: null,
         dateTo: null,

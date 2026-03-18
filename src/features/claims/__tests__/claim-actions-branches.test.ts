@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   getEmployeeRoles: vi.fn(),
   canAccessEmployeeClaimsFromRoles: vi.fn(),
   getAllWorkLocations: vi.fn(),
-  getClaimStatusByCode: vi.fn(),
   getDesignationApprovalFlow: vi.fn(),
   calculateBaseLocationItems: vi.fn(),
   calculateOutstationOwnVehicleItems: vi.fn(),
@@ -55,7 +54,6 @@ vi.mock('@/lib/services/config-service', async () => {
   return {
     ...actual,
     getAllWorkLocations: mocks.getAllWorkLocations,
-    getClaimStatusByCode: mocks.getClaimStatusByCode,
     getDesignationApprovalFlow: mocks.getDesignationApprovalFlow,
   }
 })
@@ -136,6 +134,30 @@ describe('submitClaimAction branch coverage', () => {
 
     rpcMock = vi.fn().mockResolvedValue({ error: null })
 
+    const claimStatusesQuery = {
+      approvalLevel: 1,
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockImplementation(function (
+        this: { approvalLevel: number },
+        column: string,
+        value: unknown
+      ) {
+        if (column === 'approval_level' && typeof value === 'number') {
+          this.approvalLevel = value
+        }
+        return this
+      }),
+      order: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockImplementation(function (this: {
+        approvalLevel: number
+      }) {
+        if (this.approvalLevel === 99) {
+          return Promise.resolve({ data: null, error: null })
+        }
+        return Promise.resolve({ data: { id: 'status-l1' }, error: null })
+      }),
+    }
+
     const citiesQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -157,10 +179,15 @@ describe('submitClaimAction branch coverage', () => {
       },
       rpc: rpcMock,
       from: vi.fn((table: string) => {
-        if (table !== 'cities') {
-          throw new Error(`Unexpected table query in test: ${table}`)
+        if (table === 'cities') {
+          return citiesQuery
         }
-        return citiesQuery
+
+        if (table === 'claim_statuses') {
+          return claimStatusesQuery
+        }
+
+        throw new Error(`Unexpected table query in test: ${table}`)
       }),
     })
 
@@ -194,8 +221,6 @@ describe('submitClaimAction branch coverage', () => {
     mocks.getDesignationApprovalFlow.mockResolvedValue({
       required_approval_levels: [1],
     })
-
-    mocks.getClaimStatusByCode.mockResolvedValue({ id: 'status-l1' })
     mocks.getVehicleTypeById.mockResolvedValue({
       vehicle_name: 'Two Wheeler',
       max_km_round_trip: 150,
@@ -348,7 +373,9 @@ describe('submitClaimAction branch coverage', () => {
 
     const unsupportedLevel = await submitClaimAction(BASE_LOCATION_INPUT)
     expect(unsupportedLevel.ok).toBe(false)
-    expect(unsupportedLevel.error).toContain('Unsupported first approval level')
+    expect(unsupportedLevel.error).toContain(
+      'No active pending claim status found for approval level 99'
+    )
   })
 
   it('should return default workflow start message on non-Error failures', async () => {

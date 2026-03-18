@@ -40,7 +40,7 @@ export function ApprovalFiltersBar({
           >
             <option value="">All Statuses</option>
             {statusCatalog.map((status) => (
-              <option key={status.status} value={status.status}>
+              <option key={status.status_id} value={status.status_id}>
                 {status.display_label}
               </option>
             ))}

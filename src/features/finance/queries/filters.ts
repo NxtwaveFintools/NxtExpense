@@ -14,14 +14,16 @@ import {
   getAllDesignations,
   getAllWorkLocations,
 } from '@/lib/services/config-service'
-import {
-  getClaimStatusDisplayLabel,
-  VISIBLE_CLAIM_STATUS_CODES,
-} from '@/lib/utils/claim-status'
+import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
 
 type ClaimFilterScope = {
   /** Pre-fetched UUID of the status that results must be constrained to. */
   requiredStatusId?: string
+}
+
+type FinanceActionTransitionRow = {
+  action_code: string
+  to_status_id: string
 }
 
 function toLikePattern(value: string): string {
@@ -31,6 +33,33 @@ function toLikePattern(value: string): string {
 
 function formatDesignationLabel(name: string, abbreviation: string): string {
   return abbreviation ? `${name} (${abbreviation})` : name
+}
+
+function toTitleCaseWords(value: string): string {
+  return value
+    .split('_')
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(' ')
+}
+
+function normalizeFinanceHistoryActionCode(
+  actionCode: string,
+  toStatusId: string,
+  paymentIssuedStatusIds: Set<string>
+): string {
+  if (
+    paymentIssuedStatusIds.has(toStatusId) &&
+    actionCode.startsWith('finance_')
+  ) {
+    return actionCode.slice('finance_'.length)
+  }
+
+  return actionCode
+}
+
+function formatFinanceActionLabel(actionCode: string): string {
+  return toTitleCaseWords(actionCode)
 }
 
 export async function getFilteredClaimIdsForFinance(
@@ -43,33 +72,14 @@ export async function getFilteredClaimIdsForFinance(
   }
 
   if (scope.requiredStatusId && filters.claimStatus) {
-    // If the caller requires a specific status UUID, check whether the user's
-    // selected status filter resolves to that same UUID.
-    const { data: sRow } = await supabase
-      .from('claim_statuses')
-      .select('id')
-      .eq('status_code', filters.claimStatus)
-      .maybeSingle()
-    if (!sRow || sRow.id !== scope.requiredStatusId) {
+    if (filters.claimStatus !== scope.requiredStatusId) {
       return []
     }
   }
 
   // Determine effective status UUID to filter by.
   // scope.requiredStatusId (pre-fetched) takes precedence over user's claimStatus.
-  let statusId: string | null = scope.requiredStatusId ?? null
-  if (!statusId && filters.claimStatus) {
-    const { data: sRow } = await supabase
-      .from('claim_statuses')
-      .select('id')
-      .eq('status_code', filters.claimStatus)
-      .maybeSingle()
-    if (sRow) {
-      statusId = sRow.id
-    } else {
-      return []
-    }
-  }
+  const statusId = scope.requiredStatusId ?? filters.claimStatus ?? null
 
   let query = supabase
     .from('expense_claims')
@@ -108,10 +118,54 @@ export async function getFilteredClaimIdsForFinance(
     filters.dateFilterField === 'finance_approved_date' &&
     (filters.dateFrom || filters.dateTo)
   ) {
+    const { data: paymentIssuedStatuses, error: paymentIssuedStatusError } =
+      await supabase
+        .from('claim_statuses')
+        .select('id')
+        .eq('is_payment_issued', true)
+        .eq('is_active', true)
+
+    if (paymentIssuedStatusError) {
+      throw new Error(paymentIssuedStatusError.message)
+    }
+
+    const paymentIssuedStatusIds = new Set(
+      (paymentIssuedStatuses ?? []).map((row) => row.id)
+    )
+
+    if (paymentIssuedStatusIds.size === 0) {
+      return []
+    }
+
+    const { data: transitionRows, error: transitionError } = await supabase
+      .from('claim_status_transitions')
+      .select('action_code, to_status_id')
+      .eq('is_active', true)
+
+    if (transitionError) {
+      throw new Error(transitionError.message)
+    }
+
+    const paymentIssuedActions = new Set(
+      ((transitionRows ?? []) as FinanceActionTransitionRow[])
+        .filter((row) => paymentIssuedStatusIds.has(row.to_status_id))
+        .map((row) =>
+          normalizeFinanceHistoryActionCode(
+            row.action_code,
+            row.to_status_id,
+            paymentIssuedStatusIds
+          )
+        )
+    )
+
+    if (paymentIssuedActions.size === 0) {
+      return []
+    }
+
     let financeDateQuery = supabase
       .from('finance_actions')
       .select('claim_id')
-      .eq('action', 'issued')
+      .in('action', [...paymentIssuedActions])
 
     const approvedDateFrom = toIstDayStart(filters.dateFrom)
     const approvedDateTo = toIstDayEnd(filters.dateTo)
@@ -163,7 +217,6 @@ export async function getFilteredClaimIdsForFinance(
       .from('approval_history')
       .select('claim_id')
       .eq('approver_employee_id', filters.hodApproverEmployeeId)
-      .eq('action', 'approved')
       .eq('new_status_id', financeReviewStatus.id)
 
     if (hodError) {
@@ -200,19 +253,24 @@ export async function getFinanceFilterOptions(
     .eq('is_terminal', false)
     .maybeSingle()
 
-  const [designations, workLocationRows, statusResult] = await Promise.all([
-    getAllDesignations(supabase),
-    getAllWorkLocations(supabase),
-    supabase
-      .from('claim_statuses')
-      .select('status_code, status_name, display_order')
-      .eq('is_active', true)
-      .in('status_code', [...VISIBLE_CLAIM_STATUS_CODES])
-      .order('display_order', { ascending: true }),
-  ])
+  const [designations, workLocationRows, statusResult, financeActionResult] =
+    await Promise.all([
+      getAllDesignations(supabase),
+      getAllWorkLocations(supabase),
+      supabase
+        .from('claim_statuses')
+        .select('id, status_code, status_name, display_order')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true }),
+      supabase.from('finance_actions').select('action'),
+    ])
 
   if (statusResult.error) {
     throw new Error(statusResult.error.message)
+  }
+
+  if (financeActionResult.error) {
+    throw new Error(financeActionResult.error.message)
   }
 
   const designationOptions: FinanceFilterOption[] = designations
@@ -232,7 +290,6 @@ export async function getFinanceFilterOptions(
     const { data: hodRows, error: hodError } = await supabase
       .from('approval_history')
       .select('approver_employee_id')
-      .eq('action', 'approved')
       .eq('new_status_id', financeReviewStatus.id)
       .not('approver_employee_id', 'is', null)
 
@@ -251,7 +308,7 @@ export async function getFinanceFilterOptions(
 
   const claimStatuses: FinanceFilterOption[] = (statusResult.data ?? []).map(
     (status) => ({
-      value: status.status_code,
+      value: status.id,
       label: getClaimStatusDisplayLabel(status.status_code, status.status_name),
     })
   )
@@ -261,12 +318,24 @@ export async function getFinanceFilterOptions(
     label: wl.location_name,
   }))
 
+  const financeActionValues = [
+    ...new Set((financeActionResult.data ?? []).map((row) => row.action)),
+  ].sort((left, right) => left.localeCompare(right))
+
+  const financeActions: FinanceFilterOption[] = financeActionValues.map(
+    (actionCode) => ({
+      value: actionCode,
+      label: formatFinanceActionLabel(actionCode),
+    })
+  )
+
   if (hodEmployeeIds.length === 0) {
     return {
       ownerDesignations: designationOptions,
       hodApprovers: [],
       claimStatuses,
       workLocations,
+      financeActions,
     }
   }
 
@@ -320,5 +389,6 @@ export async function getFinanceFilterOptions(
     hodApprovers: hodApproverOptions,
     claimStatuses,
     workLocations,
+    financeActions,
   }
 }

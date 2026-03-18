@@ -1,28 +1,56 @@
-import type {
-  FinanceActionType,
-  FinanceQueueItem,
-} from '@/features/finance/types'
+import type { ClaimAvailableAction } from '@/features/claims/types'
+import type { FinanceQueueItem } from '@/features/finance/types'
+import {
+  getWorkflowActionAllowReclaimLabel,
+  getWorkflowActionCtaLabel,
+} from '@/lib/utils/workflow-action-labels'
 
-export type FinanceActionIntent =
-  | FinanceActionType
-  | 'finance_rejected_allow_reclaim'
+export type FinanceActionIntent = {
+  key: string
+  actionCode: string
+  label: string
+  allowResubmit: boolean
+}
+
+export function getFinanceActionIntentKey(
+  actionCode: string,
+  allowResubmit: boolean
+): string {
+  return `${actionCode}:${allowResubmit ? 'allow_resubmit' : 'default'}`
+}
+
+export function buildFinanceActionIntents(
+  action: ClaimAvailableAction
+): FinanceActionIntent[] {
+  const intents: FinanceActionIntent[] = [
+    {
+      key: getFinanceActionIntentKey(action.action, false),
+      actionCode: action.action,
+      label: getWorkflowActionCtaLabel(action),
+      allowResubmit: false,
+    },
+  ]
+
+  if (action.supports_allow_resubmit) {
+    intents.push({
+      key: getFinanceActionIntentKey(action.action, true),
+      actionCode: action.action,
+      label: getWorkflowActionAllowReclaimLabel(action),
+      allowResubmit: true,
+    })
+  }
+
+  return intents
+}
 
 export function supportsFinanceIntent(
   item: Pick<FinanceQueueItem, 'availableActions'>,
   intent: FinanceActionIntent
 ): boolean {
-  if (intent === 'issued') {
-    return item.availableActions.some((action) => action.action === 'issued')
-  }
-
-  if (intent === 'finance_rejected') {
-    return item.availableActions.some(
-      (action) => action.action === 'finance_rejected'
-    )
-  }
-
   return item.availableActions.some(
-    (action) => action.action === 'finance_rejected'
+    (action) =>
+      action.action === intent.actionCode &&
+      (!intent.allowResubmit || action.supports_allow_resubmit)
   )
 }
 
@@ -31,20 +59,7 @@ export function getFinanceSuccessLabel(
   processedCount: number
 ): string {
   const count = Math.max(1, processedCount)
-
-  if (intent === 'issued') {
-    return count === 1
-      ? 'Payment issued successfully.'
-      : `Payments issued for ${count} claims.`
-  }
-
-  if (intent === 'finance_rejected_allow_reclaim') {
-    return count === 1
-      ? 'Claim rejected and reclaim allowed.'
-      : `Rejected ${count} claims and allowed reclaim.`
-  }
-
   return count === 1
-    ? 'Claim rejected successfully.'
-    : `Rejected ${count} claims successfully.`
+    ? `${intent.label} completed successfully.`
+    : `${intent.label} completed for ${count} claims.`
 }

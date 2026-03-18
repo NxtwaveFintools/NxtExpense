@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import {
   normalizeApprovalHistoryFilters,
-  getDefaultApprovalActorFilter,
   buildApprovalHistoryCsv,
 } from '@/features/approvals/utils/history-filters'
+
+const VALID_STATUS_ID = '7a0068ba-39c3-4229-b6f5-88559ace4e77'
 
 describe('normalizeApprovalHistoryFilters', () => {
   it('normalizes empty input to defaults', () => {
     const result = normalizeApprovalHistoryFilters({})
     expect(result.employeeName).toBeNull()
-    expect(result.actorFilter).toBe('all')
     expect(result.claimStatus).toBeNull()
     expect(result.claimDate).toBeNull()
     expect(result.hodApprovedFrom).toBeNull()
@@ -61,18 +61,6 @@ describe('normalizeApprovalHistoryFilters', () => {
     expect(result.hodApprovedTo).toBe('2026-03-07')
   })
 
-  it('defaults actorFilter to "all" when empty string', () => {
-    const result = normalizeApprovalHistoryFilters({ actorFilter: '' })
-    expect(result.actorFilter).toBe('all')
-  })
-
-  it('accepts valid actorFilter values', () => {
-    for (const value of ['all', 'sbh', 'hod', 'finance'] as const) {
-      const result = normalizeApprovalHistoryFilters({ actorFilter: value })
-      expect(result.actorFilter).toBe(value)
-    }
-  })
-
   it('throws on inverted HOD date range', () => {
     expect(() =>
       normalizeApprovalHistoryFilters({
@@ -100,8 +88,7 @@ describe('normalizeApprovalHistoryFilters', () => {
   it('applies all filters simultaneously', () => {
     const result = normalizeApprovalHistoryFilters({
       employeeName: 'Yohan',
-      actorFilter: 'sbh',
-      claimStatus: 'L1_PENDING',
+      claimStatus: VALID_STATUS_ID,
       claimDate: '2026-03-01',
       hodApprovedFrom: '2026-03-02',
       hodApprovedTo: '2026-03-06',
@@ -109,72 +96,12 @@ describe('normalizeApprovalHistoryFilters', () => {
       financeApprovedTo: '2026-03-05',
     })
     expect(result.employeeName).toBe('Yohan')
-    expect(result.actorFilter).toBe('sbh')
-    expect(result.claimStatus).toBe('L1_PENDING')
+    expect(result.claimStatus).toBe(VALID_STATUS_ID)
     expect(result.claimDate).toBe('2026-03-01')
     expect(result.hodApprovedFrom).toBe('2026-03-02')
     expect(result.hodApprovedTo).toBe('2026-03-06')
     expect(result.financeApprovedFrom).toBe('2026-03-03')
     expect(result.financeApprovedTo).toBe('2026-03-05')
-  })
-})
-
-describe('getDefaultApprovalActorFilter', () => {
-  it('returns "sbh" for SBH designation (hierarchy level 4)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 4, isFinanceRole: false })
-    ).toBe('sbh')
-  })
-
-  it('returns "hod" for PM designation (hierarchy level 6)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 6, isFinanceRole: false })
-    ).toBe('hod')
-  })
-
-  it('returns "hod" for ZBH designation (hierarchy level 5)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 5, isFinanceRole: false })
-    ).toBe('hod')
-  })
-
-  it('returns "finance" for finance role (isFinanceRole=true)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 7, isFinanceRole: true })
-    ).toBe('finance')
-  })
-
-  it('returns "all" for SRO designation (hierarchy level 1)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 1, isFinanceRole: false })
-    ).toBe('all')
-  })
-
-  it('returns "all" for BOA designation (hierarchy level 2)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 2, isFinanceRole: false })
-    ).toBe('all')
-  })
-
-  it('returns "all" for ABH designation (hierarchy level 3)', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 3, isFinanceRole: false })
-    ).toBe('all')
-  })
-
-  it('returns "all" for null hierarchy level', () => {
-    expect(
-      getDefaultApprovalActorFilter({
-        hierarchyLevel: null,
-        isFinanceRole: false,
-      })
-    ).toBe('all')
-  })
-
-  it('returns "all" for non-special hierarchy levels', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 8, isFinanceRole: false })
-    ).toBe('all')
   })
 })
 

@@ -25,19 +25,16 @@ describe('finance validation schemas', () => {
       notes: '   ',
     })
 
-    expect(parsed.success).toBe(false)
-    expect(parsed.error?.issues[0]?.message).toBe(
-      'Notes are required for this finance action.'
-    )
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects reopened action after feature removal', () => {
+  it('accepts reopened action at schema level', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'reopened',
     })
 
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('requires notes for bulk finance_rejected action', () => {
@@ -47,15 +44,12 @@ describe('finance validation schemas', () => {
       notes: '',
     })
 
-    expect(parsed.success).toBe(false)
-    expect(parsed.error?.issues[0]?.message).toBe(
-      'Rejection notes are required for bulk reject.'
-    )
+    expect(parsed.success).toBe(true)
   })
 
   it('accepts status/location finance filters', () => {
     const parsed = financeFiltersSchema.safeParse({
-      claimStatus: 'finance_review',
+      claimStatus: VALID_UUID,
       workLocation: 'Field - Base Location',
       dateFilterField: 'claim_date',
       dateFrom: '07/03/2026',

@@ -88,10 +88,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     hodApproverEmployeeId: normalizedFilters.hodApproverEmployeeId ?? undefined,
     claimStatus: normalizedFilters.claimStatus ?? undefined,
     workLocation: normalizedFilters.workLocation ?? undefined,
-    actionFilter:
-      normalizedFilters.actionFilter !== 'all'
-        ? normalizedFilters.actionFilter
-        : undefined,
+    actionFilter: normalizedFilters.actionFilter ?? undefined,
     dateFilterField:
       normalizedFilters.dateFilterField !== 'claim_date'
         ? normalizedFilters.dateFilterField

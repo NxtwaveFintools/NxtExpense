@@ -64,6 +64,39 @@ type FinanceRpcParams = {
   p_allow_resubmit: boolean
 }
 
+function getMockAvailableActions() {
+  return [
+    {
+      action: 'approved',
+      display_label: 'Approve',
+      require_notes: false,
+      supports_allow_resubmit: false,
+      actor_scope: 'approver',
+    },
+    {
+      action: 'rejected',
+      display_label: 'Reject',
+      require_notes: true,
+      supports_allow_resubmit: true,
+      actor_scope: 'approver',
+    },
+    {
+      action: 'issued',
+      display_label: 'Issue',
+      require_notes: false,
+      supports_allow_resubmit: false,
+      actor_scope: 'finance',
+    },
+    {
+      action: 'finance_rejected',
+      display_label: 'Reject',
+      require_notes: true,
+      supports_allow_resubmit: true,
+      actor_scope: 'finance',
+    },
+  ]
+}
+
 let activeUserEmail = ''
 let claimSequence = 1
 let claimStore = new Map<string, WorkflowClaimState>()
@@ -174,6 +207,16 @@ describe('expense approval workflow integration — standard flow', () => {
         }),
       },
       rpc: vi.fn(async (rpcName: string, params: unknown) => {
+        if (rpcName === 'get_claim_available_actions') {
+          const claimId = (params as { p_claim_id: string }).p_claim_id
+          const claim = claimStore.get(claimId)
+          if (!claim) {
+            return { data: [], error: null }
+          }
+
+          return { data: getMockAvailableActions(), error: null }
+        }
+
         if (rpcName === 'submit_approval_action_atomic') {
           const typed = params as ApprovalRpcParams
           const claim = claimStore.get(typed.p_claim_id)

@@ -15,11 +15,13 @@ const BASE_FILTERS: FinanceFilters = {
   hodApproverEmployeeId: null,
   claimStatus: null,
   workLocation: null,
-  actionFilter: 'all',
+  actionFilter: null,
   dateFilterField: 'claim_date',
   dateFrom: null,
   dateTo: null,
 }
+
+const VALID_STATUS_ID = '3ae9b558-c006-427d-8ce6-13057d438d17'
 
 describe('finance filter serialization', () => {
   it('omits default and null values from URL params', () => {
@@ -37,7 +39,7 @@ describe('finance filter serialization', () => {
       claimNumber: 'CLAIM-001',
       ownerDesignation: 'Program Manager',
       hodApproverEmployeeId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-      claimStatus: 'finance_review',
+      claimStatus: VALID_STATUS_ID,
       workLocation: 'Field - Outstation',
       actionFilter: 'issued',
       dateFilterField: 'finance_approved_date',
@@ -51,7 +53,7 @@ describe('finance filter serialization', () => {
     expect(params.get('hodApproverEmployeeId')).toBe(
       'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
     )
-    expect(params.get('claimStatus')).toBe('finance_review')
+    expect(params.get('claimStatus')).toBe(VALID_STATUS_ID)
     expect(params.get('workLocation')).toBe('Field - Outstation')
     expect(params.get('actionFilter')).toBe('issued')
     expect(params.get('dateFilterField')).toBe('finance_approved_date')

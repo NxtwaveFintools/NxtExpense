@@ -3,34 +3,38 @@
 import { useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 
-import type { FinanceActionType } from '@/features/finance/types'
-
-type FinanceActionIntent = FinanceActionType | 'finance_rejected_allow_reclaim'
+type FinanceBulkActionOption = {
+  key: string
+  label: string
+}
 
 type FinanceQueueToolbarProps = {
   selectedCount: number
   allSelected: boolean
   partiallySelected: boolean
   totalCount: number
-  canRejectAllowReclaim: boolean
+  bulkActions: FinanceBulkActionOption[]
   onToggleSelectAll: (checked: boolean) => void
-  onIssueSelected: () => void
-  onRejectSelected: () => void
-  onRejectAllowReclaimSelected: () => void
+  onRunBulkAction: (actionKey: string) => void
   disabled: boolean
-  processingAction: FinanceActionIntent | null
+  processingAction: string | null
 }
+
+const TOOLBAR_ACTION_BUTTON_CLASSES = [
+  'bg-emerald-600 hover:bg-emerald-700',
+  'bg-rose-600 hover:bg-rose-700',
+  'bg-amber-600 hover:bg-amber-700',
+  'bg-sky-600 hover:bg-sky-700',
+] as const
 
 export function FinanceQueueToolbar({
   selectedCount,
   allSelected,
   partiallySelected,
   totalCount,
-  canRejectAllowReclaim,
+  bulkActions,
   onToggleSelectAll,
-  onIssueSelected,
-  onRejectSelected,
-  onRejectAllowReclaimSelected,
+  onRunBulkAction,
   disabled,
   processingAction,
 }: FinanceQueueToolbarProps) {
@@ -60,47 +64,37 @@ export function FinanceQueueToolbar({
         </label>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onIssueSelected}
-            disabled={disabled || selectedCount === 0}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {processingAction === 'issued' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : null}
-            {processingAction === 'issued'
-              ? 'Processing...'
-              : 'Issue Payment Selected'}
-          </button>
+          {bulkActions.map((action, index) => {
+            const toneClass =
+              TOOLBAR_ACTION_BUTTON_CLASSES[
+                index % TOOLBAR_ACTION_BUTTON_CLASSES.length
+              ]
 
-          <button
-            type="button"
-            onClick={onRejectSelected}
-            disabled={disabled || selectedCount === 0}
-            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
-          >
-            {processingAction === 'finance_rejected' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : null}
-            {processingAction === 'finance_rejected'
-              ? 'Processing...'
-              : 'Reject Selected'}
-          </button>
+            return (
+              <button
+                key={action.key}
+                type="button"
+                onClick={() => onRunBulkAction(action.key)}
+                disabled={disabled || selectedCount === 0}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-semibold text-white transition-all disabled:opacity-50 ${toneClass}`}
+              >
+                {processingAction === action.key ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : null}
+                {processingAction === action.key
+                  ? 'Processing...'
+                  : action.label}
+              </button>
+            )
+          })}
 
-          {canRejectAllowReclaim ? (
+          {bulkActions.length === 0 ? (
             <button
               type="button"
-              onClick={onRejectAllowReclaimSelected}
-              disabled={disabled || selectedCount === 0}
-              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
+              disabled
+              className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3.5 py-2 text-xs font-semibold text-muted-foreground"
             >
-              {processingAction === 'finance_rejected_allow_reclaim' ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : null}
-              {processingAction === 'finance_rejected_allow_reclaim'
-                ? 'Processing...'
-                : 'Reject & Allow Reclaim'}
+              No actions available
             </button>
           ) : null}
         </div>

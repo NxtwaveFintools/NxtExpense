@@ -30,39 +30,23 @@ function optionalDateField(label: string) {
     })
 }
 
-export const approvalActionSchema = z
-  .object({
-    claimId: z.string().uuid('Invalid claim identifier.'),
-    action: z.enum(['approved', 'rejected']),
-    notes: z
-      .string()
-      .trim()
-      .max(500, 'Notes cannot exceed 500 characters.')
-      .optional(),
-    allowResubmit: z.boolean().optional(),
-  })
-  .superRefine((value, context) => {
-    if (value.action === 'rejected' && !value.notes?.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['notes'],
-        message: 'Rejection notes are required.',
-      })
-    }
-  })
+export const approvalActionSchema = z.object({
+  claimId: z.string().uuid('Invalid claim identifier.'),
+  action: z.string().trim().min(1, 'Action is required.'),
+  notes: z
+    .string()
+    .trim()
+    .max(500, 'Notes cannot exceed 500 characters.')
+    .optional(),
+  allowResubmit: z.boolean().optional(),
+})
 
 export const approvalHistoryFiltersSchema = z
   .object({
     employeeName: z.string().trim().max(100).optional(),
     claimStatus: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().trim().max(100).optional()
-    ),
-    // Defensive: treat empty string (e.g., manual ?actorFilter= in URL) as
-    // undefined so the enum default ('all') is applied without throwing.
-    actorFilter: z.preprocess(
-      (val) => (val === '' ? undefined : val),
-      z.enum(['all', 'sbh', 'hod', 'finance']).default('all')
+      z.string().trim().uuid().optional()
     ),
     claimDate: optionalDateField('Claim date'),
     hodApprovedFrom: optionalDateField('HOD approval date from'),
@@ -99,23 +83,13 @@ export const approvalHistoryFiltersSchema = z
     )
   })
 
-export const bulkApprovalActionSchema = z
-  .object({
-    claimIds: z.array(z.string().uuid('Invalid claim identifier.')).min(1),
-    action: z.enum(['approved', 'rejected']),
-    notes: z
-      .string()
-      .trim()
-      .max(500, 'Notes cannot exceed 500 characters.')
-      .optional(),
-    allowResubmit: z.boolean().optional(),
-  })
-  .superRefine((value, context) => {
-    if (value.action === 'rejected' && !value.notes?.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['notes'],
-        message: 'Rejection notes are required.',
-      })
-    }
-  })
+export const bulkApprovalActionSchema = z.object({
+  claimIds: z.array(z.string().uuid('Invalid claim identifier.')).min(1),
+  action: z.string().trim().min(1, 'Action is required.'),
+  notes: z
+    .string()
+    .trim()
+    .max(500, 'Notes cannot exceed 500 characters.')
+    .optional(),
+  allowResubmit: z.boolean().optional(),
+})

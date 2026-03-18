@@ -68,7 +68,10 @@ export const claimSubmissionSchema = z.object({
 })
 
 export const myClaimsFiltersSchema = z.object({
-  claimStatus: z.string().trim().max(100).optional(),
+  claimStatus: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string().trim().uuid().optional()
+  ),
   workLocation: z.preprocess(
     (val) => (val === '' ? undefined : val),
     z.string().trim().max(100).optional()

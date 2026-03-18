@@ -3,15 +3,15 @@ import { describe, expect, it } from 'vitest'
 import {
   addApprovalFiltersToParams,
   buildApprovalHistoryCsv,
-  getDefaultApprovalActorFilter,
   normalizeApprovalHistoryFilters,
 } from '@/features/approvals/utils/history-filters'
+
+const VALID_STATUS_ID = '3ae9b558-c006-427d-8ce6-13057d438d17'
 
 describe('approval history filter utilities', () => {
   it('normalizes DD/MM/YYYY input into ISO dates', () => {
     const normalized = normalizeApprovalHistoryFilters({
       employeeName: '  John  ',
-      actorFilter: 'finance',
       claimDate: '07/03/2026',
       hodApprovedFrom: '01/03/2026',
       hodApprovedTo: '02/03/2026',
@@ -21,7 +21,6 @@ describe('approval history filter utilities', () => {
 
     expect(normalized).toEqual({
       employeeName: 'John',
-      actorFilter: 'finance',
       claimStatus: null,
       claimDate: '2026-03-07',
       hodApprovedFrom: '2026-03-01',
@@ -33,7 +32,6 @@ describe('approval history filter utilities', () => {
 
   it('supports ISO date input from calendar pickers', () => {
     const normalized = normalizeApprovalHistoryFilters({
-      actorFilter: 'all',
       claimDate: '2026-03-07',
     })
 
@@ -51,8 +49,7 @@ describe('approval history filter utilities', () => {
   it('adds all filter params for finance-focused filtering', () => {
     const params = addApprovalFiltersToParams(new URLSearchParams(), {
       employeeName: 'Alex',
-      actorFilter: 'finance',
-      claimStatus: 'L3_PENDING_FINANCE_REVIEW',
+      claimStatus: VALID_STATUS_ID,
       claimDate: '2026-03-01',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-07',
@@ -61,8 +58,7 @@ describe('approval history filter utilities', () => {
     })
 
     expect(params.get('employeeName')).toBe('Alex')
-    expect(params.get('actorFilter')).toBe('finance')
-    expect(params.get('claimStatus')).toBe('L3_PENDING_FINANCE_REVIEW')
+    expect(params.get('claimStatus')).toBe(VALID_STATUS_ID)
     expect(params.get('claimDate')).toBe('2026-03-01')
     expect(params.get('hodApprovedFrom')).toBe('2026-03-01')
     expect(params.get('hodApprovedTo')).toBe('2026-03-07')
@@ -73,7 +69,6 @@ describe('approval history filter utilities', () => {
   it('omits query params when filters are at default values', () => {
     const params = addApprovalFiltersToParams(new URLSearchParams(), {
       employeeName: null,
-      actorFilter: 'all',
       claimStatus: null,
       claimDate: null,
       hodApprovedFrom: null,
@@ -115,50 +110,10 @@ describe('approval history filter utilities', () => {
     expect(csv).toContain('"finance issued"')
   })
 
-  it('uses role-aware default actor bucket for approvals page UX', () => {
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 4, isFinanceRole: false })
-    ).toBe('sbh')
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 6, isFinanceRole: false })
-    ).toBe('hod')
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 5, isFinanceRole: false })
-    ).toBe('hod')
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 7, isFinanceRole: true })
-    ).toBe('finance')
-    expect(
-      getDefaultApprovalActorFilter({ hierarchyLevel: 3, isFinanceRole: false })
-    ).toBe('all')
-  })
-
-  // ─── Defensive edge cases for actorFilter ─────────────────────────────────
-
-  it('does NOT throw when actorFilter is empty string (converted to default "all")', () => {
-    // Defensive: if someone manually sets ?actorFilter= in the URL,
-    // the schema should not explode — it converts '' to undefined then defaults to 'all'.
-    expect(() =>
-      normalizeApprovalHistoryFilters({ actorFilter: '' })
-    ).not.toThrow()
-  })
-
-  it('defaults actorFilter to "all" when absent', () => {
+  it('keeps defaults for omitted optional filters', () => {
     const result = normalizeApprovalHistoryFilters({})
-    expect(result.actorFilter).toBe('all')
-  })
-
-  it('preserves employeeName when actorFilter is empty string', () => {
-    const result = normalizeApprovalHistoryFilters({
-      employeeName: 'John',
-      actorFilter: '',
-    })
-    expect(result.employeeName).toBe('John')
-    expect(result.actorFilter).toBe('all')
-  })
-
-  it('normalizes actorFilter=sbh correctly', () => {
-    const result = normalizeApprovalHistoryFilters({ actorFilter: 'sbh' })
-    expect(result.actorFilter).toBe('sbh')
+    expect(result.employeeName).toBeNull()
+    expect(result.claimStatus).toBeNull()
+    expect(result.claimDate).toBeNull()
   })
 })

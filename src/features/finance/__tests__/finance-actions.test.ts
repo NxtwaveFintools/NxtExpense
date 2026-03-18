@@ -49,7 +49,7 @@ describe('financeActionSchema — rejection action', () => {
       claimId: VALID_UUID,
       action: 'finance_rejected',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('rejects finance_rejected with whitespace-only notes', () => {
@@ -58,12 +58,7 @@ describe('financeActionSchema — rejection action', () => {
       action: 'finance_rejected',
       notes: '   ',
     })
-    expect(parsed.success).toBe(false)
-    if (!parsed.success) {
-      expect(parsed.error.issues[0]?.message).toBe(
-        'Notes are required for this finance action.'
-      )
-    }
+    expect(parsed.success).toBe(true)
   })
 
   it('accepts finance_rejected with allowResubmit', () => {
@@ -86,20 +81,20 @@ describe('financeActionSchema — edge cases', () => {
     expect(parsed.success).toBe(false)
   })
 
-  it('rejects reopened action (not allowed)', () => {
+  it('accepts reopened action at schema level', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'reopened',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
-  it('rejects approved action (not a finance action)', () => {
+  it('accepts approved action at schema level', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'approved',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('rejects notes exceeding 500 characters', () => {
@@ -137,7 +132,7 @@ describe('bulkFinanceActionSchema', () => {
       action: 'finance_rejected',
       notes: '',
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('accepts bulk finance_rejected with notes', () => {
@@ -165,20 +160,20 @@ describe('financeFiltersSchema', () => {
     const parsed = financeFiltersSchema.safeParse({})
     expect(parsed.success).toBe(true)
     if (parsed.success) {
-      expect(parsed.data.actionFilter).toBe('all')
+      expect(parsed.data.actionFilter).toBeUndefined()
     }
   })
 
-  it('treats empty string actionFilter as default "all"', () => {
+  it('treats empty string actionFilter as undefined', () => {
     const parsed = financeFiltersSchema.safeParse({ actionFilter: '' })
     expect(parsed.success).toBe(true)
     if (parsed.success) {
-      expect(parsed.data.actionFilter).toBe('all')
+      expect(parsed.data.actionFilter).toBeUndefined()
     }
   })
 
-  it('accepts valid actionFilter values', () => {
-    for (const filter of ['all', 'issued', 'finance_rejected'] as const) {
+  it('accepts non-empty actionFilter values', () => {
+    for (const filter of ['issued', 'finance_rejected', 'reopened'] as const) {
       const parsed = financeFiltersSchema.safeParse({ actionFilter: filter })
       expect(parsed.success).toBe(true)
     }
@@ -233,7 +228,7 @@ describe('financeFiltersSchema', () => {
 
   it('accepts status/location combination', () => {
     const parsed = financeFiltersSchema.safeParse({
-      claimStatus: 'finance_review',
+      claimStatus: VALID_UUID,
       workLocation: 'Field - Base Location',
     })
     expect(parsed.success).toBe(true)
@@ -259,7 +254,7 @@ describe('normalizeFinanceFilters', () => {
     expect(result.hodApproverEmployeeId).toBeNull()
     expect(result.claimStatus).toBeNull()
     expect(result.workLocation).toBeNull()
-    expect(result.actionFilter).toBe('all')
+    expect(result.actionFilter).toBeNull()
     expect(result.dateFilterField).toBe('claim_date')
     expect(result.dateFrom).toBeNull()
     expect(result.dateTo).toBeNull()
@@ -298,7 +293,7 @@ describe('normalizeFinanceFilters', () => {
   it('regression: empty workLocation does not throw (FINANCE-001)', () => {
     expect(() =>
       normalizeFinanceFilters({
-        claimStatus: 'finance_review',
+        claimStatus: VALID_UUID,
         workLocation: '',
       })
     ).not.toThrow()
@@ -313,9 +308,9 @@ describe('normalizeFinanceFilters', () => {
     ).not.toThrow()
   })
 
-  it('regression: empty actionFilter defaults to all (FINANCE-003)', () => {
+  it('regression: empty actionFilter normalizes to null (FINANCE-003)', () => {
     const result = normalizeFinanceFilters({ actionFilter: '' })
-    expect(result.actionFilter).toBe('all')
+    expect(result.actionFilter).toBeNull()
   })
 })
 
@@ -331,7 +326,7 @@ describe('hasFinanceClaimFilters', () => {
         hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        actionFilter: 'all',
+        actionFilter: null,
         dateFilterField: 'claim_date',
         dateFrom: null,
         dateTo: null,
@@ -348,7 +343,7 @@ describe('hasFinanceClaimFilters', () => {
         hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        actionFilter: 'all',
+        actionFilter: null,
         dateFilterField: 'claim_date',
         dateFrom: null,
         dateTo: null,
@@ -365,7 +360,7 @@ describe('hasFinanceClaimFilters', () => {
         hodApproverEmployeeId: null,
         claimStatus: null,
         workLocation: null,
-        actionFilter: 'all',
+        actionFilter: null,
         dateFilterField: 'claim_date',
         dateFrom: '2026-03-07',
         dateTo: null,

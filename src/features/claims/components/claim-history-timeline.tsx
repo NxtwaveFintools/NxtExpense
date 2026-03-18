@@ -48,13 +48,13 @@ export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
       ) : (
         <div className="mt-5 relative">
           {/* Timeline line */}
-          <div className="absolute top-2 left-[7px] bottom-2 w-px bg-border" />
+          <div className="absolute top-2 left-1.75 bottom-2 w-px bg-border" />
           <ul className="space-y-4">
             {history.map((entry) => (
               <li key={entry.id} className="relative pl-7">
                 {/* Timeline dot */}
                 <div
-                  className={`absolute left-0 top-1.5 size-[15px] rounded-full border-2 border-surface ${
+                  className={`absolute left-0 top-1.5 size-3.75 rounded-full border-2 border-surface ${
                     ACTION_COLORS[entry.action] ?? 'bg-zinc-400'
                   }`}
                 />
@@ -79,9 +79,7 @@ export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
                       Reason: {entry.rejection_notes}
                     </p>
                   ) : null}
-                  {entry.allow_resubmit !== null &&
-                  (entry.action === 'rejected' ||
-                    entry.action === 'finance_rejected') ? (
+                  {entry.allow_resubmit !== null ? (
                     entry.allow_resubmit ? (
                       <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-light px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                         <span className="size-1.5 rounded-full bg-emerald-500" />

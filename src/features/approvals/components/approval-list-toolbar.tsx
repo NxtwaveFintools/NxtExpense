@@ -1,33 +1,41 @@
 import { Loader2 } from 'lucide-react'
 
+type BulkApprovalActionOption = {
+  key: string
+  label: string
+}
+
 type ApprovalListToolbarProps = {
   allSelected: boolean
   selectedCount: number
   selectableCount: number
   notes: string
-  canRejectAllowReclaim: boolean
   isProcessing: boolean
   processingAction: string | null
+  bulkActions: BulkApprovalActionOption[]
   onToggleSelectAll: (checked: boolean) => void
   onNotesChange: (value: string) => void
-  onApproveSelected: () => void
-  onRejectSelected: () => void
-  onRejectAllowReclaimSelected: () => void
+  onRunBulkAction: (actionKey: string) => void
 }
+
+const BULK_ACTION_BUTTON_CLASSES = [
+  'bg-emerald-600 hover:bg-emerald-700',
+  'bg-rose-600 hover:bg-rose-700',
+  'bg-amber-600 hover:bg-amber-700',
+  'bg-sky-600 hover:bg-sky-700',
+] as const
 
 export function ApprovalListToolbar({
   allSelected,
   selectedCount,
   selectableCount,
   notes,
-  canRejectAllowReclaim,
   isProcessing,
   processingAction,
+  bulkActions,
   onToggleSelectAll,
   onNotesChange,
-  onApproveSelected,
-  onRejectSelected,
-  onRejectAllowReclaimSelected,
+  onRunBulkAction,
 }: ApprovalListToolbarProps) {
   return (
     <div className="border-b border-border bg-muted/30 px-6 py-3">
@@ -46,45 +54,40 @@ export function ApprovalListToolbar({
         <textarea
           value={notes}
           onChange={(event) => onNotesChange(event.target.value)}
-          placeholder="Reason (required for rejection actions)..."
+          placeholder="Notes for the selected workflow action..."
           className="min-h-9 w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-xs transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           rows={1}
         />
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onApproveSelected}
-            disabled={isProcessing || selectedCount === 0}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {isProcessing && processingAction === 'approved' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : null}
-            Approve Selected
-          </button>
-          <button
-            type="button"
-            onClick={onRejectSelected}
-            disabled={isProcessing || selectedCount === 0}
-            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
-          >
-            {isProcessing && processingAction === 'rejected' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : null}
-            Reject Selected
-          </button>
-          {canRejectAllowReclaim ? (
+          {bulkActions.map((action, index) => {
+            const toneClass =
+              BULK_ACTION_BUTTON_CLASSES[
+                index % BULK_ACTION_BUTTON_CLASSES.length
+              ]
+
+            return (
+              <button
+                key={action.key}
+                type="button"
+                onClick={() => onRunBulkAction(action.key)}
+                disabled={isProcessing || selectedCount === 0}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-semibold text-white transition-all disabled:opacity-50 ${toneClass}`}
+              >
+                {isProcessing && processingAction === action.key ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : null}
+                {action.label}
+              </button>
+            )
+          })}
+          {bulkActions.length === 0 ? (
             <button
               type="button"
-              onClick={onRejectAllowReclaimSelected}
-              disabled={isProcessing || selectedCount === 0}
-              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
+              disabled
+              className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3.5 py-2 text-xs font-semibold text-muted-foreground"
             >
-              {isProcessing && processingAction === 'rejected_allow_reclaim' ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : null}
-              Reject & Allow Reclaim
+              No actions available
             </button>
           ) : null}
         </div>

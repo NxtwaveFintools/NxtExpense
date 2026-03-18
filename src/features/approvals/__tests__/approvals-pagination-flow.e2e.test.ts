@@ -10,12 +10,13 @@ import {
   encodeCursorTrail,
 } from '@/lib/utils/pagination'
 
+const VALID_STATUS_ID = '3ae9b558-c006-427d-8ce6-13057d438d17'
+
 describe('approvals pagination flow e2e scenario', () => {
-  it('preserves finance filters while moving next and back through history pages', () => {
+  it('preserves active filters while moving next and back through history pages', () => {
     const normalizedFilters = normalizeApprovalHistoryFilters({
       employeeName: 'Rahul',
-      actorFilter: 'finance',
-      claimStatus: 'L3_PENDING_FINANCE_REVIEW',
+      claimStatus: VALID_STATUS_ID,
       claimDate: '2026-03-01',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-31',
@@ -45,8 +46,7 @@ describe('approvals pagination flow e2e scenario', () => {
     expect(page1.nextHref).toBeTruthy()
 
     const page2Params = new URLSearchParams(page1.nextHref?.split('?')[1] ?? '')
-    expect(page2Params.get('actorFilter')).toBe('finance')
-    expect(page2Params.get('claimStatus')).toBe('L3_PENDING_FINANCE_REVIEW')
+    expect(page2Params.get('claimStatus')).toBe(VALID_STATUS_ID)
     expect(page2Params.get('employeeName')).toBe('Rahul')
     expect(page2Params.get('historyCursor')).toBe('cursor-page-2')
 
@@ -72,8 +72,7 @@ describe('approvals pagination flow e2e scenario', () => {
 
     const backToPage1 = new URLSearchParams(page2.backHref?.split('?')[1] ?? '')
     expect(backToPage1.get('historyCursor')).toBeNull()
-    expect(backToPage1.get('actorFilter')).toBe('finance')
-    expect(backToPage1.get('claimStatus')).toBe('L3_PENDING_FINANCE_REVIEW')
+    expect(backToPage1.get('claimStatus')).toBe(VALID_STATUS_ID)
     expect(backToPage1.get('employeeName')).toBe('Rahul')
   })
 
@@ -81,7 +80,6 @@ describe('approvals pagination flow e2e scenario', () => {
     const links = buildCursorNavigationLinks({
       pathname: '/approvals',
       query: {
-        actorFilter: 'all',
         pendingCursor: 'pending-cursor',
         pendingTrail: encodeCursorTrail([null, 'pending-1']),
       },

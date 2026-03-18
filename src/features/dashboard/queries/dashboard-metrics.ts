@@ -28,7 +28,6 @@ type DashboardSupabaseClient = Awaited<
 
 type ClaimStatusRow = {
   id: string
-  status_code: string
   is_rejection: boolean
   is_payment_issued: boolean
 }
@@ -55,7 +54,7 @@ export async function getEmployeeClaimStats(
 ): Promise<DashboardClaimStats> {
   const { data: statusRows, error: statusError } = await supabase
     .from('claim_statuses')
-    .select('id, status_code, is_rejection, is_payment_issued')
+    .select('id, is_rejection, is_payment_issued')
     .eq('is_active', true)
 
   if (statusError) {
@@ -70,11 +69,7 @@ export async function getEmployeeClaimStats(
 
   const approvedStatusIds = new Set(
     ((statusRows ?? []) as ClaimStatusRow[])
-      .filter(
-        (status) =>
-          status.is_payment_issued ||
-          status.status_code.toUpperCase() === 'APPROVED'
-      )
+      .filter((status) => status.is_payment_issued)
       .map((status) => status.id)
   )
 

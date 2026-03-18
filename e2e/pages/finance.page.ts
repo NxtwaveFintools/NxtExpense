@@ -12,7 +12,24 @@ export class FinancePage {
 
   get queueRows() {
     return this.page.locator(
-      '[data-testid="finance-queue-row"], table:first-of-type tbody tr'
+      '[data-testid="finance-queue-row"], table:has(th:has-text("Select")) tbody tr'
+    )
+  }
+
+  getQueueRowByClaimNumber(claimNumber: string) {
+    return this.queueRows.filter({ hasText: claimNumber }).first()
+  }
+
+  async openQueueClaimByNumber(claimNumber: string) {
+    const claimRow = this.getQueueRowByClaimNumber(claimNumber)
+    await claimRow.locator('a[href*="/claims/"]').first().click()
+    await this.page.waitForURL(/\/claims\//)
+    await this.page.waitForLoadState('networkidle')
+  }
+
+  getQueueCheckboxByClaimNumber(claimNumber: string) {
+    return this.getQueueRowByClaimNumber(claimNumber).locator(
+      'input[type="checkbox"]'
     )
   }
 
@@ -28,10 +45,7 @@ export class FinancePage {
         .locator(`[data-claim-id="${claimId}"]`)
         .getByRole('button', { name: /issue/i })
     }
-    return this.queueRows
-      .first()
-      .getByRole('button', { name: /issue/i })
-      .first()
+    return this.page.getByRole('button', { name: /^Issue$/i }).first()
   }
 
   getRejectButton(claimId?: string) {
@@ -60,8 +74,22 @@ export class FinancePage {
     return this.page.getByLabel(/employee.*name/i)
   }
 
+  get claimNumberFilter() {
+    return this.page.getByLabel(/claim number/i)
+  }
+
   get statusFilter() {
     return this.page.getByLabel(/status/i)
+  }
+
+  get applyFiltersButton() {
+    return this.page.getByRole('button', { name: /apply filters/i })
+  }
+
+  async filterByClaimNumber(claimNumber: string) {
+    await this.claimNumberFilter.fill(claimNumber)
+    await this.applyFiltersButton.click()
+    await this.page.waitForLoadState('networkidle')
   }
 
   // ── History ───────────────────────────────────────────────────────────
@@ -78,7 +106,7 @@ export class FinancePage {
 
   get bulkIssueButton() {
     return this.page.getByRole('button', {
-      name: /issue.*selected|bulk.*issue/i,
+      name: /^Issue$/i,
     })
   }
 }

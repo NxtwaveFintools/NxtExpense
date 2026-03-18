@@ -7,16 +7,15 @@ import { toast } from 'sonner'
 
 import { submitFinanceAction } from '@/features/finance/actions'
 import type { ClaimAvailableAction } from '@/features/claims/types'
+import {
+  getWorkflowActionAllowReclaimLabel,
+  getWorkflowActionCtaLabel,
+} from '@/lib/utils/workflow-action-labels'
 
 type FinanceActionsProps = {
   claimId: string
   availableActions: ClaimAvailableAction[]
 }
-
-type FinanceActionIntent =
-  | 'issued'
-  | 'finance_rejected'
-  | 'finance_rejected_allow_reclaim'
 
 export function FinanceActions({
   claimId,
@@ -26,31 +25,27 @@ export function FinanceActions({
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [pendingAction, setPendingAction] =
-    useState<FinanceActionIntent | null>(null)
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
 
-  const actions = useMemo(
-    () =>
-      availableActions.filter(
-        (action) =>
-          action.action === 'issued' || action.action === 'finance_rejected'
-      ),
-    [availableActions]
-  )
+  const actions = useMemo(() => availableActions, [availableActions])
 
-  const issuedAction = actions.find((action) => action.action === 'issued')
-  const rejectedAction = actions.find(
-    (action) => action.action === 'finance_rejected'
-  )
+  const BUTTON_TONES = [
+    'bg-emerald-600 hover:bg-emerald-700',
+    'bg-rose-600 hover:bg-rose-700',
+    'bg-sky-600 hover:bg-sky-700',
+  ] as const
+
+  function getActionIntentKey(actionCode: string, allowResubmit: boolean) {
+    return `${actionCode}:${allowResubmit ? 'allow_resubmit' : 'default'}`
+  }
 
   async function handleAction(
-    action: 'issued' | 'finance_rejected',
-    allowReclaim = false
+    action: ClaimAvailableAction,
+    allowResubmit = false
   ) {
-    const intent: FinanceActionIntent =
-      action === 'finance_rejected' && allowReclaim
-        ? 'finance_rejected_allow_reclaim'
-        : action
+    const shouldAllowResubmit =
+      allowResubmit && action.supports_allow_resubmit === true
+    const intent = getActionIntentKey(action.action, shouldAllowResubmit)
 
     setIsSubmitting(true)
     setPendingAction(intent)
@@ -59,9 +54,9 @@ export function FinanceActions({
     try {
       const result = await submitFinanceAction({
         claimId,
-        action,
+        action: action.action,
         notes,
-        allowResubmit: action === 'finance_rejected' ? allowReclaim : false,
+        allowResubmit: shouldAllowResubmit ? true : undefined,
       })
 
       if (!result.ok) {
@@ -70,7 +65,10 @@ export function FinanceActions({
         return
       }
 
-      toast.success('Finance action submitted successfully.')
+      const actionLabel = shouldAllowResubmit
+        ? getWorkflowActionAllowReclaimLabel(action)
+        : getWorkflowActionCtaLabel(action)
+      toast.success(`${actionLabel} submitted successfully.`)
       router.push('/finance')
     } catch {
       const message = 'Unexpected error while submitting finance action.'
@@ -93,7 +91,7 @@ export function FinanceActions({
       ) : (
         <label className="mt-4 block space-y-1.5 text-sm">
           <span className="font-medium text-foreground">
-            Notes (required for rejection actions)
+            Notes for the selected workflow action
           </span>
           <textarea
             value={notes}
@@ -111,54 +109,50 @@ export function FinanceActions({
       ) : null}
 
       <div className="mt-5 flex flex-wrap gap-2.5">
-        {issuedAction ? (
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={() => handleAction('issued')}
-            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {isSubmitting && pendingAction === 'issued' ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            {isSubmitting && pendingAction === 'issued'
-              ? 'Submitting...'
-              : issuedAction.display_label}
-          </button>
-        ) : null}
+        {actions.map((action, index) => {
+          const intentKey = getActionIntentKey(action.action, false)
+          const toneClass = BUTTON_TONES[index % BUTTON_TONES.length]
 
-        {rejectedAction ? (
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={() => handleAction('finance_rejected', false)}
-            className="inline-flex items-center gap-2 rounded-md bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-rose-700 disabled:opacity-50"
-          >
-            {isSubmitting && pendingAction === 'finance_rejected' ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            {isSubmitting && pendingAction === 'finance_rejected'
-              ? 'Submitting...'
-              : rejectedAction.display_label}
-          </button>
-        ) : null}
+          return (
+            <button
+              key={intentKey}
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handleAction(action, false)}
+              className={`inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50 ${toneClass}`}
+            >
+              {isSubmitting && pendingAction === intentKey ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              {isSubmitting && pendingAction === intentKey
+                ? 'Submitting...'
+                : getWorkflowActionCtaLabel(action)}
+            </button>
+          )
+        })}
 
-        {rejectedAction ? (
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={() => handleAction('finance_rejected', true)}
-            className="inline-flex items-center gap-2 rounded-md bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
-          >
-            {isSubmitting &&
-            pendingAction === 'finance_rejected_allow_reclaim' ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            {isSubmitting && pendingAction === 'finance_rejected_allow_reclaim'
-              ? 'Submitting...'
-              : 'Reject & Allow Reclaim'}
-          </button>
-        ) : null}
+        {actions
+          .filter((action) => action.supports_allow_resubmit)
+          .map((action) => {
+            const intentKey = getActionIntentKey(action.action, true)
+
+            return (
+              <button
+                key={intentKey}
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleAction(action, true)}
+                className="inline-flex items-center gap-2 rounded-md bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-700 disabled:opacity-50"
+              >
+                {isSubmitting && pendingAction === intentKey ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                {isSubmitting && pendingAction === intentKey
+                  ? 'Submitting...'
+                  : getWorkflowActionAllowReclaimLabel(action)}
+              </button>
+            )
+          })}
       </div>
     </section>
   )

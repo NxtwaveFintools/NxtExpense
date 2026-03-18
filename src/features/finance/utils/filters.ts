@@ -37,7 +37,7 @@ export function normalizeFinanceFilters(
     hodApproverEmployeeId: normalizeText(value.hodApproverEmployeeId),
     claimStatus: normalizeText(value.claimStatus),
     workLocation: normalizeText(value.workLocation),
-    actionFilter: value.actionFilter,
+    actionFilter: normalizeText(value.actionFilter),
     dateFilterField: value.dateFilterField,
     dateFrom: value.dateFrom ?? null,
     dateTo: value.dateTo ?? null,
@@ -85,7 +85,7 @@ export function addFinanceFiltersToParams(
     params.set('workLocation', filters.workLocation)
   }
 
-  if (filters.actionFilter && filters.actionFilter !== 'all') {
+  if (filters.actionFilter) {
     params.set('actionFilter', filters.actionFilter)
   }
 

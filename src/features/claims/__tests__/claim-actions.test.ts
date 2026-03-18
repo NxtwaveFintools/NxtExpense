@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   getEmployeeRoles: vi.fn(),
   canAccessEmployeeClaimsFromRoles: vi.fn(),
   getAllWorkLocations: vi.fn(),
-  getClaimStatusByCode: vi.fn(),
   getDesignationApprovalFlow: vi.fn(),
   calculateBaseLocationItems: vi.fn(),
   calculateOutstationOwnVehicleItems: vi.fn(),
@@ -55,7 +54,6 @@ vi.mock('@/lib/services/config-service', async () => {
   return {
     ...actual,
     getAllWorkLocations: mocks.getAllWorkLocations,
-    getClaimStatusByCode: mocks.getClaimStatusByCode,
     getDesignationApprovalFlow: mocks.getDesignationApprovalFlow,
   }
 })
@@ -109,6 +107,30 @@ describe('submitClaimAction', () => {
 
     rpcMock = vi.fn().mockResolvedValue({ error: null })
 
+    const claimStatusesQuery = {
+      approvalLevel: 1,
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockImplementation(function (
+        this: { approvalLevel: number },
+        column: string,
+        value: unknown
+      ) {
+        if (column === 'approval_level' && typeof value === 'number') {
+          this.approvalLevel = value
+        }
+        return this
+      }),
+      order: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockImplementation(function (this: {
+        approvalLevel: number
+      }) {
+        if (this.approvalLevel === 99) {
+          return Promise.resolve({ data: null, error: null })
+        }
+        return Promise.resolve({ data: { id: 'status-l1' }, error: null })
+      }),
+    }
+
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -120,6 +142,13 @@ describe('submitClaimAction', () => {
         }),
       },
       rpc: rpcMock,
+      from: vi.fn((table: string) => {
+        if (table === 'claim_statuses') {
+          return claimStatusesQuery
+        }
+
+        throw new Error(`Unexpected table query in test: ${table}`)
+      }),
     })
 
     mocks.getEmployeeByEmail.mockResolvedValue({
@@ -142,8 +171,6 @@ describe('submitClaimAction', () => {
     mocks.getDesignationApprovalFlow.mockResolvedValue({
       required_approval_levels: [1],
     })
-
-    mocks.getClaimStatusByCode.mockResolvedValue({ id: 'status-l1' })
     mocks.calculateBaseLocationItems.mockResolvedValue({ items: [], total: 0 })
     mocks.calculateOutstationOwnVehicleItems.mockResolvedValue({
       items: [],

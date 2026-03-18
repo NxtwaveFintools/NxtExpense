@@ -13,6 +13,13 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "npx vitest --coverage --ui",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:ci": "playwright test --project=chromium",
+    "test:e2e:live:fast": "playwright test --project=chromium --headed --workers=50% --grep-invert \"Approval Workflow Matrix|Approval Workflow — SRO claim through full chain|Approval Rejection Flows|Finance Rejection Flows\"",
+    "test:e2e:live:workflow": "playwright test e2e/approval-workflow-matrix.spec.ts e2e/approval-rejection-flows.spec.ts e2e/finance-rejection-flows.spec.ts --project=chromium --headed --workers=1",
+    "test:e2e:live": "npm run test:e2e:live:fast && npm run test:e2e:live:workflow",
+    "test:e2e:ui": "playwright test --ui --project=chromium",
+    "test:e2e:rejections": "playwright test e2e/approval-rejection-flows.spec.ts e2e/finance-rejection-flows.spec.ts --project=chromium",
     "prepare": "husky"
   },
   "lint-staged": {

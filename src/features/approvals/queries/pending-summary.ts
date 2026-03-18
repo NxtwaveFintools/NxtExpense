@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { PendingApprovalsFilters } from '@/features/approvals/types'
-import { getDesignationByCode } from '@/lib/services/config-service'
 
 type PendingApprovalsSummary = {
   count: number
@@ -16,7 +15,6 @@ type PendingSummaryRow = {
 
 const DEFAULT_PENDING_FILTERS: PendingApprovalsFilters = {
   employeeName: null,
-  actorFilter: 'all',
   claimStatus: null,
 }
 
@@ -43,7 +41,7 @@ export async function getPendingApprovalsSummary(
       .maybeSingle(),
     supabase
       .from('claim_statuses')
-      .select('id, status_code')
+      .select('id')
       .not('approval_level', 'is', null)
       .eq('is_rejection', false)
       .eq('is_terminal', false)
@@ -64,13 +62,11 @@ export async function getPendingApprovalsSummary(
   }
 
   const pendingStatuses = pendingStatusesResult.data ?? []
-  const normalizedStatusFilter = filters.claimStatus?.trim().toUpperCase()
+  const normalizedStatusFilter = filters.claimStatus?.trim()
 
   const pendingStatusIds = (
     normalizedStatusFilter
-      ? pendingStatuses.filter(
-          (status) => status.status_code === normalizedStatusFilter
-        )
+      ? pendingStatuses.filter((status) => status.id === normalizedStatusFilter)
       : pendingStatuses
   ).map((status) => status.id)
 
@@ -121,24 +117,6 @@ export async function getPendingApprovalsSummary(
   }
 
   const normalizedName = filters.employeeName?.trim() ?? ''
-  const actorFilter = filters.actorFilter
-  let actorDesignationId: string | null = null
-
-  if (actorFilter === 'sbh') {
-    const sbhDesignation = await getDesignationByCode(supabase, 'SBH')
-    if (!sbhDesignation) {
-      return { count: 0, amount: 0 }
-    }
-    actorDesignationId = sbhDesignation.id
-  }
-
-  if (actorFilter === 'finance') {
-    const financeDesignation = await getDesignationByCode(supabase, 'FIN')
-    if (!financeDesignation) {
-      return { count: 0, amount: 0 }
-    }
-    actorDesignationId = financeDesignation.id
-  }
 
   const pageSize = 500
 
@@ -167,14 +145,6 @@ export async function getPendingApprovalsSummary(
         .replaceAll('%', '\\%')
         .replaceAll('_', '\\_')
       query = query.ilike('employees.employee_name', `%${escapedName}%`)
-    }
-
-    if (actorDesignationId) {
-      query = query.eq('employees.designation_id', actorDesignationId)
-    }
-
-    if (actorFilter === 'hod') {
-      query = query.not('employees.approval_employee_id_level_3', 'is', null)
     }
 
     const { data, error } = await query

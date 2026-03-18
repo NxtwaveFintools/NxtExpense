@@ -1,6 +1,5 @@
 import { formatDate, formatDatetime } from '@/lib/utils/date'
 import type {
-  ApprovalActorFilter,
   ApprovalHistoryFilters,
   ApprovalHistoryRecord,
 } from '@/features/approvals/types'
@@ -54,7 +53,6 @@ export function normalizeApprovalHistoryFilters(
 
   return {
     employeeName: normalizeText(value.employeeName),
-    actorFilter: value.actorFilter,
     claimStatus: normalizeText(value.claimStatus),
     claimDate: value.claimDate ?? null,
     hodApprovedFrom: value.hodApprovedFrom ?? null,
@@ -64,38 +62,12 @@ export function normalizeApprovalHistoryFilters(
   }
 }
 
-export function getDefaultApprovalActorFilter({
-  hierarchyLevel,
-  isFinanceRole,
-}: {
-  hierarchyLevel: number | null
-  isFinanceRole: boolean
-}): ApprovalActorFilter {
-  if (isFinanceRole) {
-    return 'finance'
-  }
-
-  if (hierarchyLevel === 4) {
-    return 'sbh'
-  }
-
-  if (hierarchyLevel !== null && hierarchyLevel >= 5 && hierarchyLevel <= 6) {
-    return 'hod'
-  }
-
-  return 'all'
-}
-
 export function addApprovalFiltersToParams(
   params: URLSearchParams,
   filters: ApprovalHistoryFilters
 ): URLSearchParams {
   if (filters.employeeName) {
     params.set('employeeName', filters.employeeName)
-  }
-
-  if (filters.actorFilter !== 'all') {
-    params.set('actorFilter', filters.actorFilter)
   }
 
   if (filters.claimStatus) {

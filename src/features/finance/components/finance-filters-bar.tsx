@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { Filter, Download } from 'lucide-react'
 
 import type {
-  FinanceActionFilter,
   FinanceDateFilterField,
   FinanceFilterOptions,
   FinanceFilters,
@@ -37,9 +36,7 @@ export function FinanceFiltersBar({
   )
   const [claimStatus, setClaimStatus] = useState(filters.claimStatus ?? '')
   const [workLocation, setWorkLocation] = useState(filters.workLocation ?? '')
-  const [actionFilter, setActionFilter] = useState<FinanceActionFilter>(
-    filters.actionFilter
-  )
+  const [actionFilter, setActionFilter] = useState(filters.actionFilter ?? '')
   const [dateFilterField, setDateFilterField] =
     useState<FinanceDateFilterField>(filters.dateFilterField)
   const [dateFrom, setDateFrom] = useState(filters.dateFrom ?? '')
@@ -55,7 +52,7 @@ export function FinanceFiltersBar({
       params.set('hodApproverEmployeeId', hodApproverEmployeeId)
     if (claimStatus) params.set('claimStatus', claimStatus)
     if (workLocation) params.set('workLocation', workLocation)
-    if (actionFilter !== 'all') {
+    if (actionFilter) {
       params.set('actionFilter', actionFilter)
     }
     if (dateFilterField !== 'claim_date') {
@@ -74,7 +71,7 @@ export function FinanceFiltersBar({
     setHodApproverEmployeeId('')
     setClaimStatus('')
     setWorkLocation('')
-    setActionFilter('all')
+    setActionFilter('')
     setDateFilterField('claim_date')
     setDateFrom('')
     setDateTo('')
@@ -191,14 +188,15 @@ export function FinanceFiltersBar({
           <select
             name="actionFilter"
             value={actionFilter}
-            onChange={(e) =>
-              setActionFilter(e.target.value as FinanceActionFilter)
-            }
+            onChange={(e) => setActionFilter(e.target.value)}
             className={inputCls}
           >
-            <option value="all">All Actions</option>
-            <option value="issued">Issued</option>
-            <option value="finance_rejected">Finance Rejected</option>
+            <option value="">All Actions</option>
+            {options.financeActions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
 

@@ -8,7 +8,6 @@ import {
 } from '@/features/claims/queries'
 import { getEmployeeById } from '@/lib/services/employee-service'
 import type { EmployeeRow } from '@/lib/services/employee-service'
-import { getDesignationByCode } from '@/lib/services/config-service'
 import type {
   ApprovalAction,
   PendingApprovalsFilters,
@@ -23,7 +22,6 @@ export async function getPendingApprovalsPaginated(
   limit = 10,
   filters: PendingApprovalsFilters = {
     employeeName: null,
-    actorFilter: 'all',
     claimStatus: null,
   }
 ) {
@@ -38,7 +36,7 @@ export async function getPendingApprovalsPaginated(
       .maybeSingle(),
     supabase
       .from('claim_statuses')
-      .select('id, status_code')
+      .select('id')
       .not('approval_level', 'is', null)
       .eq('is_rejection', false)
       .eq('is_terminal', false)
@@ -58,11 +56,11 @@ export async function getPendingApprovalsPaginated(
   const pendingStatuses = pendingStatusesResult.data ?? []
 
   let pendingStatusIds = pendingStatuses.map((status) => status.id)
-  const normalizedStatusFilter = filters.claimStatus?.trim().toUpperCase()
+  const normalizedStatusFilter = filters.claimStatus?.trim()
 
   if (normalizedStatusFilter) {
     pendingStatusIds = pendingStatuses
-      .filter((status) => status.status_code === normalizedStatusFilter)
+      .filter((status) => status.id === normalizedStatusFilter)
       .map((status) => status.id)
   }
 
@@ -138,24 +136,6 @@ export async function getPendingApprovalsPaginated(
       .replaceAll('_', '\\_')
 
     query = query.ilike('employees.employee_name', `%${escapedName}%`)
-  }
-
-  if (filters.actorFilter === 'sbh') {
-    const sbhDesignation = await getDesignationByCode(supabase, 'SBH')
-    if (sbhDesignation) {
-      query = query.eq('employees.designation_id', sbhDesignation.id)
-    }
-  }
-
-  if (filters.actorFilter === 'finance') {
-    const finDesignation = await getDesignationByCode(supabase, 'FIN')
-    if (finDesignation) {
-      query = query.eq('employees.designation_id', finDesignation.id)
-    }
-  }
-
-  if (filters.actorFilter === 'hod') {
-    query = query.not('employees.approval_employee_id_level_3', 'is', null)
   }
 
   const { data, error } = await query

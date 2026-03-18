@@ -19,6 +19,10 @@ import type {
   PaginatedPendingApprovals,
 } from '@/features/approvals/types'
 import type { ClaimAvailableAction } from '@/features/claims/types'
+import {
+  getWorkflowActionAllowReclaimLabel,
+  getWorkflowActionCtaLabel,
+} from '@/lib/utils/workflow-action-labels'
 
 type ApprovalListPagination = {
   backHref: string | null
@@ -31,18 +35,48 @@ type ApprovalListProps = {
   pagination: ApprovalListPagination
 }
 
-type ApprovalActionIntent = 'approved' | 'rejected' | 'rejected_allow_reclaim'
+type ApprovalActionIntent = {
+  key: string
+  actionCode: string
+  label: string
+  allowResubmit: boolean
+}
+
+function getActionIntentKey(
+  actionCode: string,
+  allowResubmit: boolean
+): string {
+  return `${actionCode}:${allowResubmit ? 'allow_resubmit' : 'default'}`
+}
+
+function toActionIntents(action: ClaimAvailableAction): ApprovalActionIntent[] {
+  const intents: ApprovalActionIntent[] = [
+    {
+      key: getActionIntentKey(action.action, false),
+      actionCode: action.action,
+      label: getWorkflowActionCtaLabel(action),
+      allowResubmit: false,
+    },
+  ]
+
+  if (action.supports_allow_resubmit) {
+    intents.push({
+      key: getActionIntentKey(action.action, true),
+      actionCode: action.action,
+      label: getWorkflowActionAllowReclaimLabel(action),
+      allowResubmit: true,
+    })
+  }
+
+  return intents
+}
 
 function supportsIntent(item: PendingApproval, intent: ApprovalActionIntent) {
-  if (intent === 'approved') {
-    return item.availableActions.some((action) => action.action === 'approved')
-  }
-
-  if (intent === 'rejected') {
-    return item.availableActions.some((action) => action.action === 'rejected')
-  }
-
-  return item.availableActions.some((action) => action.action === 'rejected')
+  return item.availableActions.some(
+    (action) =>
+      action.action === intent.actionCode &&
+      (!intent.allowResubmit || action.supports_allow_resubmit)
+  )
 }
 
 export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
@@ -58,24 +92,32 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
   const [processingAction, setProcessingAction] = useState<string | null>(null)
 
   const allSelectable = useMemo(
-    () =>
-      items.filter((i: PendingApproval) =>
-        i.availableActions.some(
-          (a: ClaimAvailableAction) =>
-            a.action === 'approved' || a.action === 'rejected'
-        )
-      ),
+    () => items.filter((i: PendingApproval) => i.availableActions.length > 0),
     [items]
   )
 
-  const hasRejectAllowReclaimAction = useMemo(() => {
+  const bulkActionIntents = useMemo(() => {
     const selectedItems = items.filter((item) => selected.has(item.claim.id))
     const sourceItems = selectedItems.length > 0 ? selectedItems : allSelectable
+    const intents = new Map<string, ApprovalActionIntent>()
 
-    return sourceItems.some((item) =>
-      item.availableActions.some((action) => action.action === 'rejected')
-    )
+    for (const item of sourceItems) {
+      for (const action of item.availableActions) {
+        for (const intent of toActionIntents(action)) {
+          if (!intents.has(intent.key)) {
+            intents.set(intent.key, intent)
+          }
+        }
+      }
+    }
+
+    return Array.from(intents.values())
   }, [allSelectable, items, selected])
+
+  const bulkActionIntentMap = useMemo(
+    () => new Map(bulkActionIntents.map((intent) => [intent.key, intent])),
+    [bulkActionIntents]
+  )
 
   const allSelected =
     allSelectable.length > 0 && selected.size === allSelectable.length
@@ -105,29 +147,30 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
   async function runSingleAction(
     claimId: string,
     action: ClaimAvailableAction,
-    allowReclaim: boolean
+    allowResubmit: boolean
   ) {
     setIsProcessing(true)
     setProcessingClaimId(claimId)
 
-    const intent: ApprovalActionIntent =
-      action.action === 'rejected' && allowReclaim
-        ? 'rejected_allow_reclaim'
-        : (action.action as ApprovalActionIntent)
-    setProcessingAction(intent)
+    const shouldAllowResubmit =
+      allowResubmit && action.supports_allow_resubmit === true
+    setProcessingAction(getActionIntentKey(action.action, shouldAllowResubmit))
 
     try {
       const result = await submitBulkApprovalAction({
         claimIds: [claimId],
-        action: action.action as 'approved' | 'rejected',
+        action: action.action,
         notes,
-        allowResubmit: action.action === 'rejected' ? allowReclaim : undefined,
+        allowResubmit: shouldAllowResubmit ? true : undefined,
       })
 
       if (!result.ok) {
         toast.error(result.error ?? 'Action failed.')
       } else {
-        toast.success(`${action.display_label} applied.`)
+        const successLabel = shouldAllowResubmit
+          ? `${getWorkflowActionAllowReclaimLabel(action)} applied.`
+          : `${getWorkflowActionCtaLabel(action)} applied.`
+        toast.success(successLabel)
         router.refresh()
       }
     } catch {
@@ -160,31 +203,21 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
       )
     }
 
-    const action: 'approved' | 'rejected' =
-      intent === 'approved' ? 'approved' : 'rejected'
-    const allowResubmit = intent === 'rejected_allow_reclaim'
-
     setIsProcessing(true)
-    setProcessingAction(intent)
+    setProcessingAction(intent.key)
 
     try {
       const result = await submitBulkApprovalAction({
         claimIds: ids,
-        action,
+        action: intent.actionCode,
         notes,
-        allowResubmit: action === 'rejected' ? allowResubmit : undefined,
+        allowResubmit: intent.allowResubmit ? true : undefined,
       })
 
       if (!result.ok) {
         toast.error(result.error ?? 'Bulk action failed.')
       } else {
-        const successLabel =
-          intent === 'approved'
-            ? 'Bulk approve completed.'
-            : intent === 'rejected_allow_reclaim'
-              ? 'Bulk reject with reclaim completed.'
-              : 'Bulk reject completed.'
-        toast.success(successLabel)
+        toast.success(`${intent.label} completed.`)
         setSelected(new Set())
         router.refresh()
       }
@@ -218,16 +251,23 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
         selectedCount={selected.size}
         selectableCount={allSelectable.length}
         notes={notes}
-        canRejectAllowReclaim={hasRejectAllowReclaimAction}
         isProcessing={isProcessing}
         processingAction={processingAction}
+        bulkActions={bulkActionIntents.map((intent) => ({
+          key: intent.key,
+          label: intent.label,
+        }))}
         onToggleSelectAll={toggleSelectAll}
         onNotesChange={setNotes}
-        onApproveSelected={() => runBulkAction('approved')}
-        onRejectSelected={() => runBulkAction('rejected')}
-        onRejectAllowReclaimSelected={() =>
-          runBulkAction('rejected_allow_reclaim')
-        }
+        onRunBulkAction={(actionKey) => {
+          const intent = bulkActionIntentMap.get(actionKey)
+          if (!intent) {
+            toast.error('Selected workflow action is unavailable.')
+            return
+          }
+
+          void runBulkAction(intent)
+        }}
       />
 
       <div className={DATA_TABLE_PAGINATION_SLOT_CLASS}>
