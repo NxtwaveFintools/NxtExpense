@@ -28,6 +28,10 @@ export type Claim = {
   outstation_city_id: string | null
   from_city_id: string | null
   to_city_id: string | null
+  has_intercity_travel?: boolean
+  has_intracity_travel?: boolean
+  intercity_own_vehicle_used?: boolean | null
+  intracity_own_vehicle_used?: boolean | null
   outstation_state_name?: string | null
   outstation_city_name: string | null
   from_city_name: string | null
@@ -70,6 +74,10 @@ export type ClaimFormValues = {
   claimDate: string
   workLocation: WorkLocation
   ownVehicleUsed?: boolean
+  hasIntercityTravel?: boolean
+  hasIntracityTravel?: boolean
+  intercityOwnVehicleUsed?: boolean
+  intracityOwnVehicleUsed?: boolean
   vehicleType?: VehicleType
   transportType?: TransportType
   outstationStateId?: string
@@ -87,6 +95,10 @@ export type ClaimFormInitialValues = {
   workLocation: WorkLocation
   vehicleType?: VehicleType | null
   ownVehicleUsed?: boolean | null
+  hasIntercityTravel?: boolean | null
+  hasIntracityTravel?: boolean | null
+  intercityOwnVehicleUsed?: boolean | null
+  intracityOwnVehicleUsed?: boolean | null
   transportType?: TransportType | null
   outstationStateId?: string | null
   outstationCityId?: string | null

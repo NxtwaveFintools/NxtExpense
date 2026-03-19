@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { getIntracityAllowanceRateTypeByVehicleCode } from '@/lib/constants/claim-expense'
+
 // ────────────────────────────────────────────────────────────
 // Shared ID-based types for the entire application
 // All lookup table row shapes live here — features import from this file
@@ -109,24 +111,6 @@ export async function getAllDesignations(
   return data as Designation[]
 }
 
-export async function getDesignationByCode(
-  supabase: SupabaseClient,
-  code: string
-): Promise<Designation | null> {
-  const { data, error } = await supabase
-    .from('designations')
-    .select(
-      'id, designation_code, designation_name, designation_abbreviation, hierarchy_level, is_active'
-    )
-    .eq('designation_code', code)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  if (error)
-    throw new Error(`Failed to fetch designation by code: ${error.message}`)
-  return data as Designation | null
-}
-
 export async function getAllStates(supabase: SupabaseClient): Promise<State[]> {
   const { data, error } = await supabase
     .from('states')
@@ -227,23 +211,6 @@ export async function getAllClaimStatuses(
   return data as ClaimStatus[]
 }
 
-export async function getClaimStatusByCode(
-  supabase: SupabaseClient,
-  statusCode: string
-): Promise<ClaimStatus> {
-  const { data, error } = await supabase
-    .from('claim_statuses')
-    .select(CLAIM_STATUS_COLUMNS)
-    .ilike('status_code', statusCode)
-    .single()
-
-  if (error)
-    throw new Error(
-      `Failed to fetch claim status '${statusCode}': ${error.message}`
-    )
-  return data as ClaimStatus
-}
-
 const EXPENSE_RATE_COLUMNS =
   'id, designation_id, location_id, expense_type, rate_amount, effective_from, effective_to, is_active'
 
@@ -270,6 +237,27 @@ export async function getExpenseRateByType(
 
   if (error) throw new Error(`Failed to fetch expense rate: ${error.message}`)
   return data as ExpenseRate | null
+}
+
+export async function getIntracityAllowanceRateByVehicle(
+  supabase: SupabaseClient,
+  workLocationId: string,
+  vehicleCode: string
+): Promise<number> {
+  const expenseType = getIntracityAllowanceRateTypeByVehicleCode(vehicleCode)
+
+  if (!expenseType) {
+    return 0
+  }
+
+  const rate = await getExpenseRateByType(
+    supabase,
+    workLocationId,
+    expenseType,
+    null
+  )
+
+  return rate ? Number(rate.rate_amount) : 0
 }
 
 export async function getAllowedEmailDomains(

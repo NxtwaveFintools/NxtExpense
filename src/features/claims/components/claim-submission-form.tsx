@@ -5,10 +5,7 @@ import { Calendar, Loader2, MapPin, Send } from 'lucide-react'
 import { BaseLocationFields } from '@/features/claims/components/base-location-fields'
 import { OutstationFields } from '@/features/claims/components/outstation-fields'
 import { ClaimSummaryCard } from '@/features/claims/components/claim-summary-card'
-import {
-  KM_UI_LIMIT,
-  useClaimSubmissionForm,
-} from '@/features/claims/components/use-claim-submission-form'
+import { useClaimSubmissionForm } from '@/features/claims/components/use-claim-submission-form'
 
 import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summary-preview'
 import type {
@@ -41,11 +38,14 @@ export function ClaimSubmissionForm({
     workLocation,
     claimDate,
     vehicleType,
-    ownVehicleUsed,
+    intercityOwnVehicleUsed,
+    intracityOwnVehicleUsed,
     outstationStateId,
+    outstationCityId,
     fromCityId,
     toCityId,
     kmTravelled,
+    kmLimit,
     error,
     isSubmitting,
     todayIso,
@@ -56,10 +56,12 @@ export function ClaimSubmissionForm({
     setWorkLocation,
     setClaimDate,
     setVehicleType,
+    setOutstationCityId,
     setFromCityId,
     setToCityId,
     setKmTravelled,
-    handleOwnVehicleUsedChange,
+    handleIntercityOwnVehicleUsedChange,
+    handleIntracityOwnVehicleUsedChange,
     handleOutstationStateChange,
     handleSubmit,
   } = useClaimSubmissionForm({
@@ -149,20 +151,28 @@ export function ClaimSubmissionForm({
 
         {selectedLocation?.requires_outstation_details ? (
           <OutstationFields
-            ownVehicleUsed={ownVehicleUsed}
+            intercityOwnVehicleUsed={intercityOwnVehicleUsed}
+            intracityOwnVehicleUsed={intracityOwnVehicleUsed}
             vehicleType={vehicleType}
             outstationStateId={outstationStateId}
+            outstationCityId={outstationCityId}
             fromCityId={fromCityId}
             toCityId={toCityId}
             kmTravelled={kmTravelled}
-            kmLimit={KM_UI_LIMIT}
+            kmLimit={kmLimit}
             kmValidationMessage={kmValidationMessage}
             allowedVehicleTypes={allowedVehicleTypes}
             stateOptions={stateOptions}
             cityOptions={filteredCityOptions}
-            onOwnVehicleUsedChange={handleOwnVehicleUsedChange}
+            onIntercityOwnVehicleUsedChange={
+              handleIntercityOwnVehicleUsedChange
+            }
+            onIntracityOwnVehicleUsedChange={
+              handleIntracityOwnVehicleUsedChange
+            }
             onVehicleTypeChange={setVehicleType}
             onOutstationStateIdChange={handleOutstationStateChange}
+            onOutstationCityIdChange={setOutstationCityId}
             onFromCityIdChange={setFromCityId}
             onToCityIdChange={setToCityId}
             onKmTravelledChange={setKmTravelled}

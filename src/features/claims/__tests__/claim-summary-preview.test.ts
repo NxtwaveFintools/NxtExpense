@@ -14,22 +14,28 @@ const RATE_SNAPSHOT: ClaimRateSnapshot = {
   intercityPerKmByVehicle: {
     'veh-2w': 5,
   },
+  intracityDailyByVehicle: {
+    'veh-2w': 180,
+  },
+  maxKmRoundTripByVehicle: {
+    'veh-2w': 150,
+  },
   foodWithPrincipalsMax: 500,
 }
 
 describe('getClaimSummaryPreview', () => {
-  it('shows only food allowance for no-own-vehicle outstation flow without taxi amount', () => {
+  it('shows only food allowance when neither outstation own-vehicle branch is selected', () => {
     const result = getClaimSummaryPreview({
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
-      ownVehicleUsed: false,
-      transportType: '',
-      transportTypeName: 'Taxi',
+      hasIntercityTravel: false,
+      hasIntracityTravel: false,
+      intercityOwnVehicleUsed: false,
+      intracityOwnVehicleUsed: false,
       vehicleType: 'veh-2w',
       vehicleTypeName: 'Two Wheeler',
       kmTravelled: '',
-      taxiAmount: '',
       foodWithPrincipalsAmount: '',
       claimRateSnapshot: RATE_SNAPSHOT,
     })
@@ -38,26 +44,50 @@ describe('getClaimSummaryPreview', () => {
     expect(result.total).toBe(350)
   })
 
-  it('includes transport amount when a taxi bill amount is present', () => {
+  it('includes intra-city allowance when intra-city own vehicle is selected', () => {
     const result = getClaimSummaryPreview({
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
-      ownVehicleUsed: false,
-      transportType: 'transport-taxi',
-      transportTypeName: 'Taxi',
+      hasIntercityTravel: false,
+      hasIntracityTravel: true,
+      intercityOwnVehicleUsed: false,
+      intracityOwnVehicleUsed: true,
       vehicleType: 'veh-2w',
       vehicleTypeName: 'Two Wheeler',
       kmTravelled: '',
-      taxiAmount: '500',
       foodWithPrincipalsAmount: '',
       claimRateSnapshot: RATE_SNAPSHOT,
     })
 
     expect(result.items).toEqual([
       { label: 'Food allowance', amount: 350 },
-      { label: 'Taxi bills', amount: 500 },
+      { label: 'Two Wheeler intra-city allowance', amount: 180 },
     ])
-    expect(result.total).toBe(850)
+    expect(result.total).toBe(530)
+  })
+
+  it('includes inter-city KM and intra-city allowance when inter-city own vehicle is selected', () => {
+    const result = getClaimSummaryPreview({
+      workLocation: 'wl-outstation',
+      requiresVehicleSelection: false,
+      requiresOutstationDetails: true,
+      hasIntercityTravel: true,
+      hasIntracityTravel: false,
+      intercityOwnVehicleUsed: true,
+      intracityOwnVehicleUsed: false,
+      vehicleType: 'veh-2w',
+      vehicleTypeName: 'Two Wheeler',
+      kmTravelled: '100',
+      foodWithPrincipalsAmount: '',
+      claimRateSnapshot: RATE_SNAPSHOT,
+    })
+
+    expect(result.items).toEqual([
+      { label: 'Food allowance', amount: 350 },
+      { label: 'Intercity travel (100.00 KM @ 5.00/KM)', amount: 500 },
+      { label: 'Two Wheeler intra-city allowance', amount: 180 },
+    ])
+    expect(result.total).toBe(1030)
   })
 })

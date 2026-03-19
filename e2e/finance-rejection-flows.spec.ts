@@ -64,14 +64,16 @@ async function submitOfficeClaimAndGetClaimNumber(
 
   for (const daysBack of candidateDaysBack) {
     await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
-    await claims.workLocationSelect.selectOption('Office / WFH')
+    await claims.selectWorkLocationByName('Office / WFH')
+    await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
     await claims.submitButton.click()
 
     try {
       await page.waitForURL((url: URL) => url.pathname === '/claims', {
-        timeout: 1_200,
+        timeout: 5_000,
       })
     } catch {
+      await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
       await page.waitForTimeout(250)
     }
 

@@ -12,7 +12,7 @@ export type FinanceActionIntent = {
   allowResubmit: boolean
 }
 
-export function getFinanceActionIntentKey(
+function getFinanceActionIntentKey(
   actionCode: string,
   allowResubmit: boolean
 ): string {

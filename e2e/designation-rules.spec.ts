@@ -23,7 +23,7 @@ test.describe('Designation Rules — UI enforcement', () => {
     await page.waitForLoadState('networkidle')
 
     const claims = new ClaimsPage(page)
-    await claims.workLocationSelect.selectOption('Field - Base Location')
+    await claims.selectWorkLocationByName('Field - Base Location')
 
     // Two Wheeler should be available
     const vehicleOptions = claims.vehicleTypeSelect.locator('option')
@@ -42,7 +42,7 @@ test.describe('Designation Rules — UI enforcement', () => {
     await page.waitForLoadState('networkidle')
 
     const claims = new ClaimsPage(page)
-    await claims.workLocationSelect.selectOption('Field - Base Location')
+    await claims.selectWorkLocationByName('Field - Base Location')
 
     const vehicleOptions = claims.vehicleTypeSelect.locator('option')
     const optionTexts = await vehicleOptions.allTextContents()

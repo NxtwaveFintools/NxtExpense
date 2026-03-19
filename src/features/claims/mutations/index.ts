@@ -7,6 +7,10 @@ type ClaimPayload = {
   claimDateIso: string
   workLocationId: string | null
   ownVehicleUsed: boolean | null
+  hasIntercityTravel: boolean
+  hasIntracityTravel: boolean
+  intercityOwnVehicleUsed: boolean | null
+  intracityOwnVehicleUsed: boolean | null
   vehicleTypeId: string | null
   outstationStateId: string | null
   outstationCityId: string | null
@@ -29,33 +33,84 @@ type InsertClaimItemInput = {
   amount: number
 }
 
+function isMissingOutstationSegmentColumnsError(
+  error: { message?: string } | null
+): boolean {
+  const message = error?.message?.toLowerCase() ?? ''
+
+  if (!message.includes('does not exist')) {
+    return false
+  }
+
+  return (
+    message.includes('expense_claims.has_intercity_travel') ||
+    message.includes('expense_claims.has_intracity_travel') ||
+    message.includes('expense_claims.intercity_own_vehicle_used') ||
+    message.includes('expense_claims.intracity_own_vehicle_used')
+  )
+}
+
 export async function insertClaim(
   supabase: SupabaseClient,
   input: ClaimPayload
 ): Promise<{ id: string; claim_number: string }> {
-  const { data, error } = await supabase
+  const payloadWithSegments = {
+    employee_id: input.employeeId,
+    claim_date: input.claimDateIso,
+    work_location_id: input.workLocationId,
+    own_vehicle_used: input.ownVehicleUsed,
+    has_intercity_travel: input.hasIntercityTravel,
+    has_intracity_travel: input.hasIntracityTravel,
+    intercity_own_vehicle_used: input.intercityOwnVehicleUsed,
+    intracity_own_vehicle_used: input.intracityOwnVehicleUsed,
+    vehicle_type_id: input.vehicleTypeId,
+    outstation_state_id: input.outstationStateId,
+    outstation_city_id: input.outstationCityId,
+    from_city_id: input.fromCityId,
+    to_city_id: input.toCityId,
+    km_travelled: input.kmTravelled,
+    total_amount: input.totalAmount,
+    status_id: input.statusId,
+    current_approval_level: input.currentApprovalLevel,
+    submitted_at: input.submittedAt,
+    designation_id: input.designationId,
+    accommodation_nights: input.accommodationNights,
+    food_with_principals_amount: input.foodWithPrincipalsAmount,
+  }
+
+  const legacyPayload = {
+    employee_id: input.employeeId,
+    claim_date: input.claimDateIso,
+    work_location_id: input.workLocationId,
+    own_vehicle_used: input.ownVehicleUsed,
+    vehicle_type_id: input.vehicleTypeId,
+    outstation_state_id: input.outstationStateId,
+    outstation_city_id: input.outstationCityId,
+    from_city_id: input.fromCityId,
+    to_city_id: input.toCityId,
+    km_travelled: input.kmTravelled,
+    total_amount: input.totalAmount,
+    status_id: input.statusId,
+    current_approval_level: input.currentApprovalLevel,
+    submitted_at: input.submittedAt,
+    designation_id: input.designationId,
+    accommodation_nights: input.accommodationNights,
+    food_with_principals_amount: input.foodWithPrincipalsAmount,
+  }
+
+  let { data, error } = await supabase
     .from('expense_claims')
-    .insert({
-      employee_id: input.employeeId,
-      claim_date: input.claimDateIso,
-      work_location_id: input.workLocationId,
-      own_vehicle_used: input.ownVehicleUsed,
-      vehicle_type_id: input.vehicleTypeId,
-      outstation_state_id: input.outstationStateId,
-      outstation_city_id: input.outstationCityId,
-      from_city_id: input.fromCityId,
-      to_city_id: input.toCityId,
-      km_travelled: input.kmTravelled,
-      total_amount: input.totalAmount,
-      status_id: input.statusId,
-      current_approval_level: input.currentApprovalLevel,
-      submitted_at: input.submittedAt,
-      designation_id: input.designationId,
-      accommodation_nights: input.accommodationNights,
-      food_with_principals_amount: input.foodWithPrincipalsAmount,
-    })
+    .insert(payloadWithSegments)
     .select('id, claim_number')
     .single()
+
+  if (error && isMissingOutstationSegmentColumnsError(error)) {
+    ;({ data, error } = await supabase
+      .from('expense_claims')
+      .insert(legacyPayload)
+      .select('id, claim_number')
+      .single())
+  }
 
   if (error) {
     throw new Error(error.message)

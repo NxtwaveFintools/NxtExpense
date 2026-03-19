@@ -2,8 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   getExpenseRateByType,
+  getIntracityAllowanceRateByVehicle,
   type VehicleType,
 } from '@/lib/services/config-service'
+import {
+  CLAIM_ITEM_TYPES,
+  EXPENSE_RATE_TYPES,
+} from '@/lib/constants/claim-expense'
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -22,22 +27,16 @@ type BaseLocationInput = {
   vehicleType: VehicleType
 }
 
-/** Input for an outstation day calculation — own vehicle */
-type OutstationOwnVehicleInput = {
+/** Input for outstation with inter-city/intra-city segment selections */
+type OutstationTravelInput = {
   workLocationId: string
   designationId: string
-  vehicleType: VehicleType
-  kmTravelled: number
-  accommodationNights?: number
-  foodWithPrincipalsAmount?: number
-}
-
-/** Input for an outstation day calculation — taxi/transport */
-type OutstationTaxiInput = {
-  workLocationId: string
-  taxiAmount: number
-  transportTypeName: string
-  designationId?: string
+  hasIntercityTravel: boolean
+  hasIntracityTravel: boolean
+  intercityOwnVehicleUsed: boolean
+  intracityOwnVehicleUsed: boolean
+  vehicleType: VehicleType | null
+  kmTravelled?: number
   accommodationNights?: number
   foodWithPrincipalsAmount?: number
 }
@@ -81,7 +80,7 @@ async function getAccommodationLimit(
   const rate = await getExpenseRateByType(
     supabase,
     input.workLocationId,
-    'ACCOMMODATION',
+    EXPENSE_RATE_TYPES.ACCOMMODATION,
     input.designationId
   )
   if (!rate) return 0
@@ -97,7 +96,7 @@ export async function getFoodWithPrincipalsLimit(
   const rate = await getExpenseRateByType(
     supabase,
     workLocationId,
-    'FOOD_WITH_PRINCIPALS',
+    EXPENSE_RATE_TYPES.FOOD_WITH_PRINCIPALS,
     designationId
   )
   if (!rate) return 0
@@ -144,12 +143,12 @@ export async function calculateBaseLocationItems(
   const foodRate = await getExpenseRateByType(
     supabase,
     input.workLocationId,
-    'FOOD_BASE',
+    EXPENSE_RATE_TYPES.FOOD_BASE,
     null
   )
   if (foodRate) {
     items.push({
-      expense_type: 'food',
+      expense_type: CLAIM_ITEM_TYPES.FOOD,
       amount: Number(foodRate.rate_amount),
       description: 'Base location food allowance',
     })
@@ -157,7 +156,7 @@ export async function calculateBaseLocationItems(
 
   // Fuel rate (from vehicle_types.base_fuel_rate_per_day)
   items.push({
-    expense_type: 'fuel',
+    expense_type: CLAIM_ITEM_TYPES.FUEL,
     amount: Number(input.vehicleType.base_fuel_rate_per_day),
     description: `${input.vehicleType.vehicle_name} base location fuel allowance`,
   })
@@ -166,152 +165,105 @@ export async function calculateBaseLocationItems(
   return { items, total }
 }
 
-// ────────────────────────────────────────────────────────────
-// Claim item builders — Field Outstation (own vehicle)
-// ────────────────────────────────────────────────────────────
-
 /**
- * Calculate expense items for an outstation day with own vehicle.
- * Food from expense_rates + fuel = intercity_rate_per_km × km.
+ * Calculate expense items for outstation with inter-city/intra-city segments.
+ * - Food allowance is always added once for outstation claims.
+ * - Inter-city own vehicle adds per-km reimbursement.
+ * - Intra-city own vehicle adds a fixed daily allowance from expense_rates.
+ * - Inter-city own vehicle implies intra-city allowance for the same day/vehicle.
+ * - Non-own-vehicle segments do not add transport reimbursement in this flow.
  */
-export async function calculateOutstationOwnVehicleItems(
+export async function calculateOutstationTravelItems(
   supabase: SupabaseClient,
-  input: OutstationOwnVehicleInput
+  input: OutstationTravelInput
 ): Promise<{ items: CalculatedExpenseItem[]; total: number }> {
   const items: CalculatedExpenseItem[] = []
 
-  // Food rate (designation-independent)
   const foodRate = await getExpenseRateByType(
     supabase,
     input.workLocationId,
-    'FOOD_OUTSTATION',
+    EXPENSE_RATE_TYPES.FOOD_OUTSTATION,
     null
   )
+
   if (foodRate) {
     items.push({
-      expense_type: 'food',
+      expense_type: CLAIM_ITEM_TYPES.FOOD,
       amount: Number(foodRate.rate_amount),
       description: 'Outstation food allowance',
     })
   }
 
-  // Intercity fuel = rate_per_km × km
-  const ratePerKm = Number(input.vehicleType.intercity_rate_per_km)
-  const fuelAmount = ratePerKm * input.kmTravelled
-  items.push({
-    expense_type: 'intercity_travel',
-    amount: fuelAmount,
-    description: `${input.kmTravelled} KM @ ₹${ratePerKm}/KM`,
-  })
+  const requiresVehicleType =
+    (input.hasIntercityTravel && input.intercityOwnVehicleUsed) ||
+    (input.hasIntracityTravel && input.intracityOwnVehicleUsed)
 
-  // Accommodation (if nights > 0)
+  const includesIntracityAllowance =
+    (input.hasIntercityTravel && input.intercityOwnVehicleUsed) ||
+    (input.hasIntracityTravel && input.intracityOwnVehicleUsed)
+
+  if (requiresVehicleType && !input.vehicleType) {
+    throw new Error('Vehicle type is required for selected own-vehicle travel.')
+  }
+
+  if (
+    input.hasIntercityTravel &&
+    input.intercityOwnVehicleUsed &&
+    input.vehicleType
+  ) {
+    const kmTravelled = input.kmTravelled ?? 0
+    const ratePerKm = Number(input.vehicleType.intercity_rate_per_km)
+    const intercityAmount = kmTravelled * ratePerKm
+
+    items.push({
+      expense_type: CLAIM_ITEM_TYPES.INTERCITY_TRAVEL,
+      amount: intercityAmount,
+      description: `${kmTravelled} KM @ ₹${ratePerKm}/KM`,
+    })
+  }
+
+  if (includesIntracityAllowance && input.vehicleType) {
+    const intracityAllowance = await getIntracityAllowanceRateByVehicle(
+      supabase,
+      input.workLocationId,
+      input.vehicleType.vehicle_code
+    )
+
+    if (intracityAllowance > 0) {
+      items.push({
+        expense_type: CLAIM_ITEM_TYPES.INTRACITY_ALLOWANCE,
+        amount: intracityAllowance,
+        description: `${input.vehicleType.vehicle_name} intra-city allowance`,
+      })
+    }
+  }
+
   if (input.accommodationNights && input.accommodationNights > 0) {
     const accommodationRate = await getAccommodationLimit(supabase, {
       workLocationId: input.workLocationId,
       designationId: input.designationId,
     })
+
     if (accommodationRate > 0) {
       items.push({
-        expense_type: 'accommodation',
+        expense_type: CLAIM_ITEM_TYPES.ACCOMMODATION,
         amount: accommodationRate * input.accommodationNights,
         description: `${input.accommodationNights} night(s) @ ₹${accommodationRate}/night`,
       })
     }
   }
 
-  // Food with Principals (capped at rate)
   if (input.foodWithPrincipalsAmount && input.foodWithPrincipalsAmount > 0) {
     const fwpLimit = await getFoodWithPrincipalsLimit(
       supabase,
       input.workLocationId,
       input.designationId
     )
+
     if (fwpLimit > 0) {
       const cappedAmount = Math.min(input.foodWithPrincipalsAmount, fwpLimit)
       items.push({
-        expense_type: 'food_with_principals',
-        amount: cappedAmount,
-        description: `Food with principals (capped at ₹${fwpLimit})`,
-      })
-    }
-  }
-
-  const total = items.reduce((sum, item) => sum + item.amount, 0)
-  return { items, total }
-}
-
-// ────────────────────────────────────────────────────────────
-// Claim item builders — Field Outstation (taxi/transport)
-// ────────────────────────────────────────────────────────────
-
-/**
- * Calculate expense items for an outstation day with taxi/transport.
- * Food from expense_rates + taxi bill amount (user-provided).
- */
-export async function calculateOutstationTaxiItems(
-  supabase: SupabaseClient,
-  input: OutstationTaxiInput
-): Promise<{ items: CalculatedExpenseItem[]; total: number }> {
-  const items: CalculatedExpenseItem[] = []
-
-  // Food rate (designation-independent)
-  const foodRate = await getExpenseRateByType(
-    supabase,
-    input.workLocationId,
-    'FOOD_OUTSTATION',
-    null
-  )
-  if (foodRate) {
-    items.push({
-      expense_type: 'food',
-      amount: Number(foodRate.rate_amount),
-      description: 'Outstation food allowance',
-    })
-  }
-
-  // Taxi bill (user-submitted amount, no DB rate)
-  if (input.taxiAmount > 0) {
-    items.push({
-      expense_type: 'taxi_bill',
-      amount: input.taxiAmount,
-      description: `${input.transportTypeName} bill submitted for outstation travel`,
-    })
-  }
-
-  // Accommodation (if nights > 0)
-  if (
-    input.accommodationNights &&
-    input.accommodationNights > 0 &&
-    input.designationId
-  ) {
-    const accommodationRate = await getAccommodationLimit(supabase, {
-      workLocationId: input.workLocationId,
-      designationId: input.designationId,
-    })
-    if (accommodationRate > 0) {
-      items.push({
-        expense_type: 'accommodation',
-        amount: accommodationRate * input.accommodationNights,
-        description: `${input.accommodationNights} night(s) @ ₹${accommodationRate}/night`,
-      })
-    }
-  }
-
-  // Food with Principals (capped at rate)
-  if (
-    input.foodWithPrincipalsAmount &&
-    input.foodWithPrincipalsAmount > 0 &&
-    input.designationId
-  ) {
-    const fwpLimit = await getFoodWithPrincipalsLimit(
-      supabase,
-      input.workLocationId,
-      input.designationId
-    )
-    if (fwpLimit > 0) {
-      const cappedAmount = Math.min(input.foodWithPrincipalsAmount, fwpLimit)
-      items.push({
-        expense_type: 'food_with_principals',
+        expense_type: CLAIM_ITEM_TYPES.FOOD_WITH_PRINCIPALS,
         amount: cappedAmount,
         description: `Food with principals (capped at ₹${fwpLimit})`,
       })

@@ -28,7 +28,19 @@ type UseClaimSubmissionFormArgs = {
   initialValues?: ClaimFormInitialValues | null
 }
 
-export const KM_UI_LIMIT = 150
+function getFallbackKmLimit(
+  maxKmRoundTripByVehicle: Record<string, number>
+): number | null {
+  const limits = Object.values(maxKmRoundTripByVehicle).filter(
+    (value) => Number.isFinite(value) && value > 0
+  )
+
+  if (limits.length === 0) {
+    return null
+  }
+
+  return Math.max(...limits)
+}
 
 export function useClaimSubmissionForm({
   allowedVehicleTypes,
@@ -57,11 +69,28 @@ export function useClaimSubmissionForm({
   )
   const [vehicleType, setVehicleType] =
     useState<VehicleType>(initialVehicleType)
-  const [ownVehicleUsed, setOwnVehicleUsed] = useState(
-    initialValues?.ownVehicleUsed ?? true
-  )
+  const initialIntercityOwnVehicleUsed: boolean | null = isEditingReturnedClaim
+    ? (initialValues?.intercityOwnVehicleUsed ??
+      initialValues?.ownVehicleUsed ??
+      null)
+    : null
+  const initialIntracityOwnVehicleUsed: boolean | null = isEditingReturnedClaim
+    ? (initialValues?.intracityOwnVehicleUsed ??
+      (initialIntercityOwnVehicleUsed
+        ? true
+        : (initialValues?.ownVehicleUsed ?? null)))
+    : null
+  const [intercityOwnVehicleUsed, setIntercityOwnVehicleUsed] = useState<
+    boolean | null
+  >(initialIntercityOwnVehicleUsed)
+  const [intracityOwnVehicleUsed, setIntracityOwnVehicleUsed] = useState<
+    boolean | null
+  >(initialIntracityOwnVehicleUsed)
   const [outstationStateId, setOutstationStateId] = useState(
     initialValues?.outstationStateId ?? ''
+  )
+  const [outstationCityId, setOutstationCityId] = useState(
+    initialValues?.outstationCityId ?? ''
   )
   const [fromCityId, setFromCityId] = useState(initialValues?.fromCityId ?? '')
   const [toCityId, setToCityId] = useState(initialValues?.toCityId ?? '')
@@ -88,6 +117,22 @@ export function useClaimSubmissionForm({
     return cityOptions.filter((city) => city.stateId === outstationStateId)
   }, [cityOptions, outstationStateId])
 
+  const kmLimit = useMemo(() => {
+    const configuredLimit =
+      claimRateSnapshot.maxKmRoundTripByVehicle[vehicleType]
+
+    if (Number.isFinite(configuredLimit) && configuredLimit > 0) {
+      return configuredLimit
+    }
+
+    return getFallbackKmLimit(claimRateSnapshot.maxKmRoundTripByVehicle) ?? 0
+  }, [claimRateSnapshot.maxKmRoundTripByVehicle, vehicleType])
+
+  const hasIntercityTravel = intercityOwnVehicleUsed === true
+  const hasIntracityTravel =
+    intercityOwnVehicleUsed === true || intracityOwnVehicleUsed === true
+  const effectiveIntracityOwnVehicleUsed = hasIntracityTravel
+
   const kmValidationMessage = useMemo(() => {
     const kmValue = Number.parseFloat(kmTravelled)
     const requiresOutstationDetails =
@@ -95,18 +140,18 @@ export function useClaimSubmissionForm({
 
     if (
       !requiresOutstationDetails ||
-      !ownVehicleUsed ||
+      intercityOwnVehicleUsed !== true ||
       !Number.isFinite(kmValue)
     ) {
       return null
     }
 
-    if (kmValue > KM_UI_LIMIT) {
-      return `KM travelled cannot exceed ${KM_UI_LIMIT}.`
+    if (kmLimit > 0 && kmValue > kmLimit) {
+      return `KM travelled cannot exceed ${kmLimit}.`
     }
 
     return null
-  }, [kmTravelled, ownVehicleUsed, selectedLocation])
+  }, [intercityOwnVehicleUsed, kmLimit, kmTravelled, selectedLocation])
 
   const summary = useMemo(() => {
     return getClaimSummaryPreview({
@@ -115,40 +160,71 @@ export function useClaimSubmissionForm({
         selectedLocation?.requires_vehicle_selection ?? false,
       requiresOutstationDetails:
         selectedLocation?.requires_outstation_details ?? false,
-      ownVehicleUsed,
-      transportType: '',
-      transportTypeName: 'Taxi',
+      hasIntercityTravel,
+      hasIntracityTravel,
+      intercityOwnVehicleUsed: hasIntercityTravel,
+      intracityOwnVehicleUsed: effectiveIntracityOwnVehicleUsed,
       vehicleType,
       vehicleTypeName:
         allowedVehicleTypes.find((vehicle) => vehicle.id === vehicleType)
           ?.name ?? '',
       kmTravelled,
-      taxiAmount: '',
       foodWithPrincipalsAmount: '',
       claimRateSnapshot,
     })
   }, [
     workLocation,
     selectedLocation,
-    ownVehicleUsed,
+    hasIntercityTravel,
+    hasIntracityTravel,
+    effectiveIntracityOwnVehicleUsed,
     kmTravelled,
     vehicleType,
     allowedVehicleTypes,
     claimRateSnapshot,
   ])
 
-  function handleOwnVehicleUsedChange(value: boolean) {
-    setOwnVehicleUsed(value)
+  function handleIntercityOwnVehicleUsedChange(value: boolean) {
+    setIntercityOwnVehicleUsed(value)
+
+    if (value) {
+      setIntracityOwnVehicleUsed(null)
+      setOutstationCityId('')
+      return
+    }
+
+    setFromCityId('')
+    setToCityId('')
+    setKmTravelled('')
+    setIntracityOwnVehicleUsed(null)
+    setOutstationStateId('')
+    setOutstationCityId('')
+  }
+
+  function handleIntracityOwnVehicleUsedChange(value: boolean) {
+    setIntracityOwnVehicleUsed(value)
 
     if (!value) {
+      setOutstationCityId('')
+
+      if (intercityOwnVehicleUsed !== true) {
+        setOutstationStateId('')
+      }
+
+      return
+    }
+
+    if (intercityOwnVehicleUsed === true) {
+      setIntercityOwnVehicleUsed(false)
+      setKmTravelled('')
       setFromCityId('')
       setToCityId('')
-      setKmTravelled('')
     }
   }
 
   function handleOutstationStateChange(value: string) {
     setOutstationStateId(value)
+    setOutstationCityId('')
     setFromCityId('')
     setToCityId('')
   }
@@ -169,33 +245,97 @@ export function useClaimSubmissionForm({
       return
     }
 
-    setIsSubmitting(true)
-    setError(null)
-
     const kmTravelledValue = Number.parseFloat(kmTravelled)
     const requiresOutstationDetails =
       selectedLocation?.requires_outstation_details ?? false
     const requiresVehicleSelection =
       selectedLocation?.requires_vehicle_selection ?? false
-    const isOutstationOwnVehicle = requiresOutstationDetails && ownVehicleUsed
+
+    if (requiresOutstationDetails && intercityOwnVehicleUsed === null) {
+      const message =
+        'Please select whether you travelled between cities using your own vehicle.'
+      setError(message)
+      toast.error(message)
+      return
+    }
+
+    if (
+      requiresOutstationDetails &&
+      intercityOwnVehicleUsed === false &&
+      intracityOwnVehicleUsed === null
+    ) {
+      const message =
+        'Please select whether you travelled within the city using your own vehicle.'
+      setError(message)
+      toast.error(message)
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
+    const intercitySelection = requiresOutstationDetails
+      ? intercityOwnVehicleUsed
+      : null
+    const intracitySelection = requiresOutstationDetails
+      ? intercityOwnVehicleUsed === true
+        ? true
+        : intracityOwnVehicleUsed
+      : null
+
+    const isIntercityOwnVehicle = intercitySelection === true
+    const isIntracityOwnVehicle = intracitySelection === true
+    const hasOutstationOwnVehicle =
+      isIntercityOwnVehicle || isIntracityOwnVehicle
+
+    const isOutstationIntercity = isIntercityOwnVehicle
+    const isOutstationIntracity = isIntracityOwnVehicle
+    const isOutstationOwnVehicle = hasOutstationOwnVehicle
+
+    const derivedOutstationCityId = isOutstationIntracity
+      ? isOutstationIntercity
+        ? toCityId
+        : outstationCityId
+      : ''
+    const outstationState =
+      isOutstationIntercity || isOutstationIntracity ? outstationStateId : ''
 
     const payload: ClaimFormValues = {
       claimDate: formatDate(claimDate),
       workLocation,
-      ownVehicleUsed: requiresOutstationDetails ? ownVehicleUsed : undefined,
+      ownVehicleUsed: requiresOutstationDetails
+        ? isOutstationOwnVehicle
+        : undefined,
+      hasIntercityTravel:
+        requiresOutstationDetails && intercitySelection !== null
+          ? isOutstationIntercity
+          : undefined,
+      hasIntracityTravel:
+        requiresOutstationDetails && intracitySelection !== null
+          ? isOutstationIntracity
+          : undefined,
+      intercityOwnVehicleUsed:
+        requiresOutstationDetails && intercitySelection !== null
+          ? intercitySelection
+          : undefined,
+      intracityOwnVehicleUsed:
+        requiresOutstationDetails && intracitySelection !== null
+          ? intracitySelection
+          : undefined,
       vehicleType:
         requiresVehicleSelection || isOutstationOwnVehicle
           ? vehicleType || undefined
           : undefined,
       outstationStateId: requiresOutstationDetails
-        ? outstationStateId || undefined
+        ? outstationState || undefined
         : undefined,
-      fromCityId: requiresOutstationDetails
-        ? fromCityId || undefined
+      outstationCityId: isOutstationIntracity
+        ? derivedOutstationCityId || undefined
         : undefined,
-      toCityId: requiresOutstationDetails ? toCityId || undefined : undefined,
+      fromCityId: isOutstationIntercity ? fromCityId || undefined : undefined,
+      toCityId: isOutstationIntercity ? toCityId || undefined : undefined,
       kmTravelled:
-        isOutstationOwnVehicle && Number.isFinite(kmTravelledValue)
+        isIntercityOwnVehicle && Number.isFinite(kmTravelledValue)
           ? kmTravelledValue
           : undefined,
     }
@@ -229,11 +369,16 @@ export function useClaimSubmissionForm({
     workLocation,
     claimDate,
     vehicleType,
-    ownVehicleUsed,
+    hasIntercityTravel,
+    hasIntracityTravel,
+    intercityOwnVehicleUsed,
+    intracityOwnVehicleUsed,
     outstationStateId,
+    outstationCityId,
     fromCityId,
     toCityId,
     kmTravelled,
+    kmLimit,
     error,
     isSubmitting,
     todayIso,
@@ -244,10 +389,12 @@ export function useClaimSubmissionForm({
     setWorkLocation,
     setClaimDate,
     setVehicleType,
+    setOutstationCityId,
     setFromCityId,
     setToCityId,
     setKmTravelled,
-    handleOwnVehicleUsedChange,
+    handleIntercityOwnVehicleUsedChange,
+    handleIntracityOwnVehicleUsedChange,
     handleOutstationStateChange,
     handleSubmit,
   }

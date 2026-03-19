@@ -7,10 +7,40 @@ type SubmittedField = {
 
 function getSubmittedFields(claim: ClaimWithItems['claim']): SubmittedField[] {
   const fields: Array<SubmittedField | null> = [
+    claim.has_intercity_travel
+      ? {
+          label: 'Inter-city Travel',
+          value: 'Yes',
+        }
+      : null,
+    claim.has_intercity_travel
+      ? {
+          label: 'Inter-city Own Vehicle',
+          value: claim.intercity_own_vehicle_used ? 'Yes' : 'No',
+        }
+      : null,
+    claim.has_intracity_travel
+      ? {
+          label: 'Intra-city Travel',
+          value: 'Yes',
+        }
+      : null,
+    claim.has_intracity_travel
+      ? {
+          label: 'Intra-city Own Vehicle',
+          value: claim.intracity_own_vehicle_used ? 'Yes' : 'No',
+        }
+      : null,
     claim.outstation_state_name
       ? {
           label: 'State',
           value: claim.outstation_state_name,
+        }
+      : null,
+    claim.outstation_city_name
+      ? {
+          label: 'Intra-city City',
+          value: claim.outstation_city_name,
         }
       : null,
     claim.own_vehicle_used === null

@@ -5,7 +5,7 @@
 
 export const TEST_PASSWORD = 'Password@123'
 
-export type TestAccount = {
+type TestAccount = {
   email: string
   label: string
   designation: string

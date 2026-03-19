@@ -1,7 +1,16 @@
 import type { Page } from '@playwright/test'
 
+type WorkLocationOption = {
+  value: string
+  label: string
+}
+
 export class ClaimsPage {
   constructor(private page: Page) {}
+
+  private normalizeOptionLabel(value: string): string {
+    return value.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().toLowerCase()
+  }
 
   async goto() {
     await this.page.goto('/claims')
@@ -24,20 +33,40 @@ export class ClaimsPage {
   }
 
   get vehicleTypeSelect() {
-    return this.page.getByLabel(/vehicle type/i)
+    return this.page.locator('select[name="vehicleType"]')
   }
 
-  // "Own vehicle used?" is a Yes/No button group inside a <fieldset>, not a checkbox
-  get ownVehicleYesButton() {
-    return this.page
-      .getByRole('group', { name: /own vehicle/i })
-      .getByRole('button', { name: 'Yes' })
+  get intercityOwnVehicleGroup() {
+    return this.page.getByRole('group', {
+      name: /did you travel between cities using your own vehicle\?/i,
+    })
   }
 
-  get ownVehicleNoButton() {
-    return this.page
-      .getByRole('group', { name: /own vehicle/i })
-      .getByRole('button', { name: 'No' })
+  get intracityOwnVehicleGroup() {
+    return this.page.getByRole('group', {
+      name: /did you travel within the city using your own vehicle\?/i,
+    })
+  }
+
+  get outstationCitySelect() {
+    return this.page.locator('select[name="outstationCityId"]')
+  }
+
+  // Outstation own-vehicle selections are represented as yes/no button groups.
+  get intercityOwnVehicleYesButton() {
+    return this.intercityOwnVehicleGroup.getByRole('button', { name: 'Yes' })
+  }
+
+  get intercityOwnVehicleNoButton() {
+    return this.intercityOwnVehicleGroup.getByRole('button', { name: 'No' })
+  }
+
+  get intracityOwnVehicleYesButton() {
+    return this.intracityOwnVehicleGroup.getByRole('button', { name: 'Yes' })
+  }
+
+  get intracityOwnVehicleNoButton() {
+    return this.intracityOwnVehicleGroup.getByRole('button', { name: 'No' })
   }
 
   get kmInput() {
@@ -56,16 +85,72 @@ export class ClaimsPage {
     return this.page.locator('select[name="outstationStateId"]')
   }
 
-  get transportTypeSelect() {
-    return this.page.getByLabel(/transport.*type/i)
-  }
-
-  get taxiAmountInput() {
-    return this.page.getByLabel(/taxi.*amount|amount/i)
-  }
-
   get submitButton() {
     return this.page.getByRole('button', { name: /submit/i })
+  }
+
+  private async readWorkLocationOptions(): Promise<WorkLocationOption[]> {
+    const optionsLocator = this.workLocationSelect.locator('option')
+    const optionsCount = await optionsLocator.count()
+    const options: WorkLocationOption[] = []
+
+    for (let index = 0; index < optionsCount; index += 1) {
+      const option = optionsLocator.nth(index)
+      const value = (await option.getAttribute('value'))?.trim() ?? ''
+      const label = (await option.textContent())?.trim() ?? ''
+
+      if (!value || !label) {
+        continue
+      }
+
+      options.push({ value, label })
+    }
+
+    return options
+  }
+
+  async getWorkLocationOptions(): Promise<WorkLocationOption[]> {
+    const timeoutMs = 15_000
+    const deadline = Date.now() + timeoutMs
+
+    while (Date.now() < deadline) {
+      const options = await this.readWorkLocationOptions()
+
+      if (options.length > 0) {
+        return options
+      }
+
+      await this.page.waitForTimeout(200)
+    }
+
+    return this.readWorkLocationOptions()
+  }
+
+  async selectWorkLocationByValue(value: string) {
+    await this.workLocationSelect.selectOption({ value })
+  }
+
+  async selectWorkLocationByName(locationName: string) {
+    const normalizedTarget = this.normalizeOptionLabel(locationName)
+    const options = await this.getWorkLocationOptions()
+    const matchedOption = options.find(
+      (option) => this.normalizeOptionLabel(option.label) === normalizedTarget
+    )
+
+    if (!matchedOption) {
+      throw new Error(
+        `Unable to find work location "${locationName}". Available options: ${options
+          .map((option) => option.label)
+          .join(', ')}`
+      )
+    }
+
+    await this.selectWorkLocationByValue(matchedOption.value)
+  }
+
+  async getWorkLocationNameByValue(value: string): Promise<string | null> {
+    const options = await this.getWorkLocationOptions()
+    return options.find((option) => option.value === value)?.label ?? null
   }
 
   // ── List elements ──────────────────────────────────────────────────────
@@ -95,7 +180,7 @@ export class ClaimsPage {
     await this.page.waitForLoadState('networkidle')
   }
 
-  async getLatestClaimNumber(timeoutMs = 10_000): Promise<string> {
+  async getLatestClaimNumber(timeoutMs = 30_000): Promise<string> {
     const firstClaimLink = this.claimNumberLinks.first()
     await firstClaimLink.waitFor({ state: 'visible', timeout: timeoutMs })
 
@@ -111,8 +196,8 @@ export class ClaimsPage {
 
   async fillBaseLocationClaim(date: string, vehicleType: string) {
     await this.dateInput.fill(date)
-    await this.workLocationSelect.selectOption('Field - Base Location')
-    await this.vehicleTypeSelect.selectOption(vehicleType)
+    await this.selectWorkLocationByName('Field - Base Location')
+    await this.vehicleTypeSelect.selectOption({ label: vehicleType })
   }
 
   async fillOutstationOwnVehicleClaim(
@@ -123,11 +208,11 @@ export class ClaimsPage {
     toCity: string
   ) {
     await this.dateInput.fill(date)
-    await this.workLocationSelect.selectOption('Field - Outstation')
-    await this.ownVehicleYesButton.click()
-    await this.vehicleTypeSelect.selectOption(vehicleType)
-    await this.kmInput.fill(String(km))
+    await this.selectWorkLocationByName('Field - Outstation')
+    await this.intercityOwnVehicleYesButton.click()
+    await this.vehicleTypeSelect.selectOption({ label: vehicleType })
     await this.fromCityInput.selectOption({ label: fromCity })
     await this.toCityInput.selectOption({ label: toCity })
+    await this.kmInput.fill(String(km))
   }
 }

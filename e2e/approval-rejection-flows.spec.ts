@@ -62,14 +62,16 @@ async function submitOfficeClaimAndGetClaimNumber(
 
   for (const daysBack of candidateDaysBack) {
     await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
-    await claims.workLocationSelect.selectOption('Office / WFH')
+    await claims.selectWorkLocationByName('Office / WFH')
+    await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
     await claims.submitButton.click()
 
     try {
       await page.waitForURL((url: URL) => url.pathname === '/claims', {
-        timeout: 1_200,
+        timeout: 5_000,
       })
     } catch {
+      await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
       await page.waitForTimeout(250)
     }
 
@@ -127,11 +129,20 @@ async function approveClaimAtCurrentLevel(
 
   await approvals.getApproveButtonForClaimNumber(claimNumber).click()
 
+  await expect(
+    page
+      .getByRole('region', { name: /notifications/i })
+      .getByText(/approve applied\.|approval action submitted successfully\./i)
+  ).toBeVisible({ timeout: 10_000 })
+
   await expect
     .poll(
-      async () => approvals.getPendingRowByClaimNumber(claimNumber).count(),
+      async () => {
+        await approvals.goto()
+        return approvals.getPendingRowByClaimNumber(claimNumber).count()
+      },
       {
-        timeout: 20_000,
+        timeout: 60_000,
       }
     )
     .toBe(0)

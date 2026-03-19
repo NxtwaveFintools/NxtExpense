@@ -147,9 +147,7 @@ export default async function ApprovalsPage({
     ]
   )
 
-  const showHistoryAmountColumn = canViewApprovalHistoryAmount(
-    employee.designations?.designation_name
-  )
+  const showHistoryAmountColumn = canViewApprovalHistoryAmount(approverAccess)
 
   const pendingPagination = buildCursorNavigationLinks({
     pathname: '/approvals',

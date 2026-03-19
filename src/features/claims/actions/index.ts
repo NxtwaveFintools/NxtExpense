@@ -13,8 +13,7 @@ import {
 } from '@/lib/services/config-service'
 import {
   calculateBaseLocationItems,
-  calculateOutstationOwnVehicleItems,
-  calculateOutstationTaxiItems,
+  calculateOutstationTravelItems,
   getVehicleTypeById,
   countFoodWithPrincipalsInMonth,
   getFoodWithPrincipalsLimit,
@@ -170,6 +169,56 @@ export async function submitClaimAction(
 
   const workLocationId = wlFlags.id
 
+  const hasIntercitySelection =
+    typeof input.intercityOwnVehicleUsed === 'boolean'
+  const hasIntracitySelection =
+    typeof input.intracityOwnVehicleUsed === 'boolean'
+
+  if (wlFlags.requires_outstation_details && !hasIntercitySelection) {
+    return {
+      ok: false,
+      error:
+        'Please select whether you travelled between cities using your own vehicle.',
+    }
+  }
+
+  if (
+    wlFlags.requires_outstation_details &&
+    input.intercityOwnVehicleUsed === false &&
+    !hasIntracitySelection
+  ) {
+    return {
+      ok: false,
+      error:
+        'Please select whether you travelled within the city using your own vehicle.',
+    }
+  }
+
+  const intercityOwnVehicleUsed = wlFlags.requires_outstation_details
+    ? input.intercityOwnVehicleUsed === true
+    : false
+
+  const hasIntercityTravel = wlFlags.requires_outstation_details
+    ? intercityOwnVehicleUsed
+    : false
+
+  // Inter-city own-vehicle flow implicitly includes intra-city movement in the destination city.
+  const intracityOwnVehicleUsed = wlFlags.requires_outstation_details
+    ? intercityOwnVehicleUsed || input.intracityOwnVehicleUsed === true
+    : false
+
+  const hasIntracityTravel = wlFlags.requires_outstation_details
+    ? intracityOwnVehicleUsed
+    : false
+
+  const effectiveOutstationCityId = hasIntracityTravel
+    ? (input.outstationCityId ??
+      (hasIntercityTravel ? input.toCityId : undefined))
+    : undefined
+
+  const isOutstationOwnVehicle =
+    intercityOwnVehicleUsed || intracityOwnVehicleUsed
+
   // ── Server-side conditional field validation based on DB flags ──
   if (wlFlags.requires_vehicle_selection && !input.vehicleType) {
     return {
@@ -179,48 +228,94 @@ export async function submitClaimAction(
   }
 
   if (wlFlags.requires_outstation_details) {
-    if (!input.outstationStateId) {
+    const hasAnyOutstationTravel = hasIntercityTravel || hasIntracityTravel
+
+    if (hasAnyOutstationTravel && !input.outstationStateId) {
       return { ok: false, error: 'State is required.' }
     }
-    if (!input.fromCityId) {
+
+    if (hasIntercityTravel && !input.fromCityId) {
       return {
         ok: false,
         error: 'From city is required for outstation travel.',
       }
     }
-    if (!input.toCityId) {
+
+    if (hasIntercityTravel && !input.toCityId) {
       return { ok: false, error: 'To city is required for outstation travel.' }
     }
-    if (input.ownVehicleUsed) {
+
+    if (hasIntercityTravel && input.fromCityId && input.toCityId) {
+      if (input.fromCityId === input.toCityId) {
+        return {
+          ok: false,
+          error: 'Inter-city travel requires different From and To cities.',
+        }
+      }
+    }
+
+    if (hasIntracityTravel && !effectiveOutstationCityId) {
+      return {
+        ok: false,
+        error: 'Intra-city city is required for outstation travel.',
+      }
+    }
+
+    if (hasIntercityTravel && hasIntracityTravel) {
+      if (
+        effectiveOutstationCityId &&
+        input.toCityId &&
+        effectiveOutstationCityId !== input.toCityId
+      ) {
+        return {
+          ok: false,
+          error:
+            'Intra-city city must match the Inter-city To City when both scopes are selected.',
+        }
+      }
+    }
+
+    if (isOutstationOwnVehicle) {
       if (!input.vehicleType) {
         return {
           ok: false,
           error: 'Vehicle type is required when using own vehicle.',
         }
       }
-      if (!input.kmTravelled || input.kmTravelled <= 0) {
+
+      if (
+        intercityOwnVehicleUsed &&
+        (!input.kmTravelled || input.kmTravelled <= 0)
+      ) {
         return { ok: false, error: 'KM travelled must be greater than zero.' }
       }
-    } else {
-      // Transport selection is intentionally hidden in the current UI phase.
-      // For no-own-vehicle outstation claims, transport type defaults server-side.
     }
 
-    const cityValidationError = await validateCitiesForSelectedState(
-      supabase,
-      input.outstationStateId,
-      [input.fromCityId, input.toCityId]
-    )
+    const cityIdsToValidate: Array<string | undefined> = []
+    if (hasIntercityTravel) {
+      cityIdsToValidate.push(input.fromCityId, input.toCityId)
+    }
+    if (hasIntracityTravel) {
+      cityIdsToValidate.push(effectiveOutstationCityId)
+    }
 
-    if (cityValidationError) {
-      return { ok: false, error: cityValidationError }
+    if (cityIdsToValidate.length > 0 && input.outstationStateId) {
+      const cityValidationError = await validateCitiesForSelectedState(
+        supabase,
+        input.outstationStateId,
+        cityIdsToValidate
+      )
+
+      if (cityValidationError) {
+        return { ok: false, error: cityValidationError }
+      }
     }
   }
 
   let vehicleTypeId: string | null = null
   if (
     wlFlags.requires_vehicle_selection ||
-    (wlFlags.requires_outstation_details && input.ownVehicleUsed)
+    (wlFlags.requires_outstation_details && isOutstationOwnVehicle)
   ) {
     // Form sends vehicleType as UUID directly
     vehicleTypeId = input.vehicleType ?? null
@@ -244,15 +339,15 @@ export async function submitClaimAction(
       workLocationId,
       vehicleType: vt,
     })
-  } else if (
-    wlFlags.requires_outstation_details &&
-    input.ownVehicleUsed &&
-    vehicleTypeId
-  ) {
-    const vt = await getVehicleTypeById(supabase, vehicleTypeId)
+  } else if (wlFlags.requires_outstation_details) {
+    const vt = vehicleTypeId
+      ? await getVehicleTypeById(supabase, vehicleTypeId)
+      : null
 
     // Validate KM limit from DB (replaces hardcoded 150/300 check)
     if (
+      hasIntercityTravel &&
+      intercityOwnVehicleUsed &&
       input.kmTravelled &&
       vt &&
       vt.max_km_round_trip > 0 &&
@@ -264,19 +359,15 @@ export async function submitClaimAction(
       }
     }
 
-    draft = await calculateOutstationOwnVehicleItems(supabase, {
+    draft = await calculateOutstationTravelItems(supabase, {
       workLocationId,
       designationId: employee.designation_id ?? '',
       vehicleType: vt,
-      kmTravelled: input.kmTravelled ?? 0,
-      foodWithPrincipalsAmount: input.foodWithPrincipalsAmount,
-    })
-  } else if (wlFlags.requires_outstation_details && !input.ownVehicleUsed) {
-    draft = await calculateOutstationTaxiItems(supabase, {
-      workLocationId,
-      taxiAmount: input.taxiAmount ?? 0,
-      transportTypeName: input.transportType ?? 'Taxi',
-      designationId: employee.designation_id ?? '',
+      hasIntercityTravel,
+      hasIntracityTravel,
+      intercityOwnVehicleUsed,
+      intracityOwnVehicleUsed,
+      kmTravelled: input.kmTravelled,
       foodWithPrincipalsAmount: input.foodWithPrincipalsAmount,
     })
   } else {
@@ -337,18 +428,42 @@ export async function submitClaimAction(
 
   // Extract variant-specific fields based on DB flags
   type OutstationInput = {
-    ownVehicleUsed: boolean
-    outstationStateId: string
+    hasIntercityTravel: boolean
+    hasIntracityTravel: boolean
+    intercityOwnVehicleUsed: boolean
+    intracityOwnVehicleUsed: boolean
+    outstationStateId?: string
+    outstationCityId?: string
     fromCityId?: string
     toCityId?: string
     kmTravelled?: number
-    taxiAmount?: number
-    transportType?: string
   }
-  const outstation = isOutstation ? (input as unknown as OutstationInput) : null
-  const hasOwnVehicle = isOutstation && outstation?.ownVehicleUsed === true
+  const outstation = isOutstation
+    ? ({
+        hasIntercityTravel,
+        hasIntracityTravel,
+        intercityOwnVehicleUsed,
+        intracityOwnVehicleUsed,
+        outstationStateId: input.outstationStateId,
+        outstationCityId: effectiveOutstationCityId,
+        fromCityId: input.fromCityId,
+        toCityId: input.toCityId,
+        kmTravelled: input.kmTravelled,
+      } satisfies OutstationInput)
+    : null
+
+  const hasIntercityScope =
+    isOutstation && outstation?.hasIntercityTravel === true
+  const hasIntracityScope =
+    isOutstation && outstation?.hasIntracityTravel === true
+  const hasOwnVehicle =
+    isOutstation &&
+    (outstation?.intercityOwnVehicleUsed === true ||
+      outstation?.intracityOwnVehicleUsed === true)
+
   const derivedOutstationCityId = isOutstation
-    ? (outstation?.toCityId ?? null)
+    ? (outstation?.outstationCityId ??
+      (hasIntercityScope ? (outstation?.toCityId ?? null) : null))
     : null
 
   // ── Re-file when a rejected claim has been granted allow_resubmit=true ──
@@ -382,13 +497,24 @@ export async function submitClaimAction(
       employeeId: employee.id,
       claimDateIso: input.claimDate.iso,
       workLocationId,
-      ownVehicleUsed: outstation?.ownVehicleUsed ?? null,
+      ownVehicleUsed: isOutstation ? hasOwnVehicle : null,
       vehicleTypeId: isBaseLocation || hasOwnVehicle ? vehicleTypeId : null,
       outstationStateId: outstation?.outstationStateId ?? null,
       outstationCityId: derivedOutstationCityId,
-      fromCityId: isOutstation ? (outstation?.fromCityId ?? null) : null,
-      toCityId: isOutstation ? (outstation?.toCityId ?? null) : null,
-      kmTravelled: hasOwnVehicle ? (outstation?.kmTravelled ?? null) : null,
+      fromCityId: hasIntercityScope ? (outstation?.fromCityId ?? null) : null,
+      toCityId: hasIntercityScope ? (outstation?.toCityId ?? null) : null,
+      kmTravelled:
+        hasIntercityScope && outstation?.intercityOwnVehicleUsed
+          ? (outstation?.kmTravelled ?? null)
+          : null,
+      hasIntercityTravel: isOutstation ? hasIntercityScope : false,
+      hasIntracityTravel: isOutstation ? hasIntracityScope : false,
+      intercityOwnVehicleUsed: hasIntercityScope
+        ? (outstation?.intercityOwnVehicleUsed ?? false)
+        : null,
+      intracityOwnVehicleUsed: hasIntracityScope
+        ? (outstation?.intracityOwnVehicleUsed ?? false)
+        : null,
       totalAmount: draft.total,
       statusId: initialWorkflowState.statusId,
       currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
@@ -422,13 +548,24 @@ export async function submitClaimAction(
     employeeId: employee.id,
     claimDateIso: input.claimDate.iso,
     workLocationId,
-    ownVehicleUsed: outstation?.ownVehicleUsed ?? null,
+    ownVehicleUsed: isOutstation ? hasOwnVehicle : null,
     vehicleTypeId: isBaseLocation || hasOwnVehicle ? vehicleTypeId : null,
     outstationStateId: outstation?.outstationStateId ?? null,
     outstationCityId: derivedOutstationCityId,
-    fromCityId: isOutstation ? (outstation?.fromCityId ?? null) : null,
-    toCityId: isOutstation ? (outstation?.toCityId ?? null) : null,
-    kmTravelled: hasOwnVehicle ? (outstation?.kmTravelled ?? null) : null,
+    fromCityId: hasIntercityScope ? (outstation?.fromCityId ?? null) : null,
+    toCityId: hasIntercityScope ? (outstation?.toCityId ?? null) : null,
+    kmTravelled:
+      hasIntercityScope && outstation?.intercityOwnVehicleUsed
+        ? (outstation?.kmTravelled ?? null)
+        : null,
+    hasIntercityTravel: isOutstation ? hasIntercityScope : false,
+    hasIntracityTravel: isOutstation ? hasIntracityScope : false,
+    intercityOwnVehicleUsed: hasIntercityScope
+      ? (outstation?.intercityOwnVehicleUsed ?? false)
+      : null,
+    intracityOwnVehicleUsed: hasIntracityScope
+      ? (outstation?.intracityOwnVehicleUsed ?? false)
+      : null,
     totalAmount: draft.total,
     statusId: initialWorkflowState.statusId,
     currentApprovalLevel: initialWorkflowState.currentApprovalLevel,

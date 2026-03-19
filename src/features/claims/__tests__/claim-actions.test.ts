@@ -8,8 +8,6 @@ const mocks = vi.hoisted(() => ({
   getAllWorkLocations: vi.fn(),
   getDesignationApprovalFlow: vi.fn(),
   calculateBaseLocationItems: vi.fn(),
-  calculateOutstationOwnVehicleItems: vi.fn(),
-  calculateOutstationTaxiItems: vi.fn(),
   getVehicleTypeById: vi.fn(),
   countFoodWithPrincipalsInMonth: vi.fn(),
   getFoodWithPrincipalsLimit: vi.fn(),
@@ -66,9 +64,6 @@ vi.mock('@/lib/services/calculation-service', async () => {
   return {
     ...actual,
     calculateBaseLocationItems: mocks.calculateBaseLocationItems,
-    calculateOutstationOwnVehicleItems:
-      mocks.calculateOutstationOwnVehicleItems,
-    calculateOutstationTaxiItems: mocks.calculateOutstationTaxiItems,
     getVehicleTypeById: mocks.getVehicleTypeById,
     countFoodWithPrincipalsInMonth: mocks.countFoodWithPrincipalsInMonth,
     getFoodWithPrincipalsLimit: mocks.getFoodWithPrincipalsLimit,
@@ -172,14 +167,6 @@ describe('submitClaimAction', () => {
       required_approval_levels: [1],
     })
     mocks.calculateBaseLocationItems.mockResolvedValue({ items: [], total: 0 })
-    mocks.calculateOutstationOwnVehicleItems.mockResolvedValue({
-      items: [],
-      total: 0,
-    })
-    mocks.calculateOutstationTaxiItems.mockResolvedValue({
-      items: [],
-      total: 0,
-    })
     mocks.getVehicleTypeById.mockResolvedValue({
       vehicle_name: 'Two Wheeler',
       max_km_round_trip: 150,

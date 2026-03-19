@@ -1,10 +1,12 @@
-import type { TransportType, VehicleType } from '@/features/claims/types'
+import type { VehicleType } from '@/features/claims/types'
 
 export type ClaimRateSnapshot = {
   foodBaseDaily: number | null
   foodOutstationDaily: number | null
   fuelBaseDailyByVehicle: Record<string, number>
   intercityPerKmByVehicle: Record<string, number>
+  intracityDailyByVehicle: Record<string, number>
+  maxKmRoundTripByVehicle: Record<string, number>
   foodWithPrincipalsMax: number | null
 }
 
@@ -12,13 +14,13 @@ type ClaimSummaryPreviewInput = {
   workLocation: string
   requiresVehicleSelection: boolean
   requiresOutstationDetails: boolean
-  ownVehicleUsed: boolean
-  transportType: TransportType
-  transportTypeName: string
+  hasIntercityTravel: boolean
+  hasIntracityTravel: boolean
+  intercityOwnVehicleUsed: boolean
+  intracityOwnVehicleUsed: boolean
   vehicleType: VehicleType
   vehicleTypeName: string
   kmTravelled: string
-  taxiAmount: string
   foodWithPrincipalsAmount: string
   claimRateSnapshot: ClaimRateSnapshot
 }
@@ -26,19 +28,18 @@ type ClaimSummaryPreviewInput = {
 export function getClaimSummaryPreview({
   requiresVehicleSelection,
   requiresOutstationDetails,
-  ownVehicleUsed,
-  transportTypeName,
+  hasIntercityTravel,
+  hasIntracityTravel,
+  intercityOwnVehicleUsed,
+  intracityOwnVehicleUsed,
   vehicleType,
   vehicleTypeName,
   kmTravelled,
-  taxiAmount,
   foodWithPrincipalsAmount,
   claimRateSnapshot,
 }: ClaimSummaryPreviewInput) {
   const kmValue = Number.parseFloat(kmTravelled)
-  const taxiValue = Number.parseFloat(taxiAmount)
   const parsedKm = Number.isFinite(kmValue) ? kmValue : 0
-  const parsedTaxiAmount = Number.isFinite(taxiValue) ? taxiValue : 0
   const parsedFwpAmount = Number.parseFloat(foodWithPrincipalsAmount)
   const fwpAmount =
     Number.isFinite(parsedFwpAmount) && parsedFwpAmount > 0
@@ -50,20 +51,26 @@ export function getClaimSummaryPreview({
     const foodAllowance = claimRateSnapshot.foodOutstationDaily ?? 0
     items.push({ label: 'Food allowance', amount: foodAllowance })
 
-    if (!ownVehicleUsed) {
-      if (parsedTaxiAmount > 0) {
-        items.push({
-          label: `${transportTypeName} bills`,
-          amount: parsedTaxiAmount,
-        })
-      }
-    } else {
+    const includesIntracityAllowance =
+      (hasIntercityTravel && intercityOwnVehicleUsed) ||
+      (hasIntracityTravel && intracityOwnVehicleUsed)
+
+    if (hasIntercityTravel && intercityOwnVehicleUsed) {
       const intercityRate =
         claimRateSnapshot.intercityPerKmByVehicle[vehicleType] ?? 0
       const intercityAmount = parsedKm * intercityRate
       items.push({
         label: `Intercity travel (${parsedKm.toFixed(2)} KM @ ${intercityRate.toFixed(2)}/KM)`,
         amount: intercityAmount,
+      })
+    }
+
+    if (includesIntracityAllowance) {
+      const intracityAmount =
+        claimRateSnapshot.intracityDailyByVehicle[vehicleType] ?? 0
+      items.push({
+        label: `${vehicleTypeName} intra-city allowance`,
+        amount: intracityAmount,
       })
     }
 

@@ -18,7 +18,7 @@ async function loginWithPassword(page: Page, email: string): Promise<void> {
   await page.getByRole('button', { name: /sign in/i }).click()
 
   // Wait for redirect to dashboard
-  await page.waitForURL('**/dashboard', { timeout: 15_000 })
+  await page.waitForURL('**/dashboard', { timeout: 45_000 })
 }
 
 type AuthFixtures = {

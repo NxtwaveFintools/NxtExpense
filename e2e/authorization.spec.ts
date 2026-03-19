@@ -19,19 +19,19 @@ test.describe('Authorization Boundaries', () => {
     await page.context().clearCookies()
 
     await page.goto('/dashboard')
-    await page.waitForLoadState('networkidle')
+    await page.waitForURL(/\/login/, { timeout: 20_000 })
     expect(page.url()).toContain('/login')
 
     await page.goto('/claims')
-    await page.waitForLoadState('networkidle')
+    await page.waitForURL(/\/login/, { timeout: 20_000 })
     expect(page.url()).toContain('/login')
 
     await page.goto('/approvals')
-    await page.waitForLoadState('networkidle')
+    await page.waitForURL(/\/login/, { timeout: 20_000 })
     expect(page.url()).toContain('/login')
 
     await page.goto('/finance')
-    await page.waitForLoadState('networkidle')
+    await page.waitForURL(/\/login/, { timeout: 20_000 })
     expect(page.url()).toContain('/login')
   })
 

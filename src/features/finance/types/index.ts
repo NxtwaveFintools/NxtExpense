@@ -2,8 +2,6 @@ import type { Claim, ClaimAvailableAction } from '@/features/claims/types'
 import type { EmployeeRow } from '@/lib/services/employee-service'
 import type { PaginatedResult } from '@/lib/utils/pagination'
 
-export type FinanceActionType = string
-
 export type FinanceActionFilter = string | null
 
 export type FinanceDateFilterField = 'claim_date' | 'finance_approved_date'

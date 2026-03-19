@@ -24,7 +24,7 @@ test.describe('Edge Cases', () => {
     const dd = String(tomorrow.getDate()).padStart(2, '0')
 
     await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
-    await claims.workLocationSelect.selectOption('Office / WFH')
+    await claims.selectWorkLocationByName('Office / WFH')
     await claims.submitButton.click()
 
     // Browser's HTML5 constraint validation (max attribute) blocks form submit
@@ -52,11 +52,9 @@ test.describe('Edge Cases', () => {
     const dd = String(yesterday.getDate()).padStart(2, '0')
 
     await claims.dateInput.fill(`${yyyy}-${mm}-${dd}`)
-    await claims.workLocationSelect.selectOption('Field - Outstation')
+    await claims.selectWorkLocationByName('Field - Outstation')
+    await claims.intercityOwnVehicleYesButton.click()
     await claims.outstationStateSelect.selectOption({ index: 1 })
-
-    // "Own vehicle used?" is a Yes/No button group — click Yes to confirm own-vehicle path
-    await claims.ownVehicleYesButton.click()
     await claims.vehicleTypeSelect.selectOption('Two Wheeler')
     await expect
       .poll(async () => claims.fromCityInput.locator('option').count())

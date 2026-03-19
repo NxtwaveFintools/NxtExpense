@@ -17,11 +17,6 @@ const ACTION_LABELS: Record<string, string> = {
   admin_override: 'Admin Override',
 }
 
-const LEVEL_LABELS: Record<number, string> = {
-  1: 'Level 1 — State Business Head',
-  2: 'Level 2 — HOD (Mansoor)',
-}
-
 const ACTION_COLORS: Record<string, string> = {
   submit: 'bg-blue-500',
   resubmit: 'bg-blue-500',
@@ -64,8 +59,7 @@ export function ClaimHistoryTimeline({ history }: ClaimHistoryTimelineProps) {
                   </p>
                   {entry.approval_level ? (
                     <p className="text-muted-foreground text-xs mt-0.5">
-                      {LEVEL_LABELS[entry.approval_level] ??
-                        `Level ${entry.approval_level}`}
+                      {`Level ${entry.approval_level}`}
                     </p>
                   ) : null}
                   <p className="text-muted-foreground text-xs mt-0.5">
