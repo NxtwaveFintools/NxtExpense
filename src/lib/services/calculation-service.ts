@@ -171,7 +171,6 @@ export async function calculateBaseLocationItems(
  * - Inter-city own vehicle adds per-km reimbursement.
  * - Intra-city own vehicle adds a fixed daily allowance from expense_rates.
  * - Inter-city own vehicle implies intra-city allowance for the same day/vehicle.
- * - Non-own-vehicle segments do not add transport reimbursement in this flow.
  */
 export async function calculateOutstationTravelItems(
   supabase: SupabaseClient,

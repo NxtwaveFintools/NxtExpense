@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getEmployeeByEmail: vi.fn(),
   searchClaimsForAdmin: vi.fn(),
   searchEmployeesForAdmin: vi.fn(),
+  getMaxNotesLength: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -31,6 +32,17 @@ vi.mock('@/features/admin/queries', () => ({
   searchClaimsForAdmin: mocks.searchClaimsForAdmin,
   searchEmployeesForAdmin: mocks.searchEmployeesForAdmin,
 }))
+
+vi.mock('@/lib/services/system-settings-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/services/system-settings-service')
+  >('@/lib/services/system-settings-service')
+
+  return {
+    ...actual,
+    getMaxNotesLength: mocks.getMaxNotesLength,
+  }
+})
 
 import {
   reassignApproversAction,
@@ -91,6 +103,8 @@ describe('admin actions integration', () => {
         employee_name: 'Yohan',
       },
     ])
+
+    mocks.getMaxNotesLength.mockResolvedValue(500)
   })
 
   it('should execute rollback RPC and return rolled back status details', async () => {
@@ -191,6 +205,42 @@ describe('admin actions integration', () => {
         p_confirmation: 'CONFIRM',
       }
     )
+  })
+
+  it('should enforce rollback reason length from system settings', async () => {
+    // Arrange
+    mocks.getMaxNotesLength.mockResolvedValueOnce(10)
+
+    // Act
+    const result = await rollbackClaimStatusAction({
+      claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      reason: 'This reason is too long.',
+      confirmation: 'CONFIRM',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Rollback reason cannot exceed 10 characters.')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('should enforce reassignment reason length from system settings', async () => {
+    // Arrange
+    mocks.getMaxNotesLength.mockResolvedValueOnce(10)
+
+    // Act
+    const result = await reassignApproversAction({
+      employeeId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      reason: 'This reason is too long.',
+      confirmation: 'CONFIRM',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Reassignment reason cannot exceed 10 characters.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should reject non-admin users for reassignment', async () => {

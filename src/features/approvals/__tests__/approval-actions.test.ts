@@ -90,13 +90,13 @@ describe('approvalActionSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('rejects notes exceeding 500 characters', () => {
+  it('accepts notes exceeding 500 characters at schema level (enforced in actions)', () => {
     const parsed = approvalActionSchema.safeParse({
       claimId: VALID_UUID,
       action: 'rejected',
       notes: 'x'.repeat(501),
     })
-    expect(parsed.success).toBe(false)
+    expect(parsed.success).toBe(true)
   })
 
   it('accepts notes at exactly 500 characters', () => {

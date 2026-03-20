@@ -42,10 +42,10 @@ export default async function NewClaimPage() {
     name: vt.vehicle_name,
   }))
   const stateOptions = states.map((s) => ({ id: s.id, name: s.state_name }))
-  const cityOptions = cities.map((c) => ({
-    id: c.id,
-    name: c.city_name,
-    stateId: c.state_id,
+  const cityOptions = cities.map((city) => ({
+    id: city.id,
+    name: city.city_name,
+    stateId: city.state_id,
   }))
 
   // Build rate snapshot from new lookup tables
@@ -131,7 +131,7 @@ export default async function NewClaimPage() {
             allowedVehicleTypes={allowedVehicleTypes}
             workLocationOptions={workLocationOptions}
             stateOptions={stateOptions}
-            cityOptions={cityOptions}
+            initialCityOptions={cityOptions}
             claimRateSnapshot={claimRateSnapshot}
             initialValues={null}
           />

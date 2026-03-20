@@ -23,7 +23,7 @@ import type {
 type UseClaimSubmissionFormArgs = {
   allowedVehicleTypes: readonly SelectOption[]
   workLocationOptions: readonly WorkLocationOption[]
-  cityOptions: readonly CityOption[]
+  initialCityOptions: readonly CityOption[]
   claimRateSnapshot: ClaimRateSnapshot
   initialValues?: ClaimFormInitialValues | null
 }
@@ -45,7 +45,7 @@ function getFallbackKmLimit(
 export function useClaimSubmissionForm({
   allowedVehicleTypes,
   workLocationOptions,
-  cityOptions,
+  initialCityOptions,
   claimRateSnapshot,
   initialValues,
 }: UseClaimSubmissionFormArgs) {
@@ -114,8 +114,10 @@ export function useClaimSubmissionForm({
       return []
     }
 
-    return cityOptions.filter((city) => city.stateId === outstationStateId)
-  }, [cityOptions, outstationStateId])
+    return initialCityOptions.filter(
+      (city) => city.stateId === outstationStateId
+    )
+  }, [initialCityOptions, outstationStateId])
 
   const kmLimit = useMemo(() => {
     const configuredLimit =

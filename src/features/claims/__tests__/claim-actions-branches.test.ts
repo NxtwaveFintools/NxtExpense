@@ -113,17 +113,6 @@ const OUTSTATION_OWN_INPUT = {
   foodWithPrincipalsAmount: 0,
 }
 
-const OUTSTATION_TAXI_INPUT = {
-  claimDate: '06/03/2026',
-  workLocation: 'wl-outstation',
-  hasIntercityTravel: false,
-  hasIntracityTravel: false,
-  intercityOwnVehicleUsed: false,
-  intracityOwnVehicleUsed: false,
-  accommodationNights: 0,
-  foodWithPrincipalsAmount: 0,
-}
-
 const OUTSTATION_NO_OWN_VEHICLE_INPUT = {
   claimDate: '06/03/2026',
   workLocation: 'wl-outstation',
@@ -336,9 +325,9 @@ describe('submitClaimAction branch coverage', () => {
     expect(result.error).toBe(expected)
   })
 
-  it('should allow no-own-vehicle outstation claim without transport selection', async () => {
+  it('should allow no-own-vehicle outstation claim', async () => {
     const result = await submitClaimAction({
-      ...OUTSTATION_TAXI_INPUT,
+      ...OUTSTATION_NO_OWN_VEHICLE_INPUT,
     })
 
     expect(result.ok).toBe(true)
@@ -447,7 +436,7 @@ describe('submitClaimAction branch coverage', () => {
     expect(result.error).toBe('Unable to start workflow.')
   })
 
-  it('should map expense items for standard submissions and taxi submissions', async () => {
+  it('should map expense items for standard and no-own-vehicle submissions', async () => {
     const standardResult = await submitClaimAction(BASE_LOCATION_INPUT)
     expect(standardResult.ok).toBe(true)
 
@@ -460,7 +449,7 @@ describe('submitClaimAction branch coverage', () => {
       },
     ])
 
-    await submitClaimAction(OUTSTATION_TAXI_INPUT)
+    await submitClaimAction(OUTSTATION_NO_OWN_VEHICLE_INPUT)
 
     expect(mocks.calculateOutstationTravelItems).toHaveBeenCalledWith(
       expect.anything(),

@@ -21,6 +21,10 @@ import {
   type AdminClaimRow,
   type AdminEmployeeRow,
 } from '@/features/admin/queries'
+import {
+  getMaxNotesLength,
+  getMaxTextLengthValidationError,
+} from '@/lib/services/system-settings-service'
 
 async function getAdminContext() {
   const supabase = await createSupabaseServerClient()
@@ -56,6 +60,20 @@ export async function rollbackClaimStatusAction(payload: {
 
   try {
     const { supabase } = await getAdminContext()
+    const maxNotesLength = await getMaxNotesLength(supabase)
+    const reasonValidationError = getMaxTextLengthValidationError(
+      parsed.data.reason,
+      maxNotesLength,
+      'Rollback reason'
+    )
+
+    if (reasonValidationError) {
+      return {
+        ok: false,
+        error: reasonValidationError,
+      }
+    }
+
     const { data, error } = await supabase.rpc('admin_rollback_claim_atomic', {
       p_claim_id: parsed.data.claimId,
       p_reason: parsed.data.reason,
@@ -102,6 +120,20 @@ export async function reassignApproversAction(payload: {
 
   try {
     const { supabase } = await getAdminContext()
+    const maxNotesLength = await getMaxNotesLength(supabase)
+    const reasonValidationError = getMaxTextLengthValidationError(
+      parsed.data.reason,
+      maxNotesLength,
+      'Reassignment reason'
+    )
+
+    if (reasonValidationError) {
+      return {
+        ok: false,
+        error: reasonValidationError,
+      }
+    }
+
     const { data, error } = await supabase.rpc(
       'admin_reassign_employee_approvers_atomic',
       {

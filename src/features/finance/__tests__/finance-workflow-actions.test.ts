@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getFinanceHistoryPaginated: vi.fn(),
   getClaimAvailableActions: vi.fn(),
   normalizeFinanceFilters: vi.fn(),
+  getMaxNotesLength: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -41,6 +42,17 @@ vi.mock('@/features/claims/queries', () => ({
 vi.mock('@/features/finance/utils/filters', () => ({
   normalizeFinanceFilters: mocks.normalizeFinanceFilters,
 }))
+
+vi.mock('@/lib/services/system-settings-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/services/system-settings-service')
+  >('@/lib/services/system-settings-service')
+
+  return {
+    ...actual,
+    getMaxNotesLength: mocks.getMaxNotesLength,
+  }
+})
 
 import {
   bulkFinanceClaimsAction,
@@ -104,6 +116,8 @@ describe('finance actions workflow integration', () => {
         actor_scope: 'finance',
       },
     ])
+
+    mocks.getMaxNotesLength.mockResolvedValue(500)
 
     mocks.getFinanceQueuePaginated.mockResolvedValue({
       data: [],
@@ -243,6 +257,23 @@ describe('finance actions workflow integration', () => {
     // Assert
     expect(result.ok).toBe(false)
     expect(result.error).toBe('Invalid claim identifier.')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('should enforce notes limit from system settings', async () => {
+    // Arrange
+    mocks.getMaxNotesLength.mockResolvedValueOnce(10)
+
+    // Act
+    const result = await submitFinanceAction({
+      claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      action: 'finance_rejected',
+      notes: 'This note is too long.',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Notes cannot exceed 10 characters.')
     expect(rpcMock).not.toHaveBeenCalled()
   })
 

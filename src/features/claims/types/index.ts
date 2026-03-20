@@ -3,7 +3,6 @@ import type { WorkLocation as ConfigWorkLocation } from '@/lib/services/config-s
 
 export type WorkLocation = string
 export type VehicleType = string
-export type TransportType = string
 export type ClaimStatusId = string
 export type ExpenseItemType = string
 
@@ -79,13 +78,11 @@ export type ClaimFormValues = {
   intercityOwnVehicleUsed?: boolean
   intracityOwnVehicleUsed?: boolean
   vehicleType?: VehicleType
-  transportType?: TransportType
   outstationStateId?: string
   outstationCityId?: string
   fromCityId?: string
   toCityId?: string
   kmTravelled?: number
-  taxiAmount?: number
   accommodationNights?: number
   foodWithPrincipalsAmount?: number
 }
@@ -99,13 +96,11 @@ export type ClaimFormInitialValues = {
   hasIntracityTravel?: boolean | null
   intercityOwnVehicleUsed?: boolean | null
   intracityOwnVehicleUsed?: boolean | null
-  transportType?: TransportType | null
   outstationStateId?: string | null
   outstationCityId?: string | null
   fromCityId?: string | null
   toCityId?: string | null
   kmTravelled?: number | null
-  taxiAmount?: number | null
   accommodationNights?: number | null
   foodWithPrincipalsAmount?: number | null
 }

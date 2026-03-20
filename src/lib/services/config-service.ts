@@ -51,14 +51,6 @@ export type VehicleType = {
   is_active: boolean
 }
 
-type TransportType = {
-  id: string
-  transport_code: string
-  transport_name: string
-  display_order: number
-  is_active: boolean
-}
-
 type ClaimStatus = {
   id: string
   status_code: string
@@ -180,20 +172,6 @@ export async function getVehicleTypesByDesignation(
   return (data ?? [])
     .map((row: Record<string, unknown>) => row.vehicle_types as VehicleType)
     .filter(Boolean)
-}
-
-export async function getAllTransportTypes(
-  supabase: SupabaseClient
-): Promise<TransportType[]> {
-  const { data, error } = await supabase
-    .from('transport_types')
-    .select('id, transport_code, transport_name, display_order, is_active')
-    .eq('is_active', true)
-    .order('display_order')
-
-  if (error)
-    throw new Error(`Failed to fetch transport types: ${error.message}`)
-  return data as TransportType[]
 }
 
 const CLAIM_STATUS_COLUMNS =

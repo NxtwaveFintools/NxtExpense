@@ -20,7 +20,7 @@ type ClaimSubmissionFormProps = {
   allowedVehicleTypes: readonly SelectOption[]
   workLocationOptions: readonly WorkLocationOption[]
   stateOptions: readonly SelectOption[]
-  cityOptions: readonly CityOption[]
+  initialCityOptions: readonly CityOption[]
   claimRateSnapshot: ClaimRateSnapshot
   initialValues?: ClaimFormInitialValues | null
 }
@@ -29,7 +29,7 @@ export function ClaimSubmissionForm({
   allowedVehicleTypes,
   workLocationOptions,
   stateOptions,
-  cityOptions,
+  initialCityOptions,
   claimRateSnapshot,
   initialValues,
 }: ClaimSubmissionFormProps) {
@@ -67,7 +67,7 @@ export function ClaimSubmissionForm({
   } = useClaimSubmissionForm({
     allowedVehicleTypes,
     workLocationOptions,
-    cityOptions,
+    initialCityOptions,
     claimRateSnapshot,
     initialValues,
   })

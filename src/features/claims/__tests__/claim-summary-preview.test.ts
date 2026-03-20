@@ -90,4 +90,24 @@ describe('getClaimSummaryPreview', () => {
     ])
     expect(result.total).toBe(1030)
   })
+
+  it('shows food allowance only when outstation own vehicle is not used', () => {
+    const result = getClaimSummaryPreview({
+      workLocation: 'wl-outstation',
+      requiresVehicleSelection: false,
+      requiresOutstationDetails: true,
+      hasIntercityTravel: false,
+      hasIntracityTravel: false,
+      intercityOwnVehicleUsed: false,
+      intracityOwnVehicleUsed: false,
+      vehicleType: 'veh-2w',
+      vehicleTypeName: 'Two Wheeler',
+      kmTravelled: '',
+      foodWithPrincipalsAmount: '',
+      claimRateSnapshot: RATE_SNAPSHOT,
+    })
+
+    expect(result.items).toEqual([{ label: 'Food allowance', amount: 350 }])
+    expect(result.total).toBe(350)
+  })
 })

@@ -25,7 +25,6 @@ describe('claimSubmissionSchema — work location branches', () => {
       fromCityId: '',
       toCityId: '',
       vehicleType: '',
-      transportType: '',
     })
     expect(parsed.success).toBe(true)
   })
@@ -80,74 +79,26 @@ describe('claimSubmissionSchema — work location branches', () => {
     expect(parsed.success).toBe(true)
   })
 
-  // ── Field - Outstation: Taxi (no own vehicle) ─────────────────────────────
+  // ── Field - Outstation: No own vehicle ───────────────────────────────────
 
-  it('accepts outstation taxi claim (Rapido/Uber/Ola)', () => {
+  it('accepts outstation claim when own vehicle is not used', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
-      transportType: 'Rapido/Uber/Ola',
-      outstationCityId: 'mock-city-uuid',
-      taxiAmount: 500,
-    })
-    expect(parsed.success).toBe(true)
-  })
-
-  it('accepts outstation taxi claim (Rental Vehicle)', () => {
-    const parsed = claimSubmissionSchema.safeParse({
-      claimDate: PAST_DATE,
-      workLocation: 'Field - Outstation',
-      ownVehicleUsed: false,
-      transportType: 'Rental Vehicle',
-      outstationCityId: 'mock-city-uuid',
-      taxiAmount: 1200,
-    })
-    expect(parsed.success).toBe(true)
-  })
-
-  it('accepts outstation taxi claim with zero taxi amount', () => {
-    const parsed = claimSubmissionSchema.safeParse({
-      claimDate: PAST_DATE,
-      workLocation: 'Field - Outstation',
-      ownVehicleUsed: false,
-      transportType: 'Rapido/Uber/Ola',
       outstationCityId: 'mock-city-uuid',
     })
     expect(parsed.success).toBe(true)
   })
 
-  it('accepts outstation taxi without outstation location at schema level (validated server-side)', () => {
+  it('accepts outstation claim without outstation location at schema level (validated server-side)', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: PAST_DATE,
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
-      transportType: 'Rapido/Uber/Ola',
       outstationLocation: '',
     })
     expect(parsed.success).toBe(true)
-  })
-
-  it('accepts outstation taxi without transport type at schema level (validated server-side)', () => {
-    const parsed = claimSubmissionSchema.safeParse({
-      claimDate: PAST_DATE,
-      workLocation: 'Field - Outstation',
-      ownVehicleUsed: false,
-      outstationCityId: 'mock-city-uuid',
-    })
-    expect(parsed.success).toBe(true)
-  })
-
-  it('rejects negative taxi amount', () => {
-    const parsed = claimSubmissionSchema.safeParse({
-      claimDate: PAST_DATE,
-      workLocation: 'Field - Outstation',
-      ownVehicleUsed: false,
-      transportType: 'Rapido/Uber/Ola',
-      outstationCityId: 'mock-city-uuid',
-      taxiAmount: -100,
-    })
-    expect(parsed.success).toBe(false)
   })
 
   // ── Field - Outstation: Own Vehicle ───────────────────────────────────────
@@ -395,21 +346,6 @@ describe('claimSubmissionSchema — coercion edge cases', () => {
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       expect(parsed.data.kmTravelled).toBe(100)
-    }
-  })
-
-  it('coerces string taxi amount to number', () => {
-    const parsed = claimSubmissionSchema.safeParse({
-      claimDate: PAST_DATE,
-      workLocation: 'Field - Outstation',
-      ownVehicleUsed: false,
-      transportType: 'Rapido/Uber/Ola',
-      outstationCityId: 'mock-city-uuid',
-      taxiAmount: '500',
-    })
-    expect(parsed.success).toBe(true)
-    if (parsed.success) {
-      expect(parsed.data.taxiAmount).toBe(500)
     }
   })
 })

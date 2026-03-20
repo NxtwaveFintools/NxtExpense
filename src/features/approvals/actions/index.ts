@@ -21,6 +21,10 @@ import {
 import { getFilteredApprovalHistoryPaginated } from '@/features/approvals/queries/history-filters'
 import { getClaimAvailableActions } from '@/features/claims/queries'
 import { normalizeApprovalHistoryFilters } from '@/features/approvals/utils/history-filters'
+import {
+  getMaxNotesLength,
+  getMaxTextLengthValidationError,
+} from '@/lib/services/system-settings-service'
 
 type ApprovalActionResult = {
   ok: boolean
@@ -54,6 +58,17 @@ export async function submitApprovalAction(payload: {
   const approver = await getEmployeeByEmail(supabase, user.email)
   if (!approver) {
     return { ok: false, error: 'Approver employee profile not found.' }
+  }
+
+  const maxNotesLength = await getMaxNotesLength(supabase)
+  const notesValidationError = getMaxTextLengthValidationError(
+    parsed.data.notes,
+    maxNotesLength,
+    'Notes'
+  )
+
+  if (notesValidationError) {
+    return { ok: false, error: notesValidationError }
   }
 
   const claimWithOwner = await getClaimWithOwner(supabase, parsed.data.claimId)
@@ -203,6 +218,26 @@ export async function submitBulkApprovalAction(payload: {
       errors: parsed.data.claimIds.map((claimId) => ({
         claimId,
         message: 'Approver employee profile not found.',
+      })),
+    }
+  }
+
+  const maxNotesLength = await getMaxNotesLength(supabase)
+  const notesValidationError = getMaxTextLengthValidationError(
+    parsed.data.notes,
+    maxNotesLength,
+    'Notes'
+  )
+
+  if (notesValidationError) {
+    return {
+      ok: false,
+      error: notesValidationError,
+      succeeded: 0,
+      failed: parsed.data.claimIds.length,
+      errors: parsed.data.claimIds.map((claimId) => ({
+        claimId,
+        message: notesValidationError,
       })),
     }
   }

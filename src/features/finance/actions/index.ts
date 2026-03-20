@@ -15,6 +15,10 @@ import {
   getFinanceHistoryPaginated,
   getFinanceQueuePaginated,
 } from '@/features/finance/queries'
+import {
+  getMaxNotesLength,
+  getMaxTextLengthValidationError,
+} from '@/lib/services/system-settings-service'
 
 type FinanceActionResult = {
   ok: boolean
@@ -57,6 +61,19 @@ export async function submitFinanceAction(payload: {
 
   try {
     const { supabase } = await getFinanceEmployeeContext()
+    const maxNotesLength = await getMaxNotesLength(supabase)
+    const notesValidationError = getMaxTextLengthValidationError(
+      parsed.data.notes,
+      maxNotesLength,
+      'Notes'
+    )
+
+    if (notesValidationError) {
+      return {
+        ok: false,
+        error: notesValidationError,
+      }
+    }
 
     const availableActions = await getClaimAvailableActions(
       supabase,
@@ -113,6 +130,19 @@ export async function bulkFinanceClaimsAction(payload: {
 
   try {
     const { supabase } = await getFinanceEmployeeContext()
+    const maxNotesLength = await getMaxNotesLength(supabase)
+    const notesValidationError = getMaxTextLengthValidationError(
+      parsed.data.notes,
+      maxNotesLength,
+      'Notes'
+    )
+
+    if (notesValidationError) {
+      return {
+        ok: false,
+        error: notesValidationError,
+      }
+    }
 
     for (const claimId of parsed.data.claimIds) {
       const availableActions = await getClaimAvailableActions(supabase, claimId)

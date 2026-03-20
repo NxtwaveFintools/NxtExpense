@@ -20,7 +20,6 @@ describe('claimSubmissionSchema', () => {
       fromCityId: '',
       toCityId: '',
       vehicleType: '',
-      transportType: '',
     })
 
     expect(parsed.success).toBe(true)
@@ -41,14 +40,12 @@ describe('claimSubmissionSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('accepts outstation taxi flow without own vehicle', () => {
+  it('accepts outstation flow without own vehicle and without extra transport fields', () => {
     const parsed = claimSubmissionSchema.safeParse({
       claimDate: '06/03/2026',
       workLocation: 'Field - Outstation',
       ownVehicleUsed: false,
-      transportType: 'Rapido/Uber/Ola',
       outstationCityId: 'mock-city-uuid',
-      taxiAmount: 450,
     })
 
     expect(parsed.success).toBe(true)

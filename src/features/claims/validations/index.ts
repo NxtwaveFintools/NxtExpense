@@ -55,16 +55,11 @@ export const claimSubmissionSchema = z.object({
   intercityOwnVehicleUsed: z.boolean().optional(),
   intracityOwnVehicleUsed: z.boolean().optional(),
   vehicleType: optionalNonEmptyStringField(),
-  transportType: optionalNonEmptyStringField(),
   outstationStateId: optionalNonEmptyStringField(),
   outstationCityId: optionalNonEmptyStringField(),
   fromCityId: optionalNonEmptyStringField(),
   toCityId: optionalNonEmptyStringField(),
   kmTravelled: z.coerce.number().optional(),
-  taxiAmount: z.coerce
-    .number()
-    .min(0, 'Taxi amount cannot be negative.')
-    .optional(),
   foodWithPrincipalsAmount: z.coerce
     .number()
     .min(0, 'Food with principals amount cannot be negative.')

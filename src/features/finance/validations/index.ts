@@ -38,22 +38,14 @@ function optionalDateField(label: string) {
 export const financeActionSchema = z.object({
   claimId: z.string().uuid('Invalid claim identifier.'),
   action: z.string().trim().min(1, 'Action is required.'),
-  notes: z
-    .string()
-    .trim()
-    .max(500, 'Notes cannot exceed 500 characters.')
-    .optional(),
+  notes: z.string().trim().optional(),
   allowResubmit: z.boolean().optional(),
 })
 
 export const bulkFinanceActionSchema = z.object({
   claimIds: z.array(z.string().uuid('Invalid claim identifier.')).min(1),
   action: z.string().trim().min(1, 'Action is required.'),
-  notes: z
-    .string()
-    .trim()
-    .max(500, 'Notes cannot exceed 500 characters.')
-    .optional(),
+  notes: z.string().trim().optional(),
   allowResubmit: z.boolean().optional(),
 })
 

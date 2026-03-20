@@ -54,14 +54,14 @@ describe('adminReassignApproverSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects reassignment reason longer than 500 chars', () => {
+  it('accepts reassignment reason longer than 500 chars at schema level (enforced in actions)', () => {
     const result = adminReassignApproverSchema.safeParse({
       employeeId: VALID_UUID,
       reason: 'x'.repeat(501),
       confirmation: 'CONFIRM',
     })
 
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 })
 

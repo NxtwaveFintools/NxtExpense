@@ -13,8 +13,6 @@ type ClaimInput = {
   vehicleType?: string
   ownVehicleUsed?: boolean
   kmTravelled?: number
-  taxiAmount?: number
-  transportType?: string
 }
 
 type ClaimRates = {
@@ -56,12 +54,6 @@ export function buildClaimItemsAndTotal(
         itemType: 'intercity_travel',
         amount: intercityAmount,
         description: `${input.kmTravelled} KM @ ${rates.intercityRate}/KM`,
-      })
-    } else if (typeof input.taxiAmount === 'number' && input.taxiAmount > 0) {
-      items.push({
-        itemType: 'taxi_bill',
-        amount: input.taxiAmount,
-        description: `${input.transportType} bill submitted for outstation travel`,
       })
     }
   }

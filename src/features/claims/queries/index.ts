@@ -239,6 +239,81 @@ export async function getClaimAvailableActions(
   return (data ?? []) as ClaimAvailableAction[]
 }
 
+type BulkClaimAvailableActionRow = ClaimAvailableAction & {
+  claim_id: string
+}
+
+function isMissingBulkActionsRpcError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? ''
+
+  return (
+    message.includes('get_claim_available_actions_bulk') &&
+    (message.includes('schema cache') || message.includes('does not exist'))
+  )
+}
+
+export async function getClaimAvailableActionsByClaimIds(
+  supabase: SupabaseClient,
+  claimIds: string[]
+): Promise<Map<string, ClaimAvailableAction[]>> {
+  const uniqueClaimIds = [...new Set(claimIds)]
+
+  if (uniqueClaimIds.length === 0) {
+    return new Map()
+  }
+
+  const actionsByClaimId = new Map<string, ClaimAvailableAction[]>(
+    uniqueClaimIds.map((claimId) => [claimId, []])
+  )
+
+  const { data, error } = await supabase.rpc(
+    'get_claim_available_actions_bulk',
+    {
+      p_claim_ids: uniqueClaimIds,
+    }
+  )
+
+  // Keep compatibility with environments where the bulk RPC migration
+  // has not been applied yet by falling back to per-claim lookups.
+  if (error) {
+    if (!isMissingBulkActionsRpcError(error)) {
+      throw new Error(error.message)
+    }
+
+    const fallbackResults = await Promise.all(
+      uniqueClaimIds.map(async (claimId) => {
+        const actions = await getClaimAvailableActions(supabase, claimId)
+        return { claimId, actions }
+      })
+    )
+
+    for (const fallbackResult of fallbackResults) {
+      actionsByClaimId.set(fallbackResult.claimId, fallbackResult.actions)
+    }
+
+    return actionsByClaimId
+  }
+
+  for (const row of (data ?? []) as BulkClaimAvailableActionRow[]) {
+    const existing = actionsByClaimId.get(row.claim_id)
+
+    if (!existing) {
+      actionsByClaimId.set(row.claim_id, [row])
+      continue
+    }
+
+    existing.push({
+      action: row.action,
+      display_label: row.display_label,
+      require_notes: row.require_notes,
+      supports_allow_resubmit: row.supports_allow_resubmit,
+      actor_scope: row.actor_scope,
+    })
+  }
+
+  return actionsByClaimId
+}
+
 export async function getClaimHistory(
   supabase: SupabaseClient,
   claimId: string

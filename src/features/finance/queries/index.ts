@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Claim } from '@/features/claims/types'
 import {
-  getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds,
   CLAIM_COLUMNS,
   mapClaimRow,
 } from '@/features/claims/queries'
@@ -168,30 +168,28 @@ export async function getFinanceQueuePaginated(
   >
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
-
-  const mappedData = await Promise.all(
-    pageData.map(async (row) => {
-      const owner = Array.isArray(row.employees)
-        ? row.employees[0]
-        : row.employees
-
-      if (!owner) {
-        throw new Error('Claim owner mapping not found.')
-      }
-
-      const claim = mapClaimRow(row) as Claim
-      const availableActions = await getClaimAvailableActions(
-        supabase,
-        row.id as string
-      )
-
-      return {
-        claim,
-        owner,
-        availableActions,
-      }
-    })
+  const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
+    supabase,
+    pageData.map((row) => row.id as string)
   )
+
+  const mappedData = pageData.map((row) => {
+    const owner = Array.isArray(row.employees)
+      ? row.employees[0]
+      : row.employees
+
+    if (!owner) {
+      throw new Error('Claim owner mapping not found.')
+    }
+
+    const claimId = row.id as string
+
+    return {
+      claim: mapClaimRow(row) as Claim,
+      owner,
+      availableActions: availableActionsByClaimId.get(claimId) ?? [],
+    }
+  })
 
   const lastRecord = pageData.at(-1)
   const nextCursor =
