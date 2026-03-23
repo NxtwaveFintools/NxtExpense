@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   getExpenseRateByType,
-  getIntracityAllowanceRateByVehicle,
   type VehicleType,
 } from '@/lib/services/config-service'
 import {
@@ -169,7 +168,7 @@ export async function calculateBaseLocationItems(
  * Calculate expense items for outstation with inter-city/intra-city segments.
  * - Food allowance is always added once for outstation claims.
  * - Inter-city own vehicle adds per-km reimbursement.
- * - Intra-city own vehicle adds a fixed daily allowance from expense_rates.
+ * - Intra-city own vehicle adds daily allowance from vehicle_types.base_fuel_rate_per_day.
  * - Inter-city own vehicle implies intra-city allowance for the same day/vehicle.
  */
 export async function calculateOutstationTravelItems(
@@ -222,11 +221,7 @@ export async function calculateOutstationTravelItems(
   }
 
   if (includesIntracityAllowance && input.vehicleType) {
-    const intracityAllowance = await getIntracityAllowanceRateByVehicle(
-      supabase,
-      input.workLocationId,
-      input.vehicleType.vehicle_code
-    )
+    const intracityAllowance = Number(input.vehicleType.base_fuel_rate_per_day)
 
     if (intracityAllowance > 0) {
       items.push({

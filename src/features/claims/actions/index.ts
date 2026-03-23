@@ -140,6 +140,15 @@ export async function submitClaimAction(
     return { ok: false, error: 'Employee profile not found.' }
   }
 
+  const employeeStatusCode = employee.employee_statuses?.status_code ?? 'ACTIVE'
+
+  if (employeeStatusCode !== 'ACTIVE') {
+    return {
+      ok: false,
+      error: 'Inactive employees cannot submit new claims.',
+    }
+  }
+
   const roles = await getEmployeeRoles(supabase, employee.id)
   if (!canAccessEmployeeClaimsFromRoles(roles)) {
     return { ok: false, error: 'Your role cannot submit employee claims.' }

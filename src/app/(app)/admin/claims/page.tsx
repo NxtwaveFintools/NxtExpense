@@ -7,8 +7,8 @@ export default function AdminClaimsPage() {
         Claim Operations
       </h2>
       <p className="text-sm text-foreground/60">
-        Search for claims to perform administrative actions such as status
-        rollback.
+        Search for claims to perform administrative status reassignment and
+        workflow correction actions.
       </p>
       <ClaimOperations />
     </div>

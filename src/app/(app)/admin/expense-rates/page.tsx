@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { EXPENSE_RATE_TYPES } from '@/lib/constants/claim-expense'
 import { formatDate } from '@/lib/utils/date'
 import { ExpenseRateTable } from '@/features/admin/components/expense-rate-table'
 
@@ -18,6 +19,15 @@ type ExpenseRateRow = {
 async function getAllExpenseRates(
   supabase: SupabaseClient
 ): Promise<ExpenseRateRow[]> {
+  const currentFlowRateTypes = [
+    EXPENSE_RATE_TYPES.FOOD_BASE,
+    EXPENSE_RATE_TYPES.FOOD_OUTSTATION,
+    EXPENSE_RATE_TYPES.INTRACITY_ALLOWANCE_TWO_WHEELER,
+    EXPENSE_RATE_TYPES.INTRACITY_ALLOWANCE_FOUR_WHEELER,
+  ]
+
+  const todayIso = new Date().toISOString().slice(0, 10)
+
   const { data, error } = await supabase
     .from('expense_rates')
     .select(
@@ -27,8 +37,12 @@ async function getAllExpenseRates(
       work_locations!location_id ( location_name )
     `
     )
+    .eq('is_active', true)
+    .in('expense_type', currentFlowRateTypes)
+    .lte('effective_from', todayIso)
+    .or(`effective_to.is.null,effective_to.gte.${todayIso}`)
     .order('expense_type')
-    .order('is_active', { ascending: false })
+    .order('effective_from', { ascending: false })
 
   if (error) throw new Error(error.message)
 
@@ -46,7 +60,7 @@ async function getAllExpenseRates(
         ? formatDate(row.effective_from)
         : null,
       effective_to: row.effective_to ? formatDate(row.effective_to) : null,
-      is_active: row.is_active ?? true,
+      is_active: true,
       designation_name: des?.designation_name ?? null,
       location_name: wl?.location_name ?? null,
     }
