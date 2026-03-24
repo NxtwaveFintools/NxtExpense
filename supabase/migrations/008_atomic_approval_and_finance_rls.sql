@@ -1,3 +1,5 @@
+begin;
+
 create or replace function public.submit_approval_action_atomic(
   p_claim_id uuid,
   p_action public.approval_action_type,
@@ -164,3 +166,5 @@ with check (
   and status::text in ('issued', 'finance_rejected')
   and current_approval_level is null
 );
+
+commit;
