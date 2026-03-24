@@ -1,5 +1,3 @@
-BEGIN;
-
 create index if not exists idx_approval_history_acted_at_id
   on public.approval_history (acted_at desc, id desc);
 
@@ -157,5 +155,16 @@ as $$
   limit greatest(coalesce(p_limit, 10), 1) + 1;
 $$;
 
-COMMIT;
-
+grant execute on function public.get_filtered_approval_history(
+  int,
+  timestamptz,
+  uuid,
+  text,
+  text[],
+  date,
+  date,
+  timestamptz,
+  timestamptz,
+  timestamptz,
+  timestamptz
+) to authenticated;

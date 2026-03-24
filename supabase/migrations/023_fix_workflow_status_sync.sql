@@ -1,5 +1,3 @@
-BEGIN;
-
 -- =============================================================================
 -- Migration 023: Fix workflow RPCs
 --
@@ -567,6 +565,3 @@ BEGIN
   RETURN v_processed;
 END;
 $function$;
-
-
-COMMIT;

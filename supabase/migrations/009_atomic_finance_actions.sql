@@ -1,192 +1,176 @@
--- #region agent log
-do $migration$
+create or replace function public.submit_finance_action_atomic(
+  p_claim_id uuid,
+  p_action public.finance_action_type,
+  p_notes text default null
+)
+returns table (
+  claim_id uuid,
+  updated_status public.claim_status
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_email text;
+  v_is_finance boolean;
+  v_status public.claim_status;
+  v_next_status public.claim_status;
 begin
-  raise notice '[agent-log][session=0c4042][hypothesis=H1] entering 009_atomic_finance_actions';
+  v_email := public.current_user_email();
 
-  execute $fn1$
-    create or replace function public.submit_finance_action_atomic(
-      p_claim_id uuid,
-      p_action public.finance_action_type,
-      p_notes text default null
-    )
-    returns table (
-      claim_id uuid,
-      updated_status public.claim_status
-    )
-    language plpgsql
-    security definer
-    set search_path = public
-    as $$
-    declare
-      v_email text;
-      v_is_finance boolean;
-      v_status public.claim_status;
-      v_next_status public.claim_status;
-    begin
-      v_email := public.current_user_email();
+  if coalesce(v_email, '') = '' then
+    raise exception 'Unauthorized request.';
+  end if;
 
-      if coalesce(v_email, '') = '' then
-        raise exception 'Unauthorized request.';
-      end if;
+  select exists (
+    select 1
+    from public.employees e
+    where lower(e.employee_email) = v_email
+      and e.designation::text = 'Finance'
+  )
+  into v_is_finance;
 
-      select exists (
-        select 1
-        from public.employees e
-        where lower(e.employee_email) = v_email
-          and e.designation::text = 'Finance'
-      )
-      into v_is_finance;
+  if not v_is_finance then
+    raise exception 'Finance access is required.';
+  end if;
 
-      if not v_is_finance then
-        raise exception 'Finance access is required.';
-      end if;
+  select c.status
+  into v_status
+  from public.expense_claims c
+  where c.id = p_claim_id
+  for update;
 
-      select c.status
-      into v_status
-      from public.expense_claims c
-      where c.id = p_claim_id
-      for update;
+  if not found then
+    raise exception 'Claim not found.';
+  end if;
 
-      if not found then
-        raise exception 'Claim not found.';
-      end if;
+  if v_status::text <> 'finance_review' then
+    raise exception 'Claim is not in finance review state.';
+  end if;
 
-      if v_status::text <> 'finance_review' then
-        raise exception 'Claim is not in finance review state.';
-      end if;
+  v_next_status := case
+    when p_action::text = 'issued' then 'issued'::public.claim_status
+    else 'finance_rejected'::public.claim_status
+  end;
 
-      v_next_status := case
-        when p_action::text = 'issued' then 'issued'::public.claim_status
-        else 'finance_rejected'::public.claim_status
-      end;
+  insert into public.finance_actions (
+    claim_id,
+    actor_email,
+    action,
+    notes
+  )
+  values (
+    p_claim_id,
+    v_email,
+    p_action,
+    nullif(trim(coalesce(p_notes, '')), '')
+  );
 
-      insert into public.finance_actions (
-        claim_id,
-        actor_email,
-        action,
-        notes
-      )
-      values (
-        p_claim_id,
-        v_email,
-        p_action,
-        nullif(trim(coalesce(p_notes, '')), '')
-      );
+  update public.expense_claims
+  set status = v_next_status,
+      current_approval_level = null,
+      updated_at = now()
+  where id = p_claim_id;
 
-      update public.expense_claims
-      set status = v_next_status,
-          current_approval_level = null,
-          updated_at = now()
-      where id = p_claim_id;
-
-      return query
-      select p_claim_id, v_next_status;
-    end;
-    $$;
-  $fn1$;
-
-  execute $grant1$
-    grant execute on function public.submit_finance_action_atomic(uuid, public.finance_action_type, text)
-    to authenticated;
-  $grant1$;
-
-  execute $fn2$
-    create or replace function public.bulk_issue_claims_atomic(
-      p_claim_ids uuid[],
-      p_notes text default null
-    )
-    returns int
-    language plpgsql
-    security definer
-    set search_path = public
-    as $$
-    declare
-      v_email text;
-      v_is_finance boolean;
-      v_requested_count int;
-      v_eligible_count int;
-      v_updated_count int;
-    begin
-      v_email := public.current_user_email();
-
-      if coalesce(v_email, '') = '' then
-        raise exception 'Unauthorized request.';
-      end if;
-
-      select exists (
-        select 1
-        from public.employees e
-        where lower(e.employee_email) = v_email
-          and e.designation::text = 'Finance'
-      )
-      into v_is_finance;
-
-      if not v_is_finance then
-        raise exception 'Finance access is required.';
-      end if;
-
-      if p_claim_ids is null or coalesce(array_length(p_claim_ids, 1), 0) = 0 then
-        raise exception 'At least one claim must be selected.';
-      end if;
-
-      with requested as (
-        select distinct unnest(p_claim_ids) as claim_id
-      )
-      select count(*) into v_requested_count from requested;
-
-      with requested as (
-        select distinct unnest(p_claim_ids) as claim_id
-      ),
-      eligible as (
-        select c.id
-        from public.expense_claims c
-        join requested r on r.claim_id = c.id
-        where c.status::text = 'finance_review'
-        for update
-      )
-      select count(*) into v_eligible_count from eligible;
-
-      if v_eligible_count <> v_requested_count then
-        raise exception 'One or more selected claims are not available in finance review.';
-      end if;
-
-      with requested as (
-        select distinct unnest(p_claim_ids) as claim_id
-      )
-      insert into public.finance_actions (
-        claim_id,
-        actor_email,
-        action,
-        notes
-      )
-      select
-        r.claim_id,
-        v_email,
-        'issued'::public.finance_action_type,
-        nullif(trim(coalesce(p_notes, '')), '')
-      from requested r;
-
-      with requested as (
-        select distinct unnest(p_claim_ids) as claim_id
-      )
-      update public.expense_claims c
-      set status = 'issued'::public.claim_status,
-          current_approval_level = null,
-          updated_at = now()
-      from requested r
-      where c.id = r.claim_id;
-
-      get diagnostics v_updated_count = row_count;
-
-      return v_updated_count;
-    end;
-    $$;
-  $fn2$;
-
-  execute $grant2$
-    grant execute on function public.bulk_issue_claims_atomic(uuid[], text)
-    to authenticated;
-  $grant2$;
+  return query
+  select p_claim_id, v_next_status;
 end;
-$migration$;
--- #endregion
+$$;
+
+grant execute on function public.submit_finance_action_atomic(uuid, public.finance_action_type, text)
+to authenticated;
+
+create or replace function public.bulk_issue_claims_atomic(
+  p_claim_ids uuid[],
+  p_notes text default null
+)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_email text;
+  v_is_finance boolean;
+  v_requested_count int;
+  v_eligible_count int;
+  v_updated_count int;
+begin
+  v_email := public.current_user_email();
+
+  if coalesce(v_email, '') = '' then
+    raise exception 'Unauthorized request.';
+  end if;
+
+  select exists (
+    select 1
+    from public.employees e
+    where lower(e.employee_email) = v_email
+      and e.designation::text = 'Finance'
+  )
+  into v_is_finance;
+
+  if not v_is_finance then
+    raise exception 'Finance access is required.';
+  end if;
+
+  if p_claim_ids is null or coalesce(array_length(p_claim_ids, 1), 0) = 0 then
+    raise exception 'At least one claim must be selected.';
+  end if;
+
+  with requested as (
+    select distinct unnest(p_claim_ids) as claim_id
+  )
+  select count(*) into v_requested_count from requested;
+
+  with requested as (
+    select distinct unnest(p_claim_ids) as claim_id
+  ),
+  eligible as (
+    select c.id
+    from public.expense_claims c
+    join requested r on r.claim_id = c.id
+    where c.status::text = 'finance_review'
+    for update
+  )
+  select count(*) into v_eligible_count from eligible;
+
+  if v_eligible_count <> v_requested_count then
+    raise exception 'One or more selected claims are not available in finance review.';
+  end if;
+
+  with requested as (
+    select distinct unnest(p_claim_ids) as claim_id
+  )
+  insert into public.finance_actions (
+    claim_id,
+    actor_email,
+    action,
+    notes
+  )
+  select
+    r.claim_id,
+    v_email,
+    'issued'::public.finance_action_type,
+    nullif(trim(coalesce(p_notes, '')), '')
+  from requested r;
+
+  with requested as (
+    select distinct unnest(p_claim_ids) as claim_id
+  )
+  update public.expense_claims c
+  set status = 'issued'::public.claim_status,
+      current_approval_level = null,
+      updated_at = now()
+  from requested r
+  where c.id = r.claim_id;
+
+  get diagnostics v_updated_count = row_count;
+
+  return v_updated_count;
+end;
+$$;
+
+grant execute on function public.bulk_issue_claims_atomic(uuid[], text)
+to authenticated;

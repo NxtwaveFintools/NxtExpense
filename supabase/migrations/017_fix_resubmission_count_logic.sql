@@ -1,5 +1,3 @@
-BEGIN;
-
 create or replace function public.resubmit_claim_after_rejection_atomic(
   p_claim_id uuid,
   p_notes text default null
@@ -159,6 +157,8 @@ begin
 end;
 $$;
 
+grant execute on function public.resubmit_claim_after_rejection_atomic(uuid, text)
+to authenticated;
 
 update public.expense_claims c
 set resubmission_count = coalesce(
@@ -171,5 +171,3 @@ set resubmission_count = coalesce(
   ),
   0
 );
-
-COMMIT;

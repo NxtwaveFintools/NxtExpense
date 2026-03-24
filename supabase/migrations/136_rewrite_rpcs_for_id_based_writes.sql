@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 136: Phase 10 — Rewrite all RPCs for ID-based writes
 -- All RPCs now write BOTH old email columns AND new employee ID columns.
 -- get_filtered_approval_history now joins through IDs instead of email/text columns.
@@ -659,5 +657,3 @@ AS $function$
   order by ah.acted_at desc, ah.id desc
   limit greatest(coalesce(p_limit, 10), 1) + 1;
 $function$;
-
-COMMIT;

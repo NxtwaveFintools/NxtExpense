@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 121: Add ID-based FK columns to expense_claims, approval_history, finance_actions
 -- Also adds missing cities referenced in existing data
 -- Columns are NULLABLE initially — will be populated in migration 122
@@ -40,5 +38,3 @@ CREATE INDEX IF NOT EXISTS idx_ah_approver_employee ON approval_history(approver
 ALTER TABLE finance_actions ADD COLUMN IF NOT EXISTS actor_employee_id UUID REFERENCES employees(id);
 
 CREATE INDEX IF NOT EXISTS idx_fa_actor_employee ON finance_actions(actor_employee_id);
-
-COMMIT;

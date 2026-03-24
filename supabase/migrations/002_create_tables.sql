@@ -1,5 +1,3 @@
-BEGIN;
-
 create extension if not exists pgcrypto;
 
 create table public.employees (
@@ -78,5 +76,3 @@ create trigger trg_expense_claims_updated_at
 before update on public.expense_claims
 for each row
 execute function public.update_updated_at_column();
-
-COMMIT;

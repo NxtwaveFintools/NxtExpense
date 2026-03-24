@@ -1,5 +1,3 @@
-BEGIN;
-
 alter type public.designation_type add value if not exists 'Finance';
 
 alter type public.claim_status add value if not exists 'finance_review';
@@ -68,5 +66,3 @@ with check (
       and lower(finance_actions.actor_email) = public.current_user_email()
   )
 );
-
-COMMIT;

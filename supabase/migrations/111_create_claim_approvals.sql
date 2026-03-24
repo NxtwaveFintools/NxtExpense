@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 111: Create claim_approvals table
 -- Tracks approval history for each claim with employee_id FK (not email)
 -- Replaces email-based approval_history table
@@ -46,6 +44,3 @@ CREATE POLICY "ca_write_service" ON claim_approvals FOR ALL TO service_role USIN
 -- Check constraint for valid action types
 ALTER TABLE claim_approvals ADD CONSTRAINT chk_action_type 
   CHECK (action_type IN ('APPROVED', 'REJECTED', 'RETURNED'));
-
-
-COMMIT;

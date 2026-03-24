@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 128: Refactor RLS policies to use role-based checks (Part 1)
 -- Phase 8 of ID-based architecture migration
 --
@@ -124,5 +122,3 @@ CREATE POLICY "finance can read claim items"
         AND c.status IN ('finance_review', 'issued', 'finance_rejected')
     ))
   );
-
-COMMIT;

@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 118: Create system_settings table
 -- Global system configuration — REPLACES HARDCODED CONSTANTS
 
@@ -31,6 +29,3 @@ VALUES
   ('CURRENCY_SYMBOL', '{"value": "₹"}', 'Currency symbol', 'string'),
   ('DATE_FORMAT', '{"value": "DD/MM/YYYY"}', 'Date display format', 'string'),
   ('FISCAL_YEAR_START_MONTH', '{"value": 4}', 'Fiscal year starts in April', 'number');
-
-
-COMMIT;

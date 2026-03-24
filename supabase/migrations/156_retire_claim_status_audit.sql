@@ -1,5 +1,3 @@
-BEGIN;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Migration 156: Retire claim_status_audit write path
 --
@@ -421,5 +419,3 @@ $$;
 -- The claim_status_audit TABLE is NOT dropped here; historical rows are kept.
 
 DROP FUNCTION IF EXISTS public.log_claim_status_audit(uuid, text, text, text, text, text, integer, integer, boolean, text, jsonb);
-
-COMMIT;

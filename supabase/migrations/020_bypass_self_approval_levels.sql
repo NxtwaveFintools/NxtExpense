@@ -1,5 +1,3 @@
-BEGIN;
-
 create or replace function public.resolve_next_approval_level(
   p_owner public.employees,
   p_current_level int,
@@ -163,6 +161,3 @@ select
 from self_assigned_claim_backfill u;
 
 drop table if exists pg_temp.self_assigned_claim_backfill;
-
-
-COMMIT;

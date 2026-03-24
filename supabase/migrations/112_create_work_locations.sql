@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 112: Create work_locations table
 -- Replaces PostgreSQL work_location_type enum with ID-based lookup table
 
@@ -31,6 +29,3 @@ VALUES
   ('FIELD_OUTSTATION', 'Field – Outstation',       false, true,  3),
   ('LEAVE',            'Leave',                    false, false, 4),
   ('WEEK_OFF',         'Week-off',                 false, false, 5);
-
-
-COMMIT;

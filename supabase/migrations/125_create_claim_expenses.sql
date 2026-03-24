@@ -1,5 +1,3 @@
-BEGIN;
-
 -- ============================================================
 -- Migration 125: Create claim_expenses table (replaces expense_claim_items)
 -- Adds transport_type_id FK, bill tracking fields
@@ -100,5 +98,3 @@ USING (
       AND ec.status::text IN ('finance_review', 'issued', 'finance_rejected')
   )
 );
-
-COMMIT;

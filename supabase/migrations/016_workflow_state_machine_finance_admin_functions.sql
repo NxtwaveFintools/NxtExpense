@@ -1,5 +1,3 @@
-BEGIN;
-
 drop function if exists public.submit_finance_action_atomic(uuid, public.finance_action_type, text);
 drop function if exists public.bulk_finance_actions_atomic(uuid[], public.finance_action_type, text);
 
@@ -169,6 +167,8 @@ begin
 end;
 $$;
 
+grant execute on function public.submit_finance_action_atomic(uuid, public.finance_action_type, text, boolean)
+to authenticated;
 
 create or replace function public.bulk_finance_actions_atomic(
   p_claim_ids uuid[],
@@ -211,6 +211,8 @@ begin
 end;
 $$;
 
+grant execute on function public.bulk_finance_actions_atomic(uuid[], public.finance_action_type, text, boolean)
+to authenticated;
 
 create or replace function public.admin_rollback_claim_atomic(
   p_claim_id uuid,
@@ -372,6 +374,8 @@ begin
 end;
 $$;
 
+grant execute on function public.admin_rollback_claim_atomic(uuid, text, text)
+to authenticated;
 
 create or replace function public.admin_reassign_employee_approvers_atomic(
   p_employee_id uuid,
@@ -465,6 +469,8 @@ begin
 end;
 $$;
 
+grant execute on function public.admin_reassign_employee_approvers_atomic(uuid, text, text, text, text, text)
+to authenticated;
 
 create or replace function public.get_claim_available_actions(
   p_claim_id uuid
@@ -546,5 +552,5 @@ begin
 end;
 $$;
 
-COMMIT;
-
+grant execute on function public.get_claim_available_actions(uuid)
+to authenticated;

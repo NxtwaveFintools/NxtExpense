@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 107: Create claim_statuses table
 -- New L1/L2/L3/L4 claim status hierarchy (ID-based, replaces text-based statuses)
 -- This table coexists with claim_status_catalog (old) during migration
@@ -60,6 +58,3 @@ VALUES
 
   -- Cross-level status
   ('RETURNED_FOR_MODIFICATION', 'Returned for Modification', 'Claim returned to employee for corrections', NULL, false, false, false, false, true, 'orange', 15);
-
-
-COMMIT;

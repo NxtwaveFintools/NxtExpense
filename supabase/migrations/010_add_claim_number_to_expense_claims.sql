@@ -1,5 +1,3 @@
-BEGIN;
-
 create sequence if not exists public.claim_number_seq;
 
 alter table public.expense_claims
@@ -69,5 +67,3 @@ alter column claim_number set not null;
 
 create unique index if not exists idx_expense_claims_claim_number_unique
 on public.expense_claims(claim_number);
-
-COMMIT;

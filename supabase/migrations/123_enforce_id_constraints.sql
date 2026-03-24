@@ -1,5 +1,3 @@
-BEGIN;
-
 -- ============================================================
 -- Migration 123: Enforce NOT NULL constraints on mandatory ID columns
 -- Only columns that should ALWAYS have a value get NOT NULL
@@ -21,5 +19,3 @@ ALTER TABLE approval_history ALTER COLUMN new_status_id SET NOT NULL;
 
 -- finance_actions: actor is always a real employee
 ALTER TABLE finance_actions ALTER COLUMN actor_employee_id SET NOT NULL;
-
-COMMIT;

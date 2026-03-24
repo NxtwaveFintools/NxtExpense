@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 129: Refactor RLS policies to use role-based checks (Part 2)
 -- Phase 8 of ID-based architecture migration
 --
@@ -115,5 +113,3 @@ CREATE POLICY "finance or owner can read finance actions"
         )
     )
   );
-
-COMMIT;

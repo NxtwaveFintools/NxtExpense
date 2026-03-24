@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 126: Refactor RPCs to use role-based access checks (Part 1)
 -- Phase 7 of ID-based architecture migration
 --
@@ -363,5 +361,3 @@ begin
   order by min(t.created_at);
 end;
 $function$;
-
-COMMIT;

@@ -1,5 +1,3 @@
-BEGIN;
-
 -- ============================================================
 -- Migration 145: Fix function search_path security warnings
 --                and rewrite reassign_orphaned_approvals for
@@ -121,5 +119,3 @@ BEGIN
   RETURN QUERY SELECT v_count;
 END;
 $$;
-
-COMMIT;

@@ -1,5 +1,3 @@
-BEGIN;
-
 create or replace function public.resolve_next_approval_level(
   p_owner public.employees,
   p_current_level int,
@@ -157,6 +155,8 @@ values
   ('default', 'rejected', 'pending_approval', 'finance_review', 'admin_override', 'Admin Rollback', 'admin', null, true, null, 'reset_first_configured', null, '{"route":"admin"}'),
   ('default', 'returned_for_modification', 'pending_approval', 'finance_review', 'admin_override', 'Admin Rollback', 'admin', null, true, null, 'reset_first_configured', null, '{"route":"admin"}'),
   ('default', 'finance_review', 'pending_approval', 'finance_review', 'admin_override', 'Admin Rollback', 'admin', null, true, null, 'reset_first_configured', null, '{"route":"admin"}');
+
+drop function if exists public.submit_approval_action_atomic(uuid, public.approval_action_type, text);
 
 create or replace function public.submit_approval_action_atomic(
   p_claim_id uuid,
@@ -357,6 +357,8 @@ begin
 end;
 $$;
 
+grant execute on function public.submit_approval_action_atomic(uuid, public.approval_action_type, text, boolean)
+to authenticated;
 
 create or replace function public.resubmit_claim_after_rejection_atomic(
   p_claim_id uuid,
@@ -517,5 +519,5 @@ begin
 end;
 $$;
 
-COMMIT;
-
+grant execute on function public.resubmit_claim_after_rejection_atomic(uuid, text)
+to authenticated;

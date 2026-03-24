@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Migration 127: Refactor RPCs to use role-based access checks (Part 2)
 -- Phase 7 of ID-based architecture migration
 --
@@ -425,5 +423,3 @@ AS $function$
   order by ah.acted_at desc, ah.id desc
   limit greatest(coalesce(p_limit, 10), 1) + 1;
 $function$;
-
-COMMIT;
