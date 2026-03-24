@@ -14,7 +14,6 @@ import {
   getAllCities,
   getVehicleTypesByDesignation,
   getExpenseRateByType,
-  getIntracityAllowanceRateByVehicle,
 } from '@/lib/services/config-service'
 
 export default async function NewClaimPage() {
@@ -24,6 +23,12 @@ export default async function NewClaimPage() {
 
   if (!employee || !(await canAccessEmployeeClaims(supabase, employee))) {
     redirect('/dashboard')
+  }
+
+  const employeeStatusCode = employee.employee_statuses?.status_code ?? 'ACTIVE'
+
+  if (employeeStatusCode !== 'ACTIVE') {
+    redirect('/claims')
   }
 
   // Fetch lookup data from DB
@@ -79,21 +84,7 @@ export default async function NewClaimPage() {
   ])
 
   const intracityDailyByVehicle = Object.fromEntries(
-    await Promise.all(
-      allowedVehicles.map(async (vt) => {
-        if (!outstationLocationId) {
-          return [vt.id, 0] as const
-        }
-
-        const allowance = await getIntracityAllowanceRateByVehicle(
-          supabase,
-          outstationLocationId,
-          vt.vehicle_code
-        )
-
-        return [vt.id, allowance] as const
-      })
-    )
+    allowedVehicles.map((vt) => [vt.id, Number(vt.base_fuel_rate_per_day)])
   ) as Record<string, number>
 
   const claimRateSnapshot = {

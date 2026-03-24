@@ -9,7 +9,8 @@ import {
   MapPin,
   Car,
   DollarSign,
-  Briefcase,
+  History,
+  Network,
 } from 'lucide-react'
 
 type NavItem = {
@@ -31,11 +32,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Users className="size-4" />,
   },
   {
-    href: '/admin/designations',
-    label: 'Designations',
-    icon: <Briefcase className="size-4" />,
-  },
-  {
     href: '/admin/expense-rates',
     label: 'Expense Rates',
     icon: <DollarSign className="size-4" />,
@@ -49,6 +45,16 @@ const NAV_ITEMS: NavItem[] = [
     href: '/admin/work-locations',
     label: 'Work Locations',
     icon: <MapPin className="size-4" />,
+  },
+  {
+    href: '/admin/approver-rules',
+    label: 'Approver Rules',
+    icon: <Network className="size-4" />,
+  },
+  {
+    href: '/admin/logs',
+    label: 'Admin Logs',
+    icon: <History className="size-4" />,
   },
 ]
 

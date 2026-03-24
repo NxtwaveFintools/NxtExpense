@@ -32,9 +32,13 @@ vi.mock('@/features/admin/queries', () => ({
   searchEmployeesForAdmin: mocks.searchEmployeesForAdmin,
 }))
 
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+}))
+
 import {
+  changeClaimStatusAction,
   reassignApproversAction,
-  rollbackClaimStatusAction,
   searchClaimsAction,
   searchEmployeesAction,
   toggleDesignationActiveAction,
@@ -85,8 +89,9 @@ describe('admin action branch coverage', () => {
   })
 
   it('should short-circuit invalid payloads before DB calls', async () => {
-    const rollback = await rollbackClaimStatusAction({
+    const statusChange = await changeClaimStatusAction({
       claimId: 'invalid-id',
+      targetStatusId: VALID_ID,
       reason: 'Invalid',
       confirmation: 'CONFIRM',
     } as never)
@@ -131,7 +136,7 @@ describe('admin action branch coverage', () => {
     } as never)
 
     for (const result of [
-      rollback,
+      statusChange,
       reassign,
       designation,
       workLocation,
@@ -148,12 +153,13 @@ describe('admin action branch coverage', () => {
     expect(fromMock).not.toHaveBeenCalled()
   })
 
-  it('should return empty rollback details when RPC returns non-array data', async () => {
+  it('should return empty status-change details when RPC returns non-array data', async () => {
     rpcMock.mockResolvedValueOnce({ data: null, error: null })
 
-    const result = await rollbackClaimStatusAction({
+    const result = await changeClaimStatusAction({
       claimId: VALID_ID,
-      reason: 'Rollback for edge-path validation',
+      targetStatusId: VALID_ID,
+      reason: 'Status change for edge-path validation',
       confirmation: 'CONFIRM',
     })
 
@@ -161,7 +167,8 @@ describe('admin action branch coverage', () => {
       ok: true,
       error: null,
       claimId: undefined,
-      rolledBackTo: undefined,
+      previousStatusCode: undefined,
+      updatedStatusCode: undefined,
     })
   })
 
@@ -203,19 +210,24 @@ describe('admin action branch coverage', () => {
     })
 
     expect(result).toEqual({ ok: true, error: null })
-    expect(fromMock).toHaveBeenCalledWith('work_locations')
-    expect(updateMock).toHaveBeenCalledWith({ is_active: true })
-    expect(eqMock).toHaveBeenCalledWith('id', VALID_ID)
+    expect(rpcMock).toHaveBeenCalledWith(
+      'admin_toggle_work_location_active_atomic',
+      {
+        p_id: VALID_ID,
+        p_is_active: true,
+      }
+    )
   })
 
   it('should return default non-Error fallback messages for admin actions', async () => {
     mocks.createSupabaseServerClient.mockRejectedValueOnce('offline')
-    const rollback = await rollbackClaimStatusAction({
+    const statusChange = await changeClaimStatusAction({
       claimId: VALID_ID,
-      reason: 'Rollback fallback',
+      targetStatusId: VALID_ID,
+      reason: 'Status change fallback',
       confirmation: 'CONFIRM',
     })
-    expect(rollback.error).toBe('Unable to rollback claim.')
+    expect(statusChange.error).toBe('Unable to change claim status.')
 
     mocks.createSupabaseServerClient.mockRejectedValueOnce('offline')
     const reassign = await reassignApproversAction({
@@ -312,14 +324,19 @@ describe('admin action branch coverage', () => {
   )
 
   it('should surface DB error messages for rate update actions', async () => {
-    eqMock
+    rpcMock
       .mockResolvedValueOnce({
+        data: null,
         error: { message: 'Vehicle rates update failed.' },
       })
       .mockResolvedValueOnce({
+        data: null,
         error: { message: 'Expense rate update failed.' },
       })
-      .mockResolvedValueOnce({ error: { message: 'Expense toggle failed.' } })
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Expense toggle failed.' },
+      })
 
     const vehicleRates = await updateVehicleRatesAction({
       id: VALID_ID,
