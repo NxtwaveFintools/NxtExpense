@@ -1,5 +1,3 @@
-begin;
-
 create or replace function public.submit_approval_action_atomic(
   p_claim_id uuid,
   p_action public.approval_action_type,
@@ -124,47 +122,3 @@ begin
 end;
 $$;
 
-grant execute on function public.submit_approval_action_atomic(uuid, public.approval_action_type, text)
-to authenticated;
-
-drop policy if exists "finance can read finance claims" on public.expense_claims;
-create policy "finance can read finance claims"
-on public.expense_claims
-for select
-to authenticated
-using (
-  exists (
-    select 1
-    from public.employees current_emp
-    where lower(current_emp.employee_email) = public.current_user_email()
-      and current_emp.designation::text = 'Finance'
-  )
-  and status::text in ('finance_review', 'issued', 'finance_rejected')
-);
-
-drop policy if exists "finance can update finance review claims" on public.expense_claims;
-create policy "finance can update finance review claims"
-on public.expense_claims
-for update
-to authenticated
-using (
-  exists (
-    select 1
-    from public.employees current_emp
-    where lower(current_emp.employee_email) = public.current_user_email()
-      and current_emp.designation::text = 'Finance'
-  )
-  and status::text = 'finance_review'
-)
-with check (
-  exists (
-    select 1
-    from public.employees current_emp
-    where lower(current_emp.employee_email) = public.current_user_email()
-      and current_emp.designation::text = 'Finance'
-  )
-  and status::text in ('issued', 'finance_rejected')
-  and current_approval_level is null
-);
-
-commit;
