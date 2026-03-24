@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 147: Add missing RLS policies for employees, approvers, and admins
 -- ROOT CAUSE: Only INSERT policy existed for employees on expense_claims.
 -- PostgREST requires SELECT policy to return inserted rows (.select().single()).
@@ -239,3 +241,5 @@ CREATE POLICY "admin reads all claim items"
         AND r.role_code = 'ADMIN'
     )
   );
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 116: Create expense_rates table (ID-based)
 -- Replaces magic numbers and supplements expense_reimbursement_rates
 -- Uses designation_id and location_id FKs instead of text enums
@@ -50,3 +52,6 @@ VALUES
   (get_designation_id('SBH'), get_work_location_id('FIELD_OUTSTATION'), 'ACCOMMODATION', 2000.00),
   (get_designation_id('ZBH'), get_work_location_id('FIELD_OUTSTATION'), 'ACCOMMODATION', 2000.00),
   (get_designation_id('PM'),  get_work_location_id('FIELD_OUTSTATION'), 'ACCOMMODATION', 2000.00);
+
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Migration 154: Rewrite reassign_orphaned_approvals to accept UUID params
 --
@@ -67,3 +69,5 @@ BEGIN
   RETURN QUERY SELECT v_count;
 END;
 $$;
+
+COMMIT;

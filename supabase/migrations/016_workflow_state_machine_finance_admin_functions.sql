@@ -1,3 +1,5 @@
+BEGIN;
+
 drop function if exists public.submit_finance_action_atomic(uuid, public.finance_action_type, text);
 drop function if exists public.bulk_finance_actions_atomic(uuid[], public.finance_action_type, text);
 
@@ -543,4 +545,6 @@ begin
   order by min(t.created_at);
 end;
 $$;
+
+COMMIT;
 

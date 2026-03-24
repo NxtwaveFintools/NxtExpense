@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 115: Create transport_types table
 -- Master table for transport types (Taxi, Bus, Train, etc.)
 
@@ -28,3 +30,6 @@ VALUES
   ('TRAIN',      'Train',          4),
   ('FLIGHT',     'Flight',         5),
   ('RENTAL_CAR', 'Rental Car',     6);
+
+
+COMMIT;

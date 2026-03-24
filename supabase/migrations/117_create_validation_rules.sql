@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 117: Create validation_rules table
 -- Dynamic validation rules — REPLACES HARDCODED CONSTANTS
 -- JSONB values allow flexible rule structures
@@ -42,3 +44,6 @@ VALUES
 
   ('DUPLICATE_CLAIM_DATE_CHECK', 'Block duplicate employee-date claims',
    '{"value": true}', 'Reject duplicate claims for the same employee on the same date');
+
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 149: Rename claim number prefix from CLM to CLAIM
 -- Updates: all existing records + generate_claim_number function
 
@@ -38,3 +40,5 @@ begin
   );
 end;
 $function$;
+
+COMMIT;

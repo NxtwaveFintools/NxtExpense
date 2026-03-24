@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 108: Create claim_status_transitions table
 -- Defines allowed status transitions and who can trigger them
 -- Uses FK lookups by status_code and role_code for readability
@@ -101,3 +103,6 @@ VALUES
 
   -- 21. Employee resubmits returned claim
   (get_claim_status_id('RETURNED_FOR_MODIFICATION'), get_claim_status_id('SUBMITTED'), get_role_id('EMPLOYEE'), false, false);
+
+
+COMMIT;

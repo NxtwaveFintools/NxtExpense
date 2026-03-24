@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 110: Create designation_approval_flow table
 -- Maps which designations require which approval levels
 -- SRO/BOA/ABH need all 4 levels; SBH/ZBH/PM skip L1
@@ -26,3 +28,6 @@ VALUES
   (get_designation_id('SBH'), ARRAY[2,3,4]),
   (get_designation_id('ZBH'), ARRAY[2,3,4]),
   (get_designation_id('PM'),  ARRAY[2,3,4]);
+
+
+COMMIT;

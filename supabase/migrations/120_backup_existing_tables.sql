@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 120: Backup existing tables before Phase 4 data migration
 -- Safety: Create full backups of all tables being modified
 
@@ -42,3 +44,5 @@ BEGIN
   RAISE NOTICE 'All backups verified: expense_claims=%, approval_history=%, finance_actions=%, expense_claim_items=%', 
     ec_orig, ah_orig, fa_orig, eci_orig;
 END $$;
+
+COMMIT;

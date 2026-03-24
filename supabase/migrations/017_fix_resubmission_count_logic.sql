@@ -1,3 +1,5 @@
+BEGIN;
+
 create or replace function public.resubmit_claim_after_rejection_atomic(
   p_claim_id uuid,
   p_notes text default null
@@ -169,3 +171,5 @@ set resubmission_count = coalesce(
   ),
   0
 );
+
+COMMIT;

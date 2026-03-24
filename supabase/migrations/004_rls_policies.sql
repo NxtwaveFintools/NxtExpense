@@ -1,3 +1,5 @@
+BEGIN;
+
 alter table public.employees enable row level security;
 alter table public.expense_reimbursement_rates enable row level security;
 alter table public.expense_claims enable row level security;
@@ -151,3 +153,5 @@ with check (
       and lower(approval_history.approver_email) = public.current_user_email()
   )
 );
+
+COMMIT;

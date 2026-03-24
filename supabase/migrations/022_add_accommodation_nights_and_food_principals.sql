@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Add accommodation_nights column to expense_claims
 ALTER TABLE expense_claims
   ADD COLUMN accommodation_nights integer DEFAULT NULL;
@@ -34,3 +36,6 @@ END $$;
 INSERT INTO validation_rules (rule_code, rule_name, rule_value, rule_description, is_active)
 VALUES ('FOOD_WITH_PRINCIPALS_MAX_PER_MONTH', 'Food With Principals Monthly Limit', '5', 'Maximum times food with principals can be claimed per calendar month', true)
 ON CONFLICT DO NOTHING;
+
+
+COMMIT;

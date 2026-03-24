@@ -1,3 +1,5 @@
+BEGIN;
+
 create index idx_employees_employee_email
   on public.employees (employee_email);
 
@@ -21,3 +23,5 @@ create index idx_approval_history_claim_id
 
 create index idx_approval_history_approver_email
   on public.approval_history (approver_email);
+
+COMMIT;

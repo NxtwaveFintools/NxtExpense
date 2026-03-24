@@ -1,3 +1,5 @@
+BEGIN;
+
 create index if not exists idx_approval_history_acted_at_id
   on public.approval_history (acted_at desc, id desc);
 
@@ -154,4 +156,6 @@ as $$
   order by ah.acted_at desc, ah.id desc
   limit greatest(coalesce(p_limit, 10), 1) + 1;
 $$;
+
+COMMIT;
 

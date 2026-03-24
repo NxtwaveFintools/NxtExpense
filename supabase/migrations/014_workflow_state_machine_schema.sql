@@ -1,3 +1,5 @@
+BEGIN;
+
 alter type public.claim_status add value if not exists 'returned_for_modification';
 
 alter type public.approval_action_type add value if not exists 'resubmitted';
@@ -184,3 +186,5 @@ using (
       )
   )
 );
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Migration 157: Drop legacy denormalized text columns from employees
 --
@@ -21,3 +23,5 @@ DROP FUNCTION IF EXISTS public.sync_employee_designation_from_id();
 ALTER TABLE public.employees
   DROP COLUMN IF EXISTS designation,
   DROP COLUMN IF EXISTS state;
+
+COMMIT;

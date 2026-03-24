@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 119: Create allowed_email_domains table
 -- Corporate email domain validation — REPLACES HARDCODED ARRAY
 
@@ -19,3 +21,6 @@ CREATE POLICY "aed_write_service" ON allowed_email_domains FOR ALL TO service_ro
 
 -- Seed data
 INSERT INTO allowed_email_domains (domain_name) VALUES ('nxtwave.co.in');
+
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 create type public.designation_type as enum (
   'Student Relationship Officer',
   'Business Operation Associate',
@@ -41,3 +43,5 @@ create type public.approval_action_type as enum (
   'approved',
   'rejected'
 );
+
+COMMIT;

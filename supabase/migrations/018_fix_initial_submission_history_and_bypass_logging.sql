@@ -1,3 +1,5 @@
+BEGIN;
+
 update public.claim_transition_graph
 set trigger_action = 'submitted',
     action_label = 'Submit Claim',
@@ -321,3 +323,5 @@ update public.claim_status_audit
 set trigger_action = 'submitted'
 where trigger_action = 'resubmitted'
   and from_status::text = 'submitted';
+
+COMMIT;

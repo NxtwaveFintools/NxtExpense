@@ -1,3 +1,5 @@
+BEGIN;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Migration 155: Remove inactive legacy roles
 --
@@ -23,3 +25,5 @@ WHERE requires_role_id IN (
 
 DELETE FROM public.roles
 WHERE role_code IN ('FINANCE_PROCESSOR', 'FINANCE_REVIEWER', 'HR_MANAGER');
+
+COMMIT;

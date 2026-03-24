@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 114: Create designation_vehicle_permissions table
 -- Defines which designations can use which vehicle types
 -- Replaces hardcoded arrays in application code
@@ -46,3 +48,6 @@ VALUES
   -- PM → Both
   (get_designation_id('PM'), get_vehicle_type_id('TWO_WHEELER')),
   (get_designation_id('PM'), get_vehicle_type_id('FOUR_WHEELER'));
+
+
+COMMIT;

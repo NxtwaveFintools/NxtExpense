@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 021: Fix approval routing to skip L2 (ZBH level) entirely
 --
 -- Business rule correction:
@@ -186,3 +188,6 @@ select
 from l2_bypass_backfill b;
 
 drop table if exists pg_temp.l2_bypass_backfill;
+
+
+COMMIT;

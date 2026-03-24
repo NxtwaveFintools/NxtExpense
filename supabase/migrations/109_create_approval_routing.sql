@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 109: Create approval_routing table
 -- ID-based approval routing - REPLACES email-based state_mapping.json
 -- Defines who approves what based on designation and state
@@ -112,3 +114,6 @@ VALUES
   (get_designation_id('SBH'), NULL, 4, get_role_id('FINANCE_PROCESSOR'), get_designation_id('FIN'), NULL),
   (get_designation_id('ZBH'), NULL, 4, get_role_id('FINANCE_PROCESSOR'), get_designation_id('FIN'), NULL),
   (get_designation_id('PM'),  NULL, 4, get_role_id('FINANCE_PROCESSOR'), get_designation_id('FIN'), NULL);
+
+
+COMMIT;

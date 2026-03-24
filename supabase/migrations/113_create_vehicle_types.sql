@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 113: Create vehicle_types table
 -- Replaces PostgreSQL vehicle_type enum with ID-based lookup table
 -- Includes rate and limit data per vehicle type
@@ -28,3 +30,6 @@ INSERT INTO vehicle_types (vehicle_code, vehicle_name, base_fuel_rate_per_day, i
 VALUES
   ('TWO_WHEELER',  'Two Wheeler',  180.00, 5.00, 150, 1),
   ('FOUR_WHEELER', 'Four Wheeler', 300.00, 8.00, 300, 2);
+
+
+COMMIT;

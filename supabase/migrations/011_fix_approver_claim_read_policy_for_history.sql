@@ -1,3 +1,5 @@
+BEGIN;
+
 drop policy if exists "owner and approvers can read claims" on public.expense_claims;
 
 create policy "owner and approvers can read claims"
@@ -21,3 +23,5 @@ using (
       )
   )
 );
+
+COMMIT;
