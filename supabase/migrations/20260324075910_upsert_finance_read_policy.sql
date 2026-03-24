@@ -1,7 +1,7 @@
 -- #region agent log
 do $$
 begin
-  raise notice '[agent-log][session=0c4042][hypothesis=H2] entering 008b_upsert_finance_read_policy';
+  raise notice '[agent-log][session=0c4042][hypothesis=H3] entering 20260324075910_upsert_finance_read_policy';
   drop policy if exists "finance can read finance claims" on public.expense_claims;
   execute $policy$
     create policy "finance can read finance claims"
