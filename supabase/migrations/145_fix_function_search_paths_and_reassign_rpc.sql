@@ -8,45 +8,45 @@
 -- STEP 1: Fix mutable search_path on utility/helper functions
 -- ─────────────────────────────────────────────────────────────────────────────
 
-ALTER FUNCTION public.current_user_email()
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.current_user_email() SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_claim_status_id(p_code character varying)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_claim_status_id(character varying) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_designation_id(p_code character varying)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_designation_id(character varying) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_role_id(p_code character varying)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_role_id(character varying) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_state_id(p_code character varying)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_state_id(character varying) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_vehicle_type_id(p_code character varying)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_vehicle_type_id(character varying) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_work_location_id(p_code character varying)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_work_location_id(character varying) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_active_approver_with_delegation(
-  p_original_approver_id uuid,
-  p_approval_level integer,
-  p_state_id uuid,
-  p_check_date date
-)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_active_approver_with_delegation(uuid, integer, uuid, date) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.get_expense_rate_for_date(
-  p_location_id uuid,
-  p_expense_type character varying,
-  p_designation_id uuid,
-  p_for_date date
-)
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.get_expense_rate_for_date(uuid, character varying, uuid, date) SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
-ALTER FUNCTION public.update_updated_at_column()
-  SET search_path = public;
+DO $$ BEGIN
+  ALTER FUNCTION public.update_updated_at_column() SET search_path = public;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- STEP 2: Rewrite reassign_orphaned_approvals to use ID-based approval columns

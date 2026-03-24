@@ -7,6 +7,22 @@
 BEGIN;
 
 -- ============================================================
+-- STEP 0: Drop functions whose return type or param types changed (enum→text)
+-- ============================================================
+
+-- Drop with old enum-based signatures (from migrations 015/016)
+DROP FUNCTION IF EXISTS public.submit_approval_action_atomic(uuid, public.approval_action_type, text, boolean);
+DROP FUNCTION IF EXISTS public.submit_finance_action_atomic(uuid, public.finance_action_type, text, boolean);
+DROP FUNCTION IF EXISTS public.bulk_finance_actions_atomic(uuid[], public.finance_action_type, text, boolean);
+-- Drop with text-based signatures (from migration 136)
+DROP FUNCTION IF EXISTS public.submit_approval_action_atomic(uuid, text, text, boolean);
+DROP FUNCTION IF EXISTS public.submit_finance_action_atomic(uuid, text, text, boolean);
+DROP FUNCTION IF EXISTS public.admin_rollback_claim_atomic(uuid, text, text);
+DROP FUNCTION IF EXISTS public.resubmit_claim_after_rejection_atomic(uuid, text);
+DROP FUNCTION IF EXISTS public.bulk_finance_actions_atomic(uuid[], text, text, boolean);
+DROP FUNCTION IF EXISTS public.bulk_issue_claims_atomic(uuid[], text);
+
+-- ============================================================
 -- STEP 1: Rewrite RPCs to stop writing to columns being dropped
 -- ============================================================
 

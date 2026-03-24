@@ -1,4 +1,4 @@
-﻿-- Migration 146: Fix the 2 RPCs not fixed by migration 144.
+-- Migration 146: Fix the 2 RPCs not fixed by migration 144.
 --
 -- 1. get_filtered_approval_history (from mig 136) — references c.status (dropped),
 --    stale role codes FINANCE_REVIEWER/FINANCE_PROCESSOR, stale audit strings.

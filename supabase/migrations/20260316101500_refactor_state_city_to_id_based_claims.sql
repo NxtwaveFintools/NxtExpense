@@ -1,4 +1,4 @@
-﻿-- Migration 20260316101500: Refactor state-city architecture to full ID-based claims flow.
+-- Migration 20260316101500: Refactor state-city architecture to full ID-based claims flow.
 -- Source of truth for city master data: .github/knowledge/cities.json
 
 BEGIN;

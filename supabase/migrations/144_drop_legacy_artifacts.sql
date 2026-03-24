@@ -20,6 +20,14 @@
 BEGIN;
 
 -- =============================================================================
+-- STEP 0: Drop functions whose return column names are changing
+-- =============================================================================
+DROP FUNCTION IF EXISTS public.resubmit_claim_after_rejection_atomic(uuid, text);
+DROP FUNCTION IF EXISTS public.submit_approval_action_atomic(uuid, text, text, boolean);
+DROP FUNCTION IF EXISTS public.submit_finance_action_atomic(uuid, text, text, boolean);
+DROP FUNCTION IF EXISTS public.admin_rollback_claim_atomic(uuid, text, text);
+
+-- =============================================================================
 -- STEP 1: Rewrite RPCs to remove expense_claims.status text column references
 -- =============================================================================
 
@@ -696,6 +704,16 @@ CREATE POLICY "finance or owner can read finance actions"
 -- =============================================================================
 -- STEP 3: Drop employees.approval_email_level_1/2/3 columns and indexes
 -- =============================================================================
+
+-- First drop RLS policies that reference the approval_email columns
+DROP POLICY IF EXISTS "owner and active approver can update claims" ON public.expense_claims;
+DROP POLICY IF EXISTS "owner and approvers can read claim items" ON public.expense_claim_items;
+DROP POLICY IF EXISTS "owner and approvers can read approval history" ON public.approval_history;
+DROP POLICY IF EXISTS "owner and approvers can read claims" ON public.expense_claims;
+DROP POLICY IF EXISTS "approvers can read claim expenses" ON public.claim_expenses;
+DROP POLICY IF EXISTS "active approver can insert approval history" ON public.approval_history;
+DROP POLICY IF EXISTS "participants can read claim status audit" ON public.claim_status_audit;
+
 DROP INDEX IF EXISTS public.idx_employees_approver_email_l1;
 DROP INDEX IF EXISTS public.idx_employees_approver_email_l2;
 DROP INDEX IF EXISTS public.idx_employees_approver_email_l3;
