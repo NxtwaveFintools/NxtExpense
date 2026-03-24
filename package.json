@@ -22,6 +22,8 @@
     "test:e2e:live": "npm run test:e2e:live:fast && npm run test:e2e:live:workflow",
     "test:e2e:ui": "playwright test --ui --project=chromium",
     "test:e2e:rejections": "playwright test e2e/approval-rejection-flows.spec.ts e2e/finance-rejection-flows.spec.ts --project=chromium",
+    "db:migrate": "node --env-file=.env.local scripts/run-migrations.mjs",
+    "db:migrate:dry-run": "node --env-file=.env.local scripts/run-migrations.mjs --dry-run",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -41,6 +43,7 @@
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "pg": "^8.20.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "sonner": "^2.0.7",
