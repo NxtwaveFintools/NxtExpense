@@ -165,8 +165,6 @@ begin
 end;
 $$;
 
-grant execute on function public.submit_approval_action_atomic(uuid, public.approval_action_type, text, boolean)
-to authenticated;
 
 create or replace function public.resubmit_claim_after_rejection_atomic(
   p_claim_id uuid,
@@ -297,8 +295,6 @@ begin
 end;
 $$;
 
-grant execute on function public.resubmit_claim_after_rejection_atomic(uuid, text)
-to authenticated;
 
 delete from public.approval_history
 where action = 'bypass_logged';

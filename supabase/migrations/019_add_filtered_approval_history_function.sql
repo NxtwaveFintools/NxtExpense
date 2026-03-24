@@ -155,16 +155,3 @@ as $$
   limit greatest(coalesce(p_limit, 10), 1) + 1;
 $$;
 
-grant execute on function public.get_filtered_approval_history(
-  int,
-  timestamptz,
-  uuid,
-  text,
-  text[],
-  date,
-  date,
-  timestamptz,
-  timestamptz,
-  timestamptz,
-  timestamptz
-) to authenticated;
