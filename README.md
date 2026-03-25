@@ -1,6 +1,6 @@
 # NxtExpense Auth Setup
 
-This project uses Next.js App Router with Supabase Auth.
+This project uses Next.js App Router with Supabase Auth..
 
 ## Authentication Flows
 
