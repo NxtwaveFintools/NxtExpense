@@ -1,13 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import {
+  changeClaimStatusAction,
+  getClaimStatusOptionsAction,
   searchClaimsAction,
-  rollbackClaimStatusAction,
 } from '@/features/admin/actions'
-import type { AdminClaimRow } from '@/features/admin/queries'
+import type {
+  AdminClaimRow,
+  AdminClaimStatusOption,
+} from '@/features/admin/queries'
 import { formatDate } from '@/lib/utils/date'
 
 export function ClaimOperations() {
@@ -16,10 +20,42 @@ export function ClaimOperations() {
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
 
-  // Rollback state
+  const [statusOptions, setStatusOptions] = useState<AdminClaimStatusOption[]>(
+    []
+  )
+  const [isLoadingStatusOptions, setIsLoadingStatusOptions] = useState(false)
+
+  // Status change state
   const [selectedClaim, setSelectedClaim] = useState<AdminClaimRow | null>(null)
-  const [rollbackReason, setRollbackReason] = useState('')
-  const [isRollingBack, setIsRollingBack] = useState(false)
+  const [targetStatusId, setTargetStatusId] = useState('')
+  const [statusChangeReason, setStatusChangeReason] = useState('')
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadStatusOptions() {
+      setIsLoadingStatusOptions(true)
+      const result = await getClaimStatusOptionsAction()
+      setIsLoadingStatusOptions(false)
+
+      if (!isMounted) {
+        return
+      }
+
+      if (!result.ok) {
+        toast.error(result.error ?? 'Failed to load status options.')
+        return
+      }
+
+      setStatusOptions(result.data)
+    }
+
+    loadStatusOptions()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   async function handleSearch() {
     if (!query.trim()) return
@@ -36,28 +72,33 @@ export function ClaimOperations() {
     setClaims(result.data)
   }
 
-  async function handleRollback() {
-    if (!selectedClaim || !rollbackReason.trim()) return
-    setIsRollingBack(true)
+  async function handleStatusChange() {
+    if (!selectedClaim || !targetStatusId || !statusChangeReason.trim()) {
+      return
+    }
 
-    const result = await rollbackClaimStatusAction({
+    setIsUpdatingStatus(true)
+
+    const result = await changeClaimStatusAction({
       claimId: selectedClaim.id,
-      reason: rollbackReason.trim(),
+      targetStatusId,
+      reason: statusChangeReason.trim(),
       confirmation: 'CONFIRM',
     })
 
-    setIsRollingBack(false)
+    setIsUpdatingStatus(false)
 
     if (!result.ok) {
-      toast.error(result.error ?? 'Rollback failed')
+      toast.error(result.error ?? 'Status update failed')
       return
     }
 
     toast.success(
-      `Claim ${selectedClaim.claim_number} rolled back to ${result.rolledBackTo}`
+      `Claim ${selectedClaim.claim_number} moved from ${result.previousStatusCode ?? 'unknown'} to ${result.updatedStatusCode ?? 'unknown'}.`
     )
     setSelectedClaim(null)
-    setRollbackReason('')
+    setTargetStatusId('')
+    setStatusChangeReason('')
     // Re-search to refresh statuses
     handleSearch()
   }
@@ -134,10 +175,14 @@ export function ClaimOperations() {
                   </td>
                   <td className="px-3 py-2 text-center">
                     <button
-                      onClick={() => setSelectedClaim(claim)}
-                      className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                      onClick={() => {
+                        setSelectedClaim(claim)
+                        setTargetStatusId('')
+                        setStatusChangeReason('')
+                      }}
+                      className="rounded-md border border-primary/30 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
                     >
-                      Rollback
+                      Change Status
                     </button>
                   </td>
                 </tr>
@@ -147,45 +192,79 @@ export function ClaimOperations() {
         </div>
       )}
 
-      {/* Rollback confirmation dialog */}
+      {/* Status update panel */}
       {selectedClaim && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-600 dark:bg-amber-900/20">
-          <h3 className="font-semibold text-amber-800 dark:text-amber-300">
-            Rollback Claim: {selectedClaim.claim_number}
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <h3 className="font-semibold text-primary">
+            Change Claim Status: {selectedClaim.claim_number}
           </h3>
-          <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+          <p className="mt-1 text-sm text-foreground/80">
             Current status: <strong>{selectedClaim.status}</strong> — Employee:{' '}
             {selectedClaim.employee_name}
           </p>
+
           <div className="mt-3">
             <label
-              htmlFor="rollback-reason"
-              className="block text-sm font-medium text-amber-800 dark:text-amber-300"
+              htmlFor="target-status"
+              className="block text-sm font-medium text-foreground"
+            >
+              New status (required)
+            </label>
+            <select
+              id="target-status"
+              value={targetStatusId}
+              onChange={(event) => setTargetStatusId(event.target.value)}
+              disabled={isLoadingStatusOptions}
+              className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            >
+              <option value="">
+                {isLoadingStatusOptions
+                  ? 'Loading statuses...'
+                  : 'Select target status'}
+              </option>
+              {statusOptions.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.status_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-3">
+            <label
+              htmlFor="status-change-reason"
+              className="block text-sm font-medium text-foreground"
             >
               Reason (required)
             </label>
             <textarea
-              id="rollback-reason"
-              value={rollbackReason}
-              onChange={(e) => setRollbackReason(e.target.value)}
+              id="status-change-reason"
+              value={statusChangeReason}
+              onChange={(event) => setStatusChangeReason(event.target.value)}
               rows={3}
               maxLength={500}
-              placeholder="Explain why this claim status needs to be rolled back..."
-              className="mt-1 w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none dark:border-amber-600 dark:bg-surface"
+              placeholder="Explain why this claim status needs to be changed..."
+              className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none"
             />
           </div>
+
           <div className="mt-3 flex gap-2">
             <button
-              onClick={handleRollback}
-              disabled={isRollingBack || !rollbackReason.trim()}
-              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+              onClick={handleStatusChange}
+              disabled={
+                isUpdatingStatus ||
+                !targetStatusId ||
+                !statusChangeReason.trim()
+              }
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              {isRollingBack ? 'Rolling back...' : 'Confirm Rollback'}
+              {isUpdatingStatus ? 'Updating...' : 'Confirm Status Change'}
             </button>
             <button
               onClick={() => {
                 setSelectedClaim(null)
-                setRollbackReason('')
+                setTargetStatusId('')
+                setStatusChangeReason('')
               }}
               className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >

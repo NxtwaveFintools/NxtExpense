@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  adminCreateEmployeeSchema,
   adminReassignApproverSchema,
-  adminRollbackSchema,
+  adminStatusChangeSchema,
   adminToggleActiveSchema,
   adminUpdateRateSchema,
   adminUpdateVehicleRatesSchema,
@@ -10,20 +11,22 @@ import {
 
 const VALID_UUID = '5db22d75-b209-4f30-b5c8-f4f27ebee9e8'
 
-describe('adminRollbackSchema', () => {
-  it('accepts valid rollback payload', () => {
-    const result = adminRollbackSchema.safeParse({
+describe('adminStatusChangeSchema', () => {
+  it('accepts valid status change payload', () => {
+    const result = adminStatusChangeSchema.safeParse({
       claimId: VALID_UUID,
-      reason: 'Rollback requested after incorrect finance action',
+      targetStatusId: VALID_UUID,
+      reason: 'Status changed to re-trigger the required approval level',
       confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(true)
   })
 
-  it('rejects rollback without reason', () => {
-    const result = adminRollbackSchema.safeParse({
+  it('rejects status change without reason', () => {
+    const result = adminStatusChangeSchema.safeParse({
       claimId: VALID_UUID,
+      targetStatusId: VALID_UUID,
       reason: '   ',
       confirmation: 'CONFIRM',
     })
@@ -124,5 +127,55 @@ describe('admin rate update schemas', () => {
     })
 
     expect(result.success).toBe(false)
+  })
+})
+
+describe('adminCreateEmployeeSchema', () => {
+  it('accepts a fully valid employee creation payload', () => {
+    const result = adminCreateEmployeeSchema.safeParse({
+      employeeId: 'NXT-EMP-1001',
+      employeeName: 'John Doe',
+      employeeEmail: 'john.doe@nxtwave.co.in',
+      designationId: VALID_UUID,
+      employeeStatusId: VALID_UUID,
+      roleId: VALID_UUID,
+      stateId: VALID_UUID,
+      approvalEmployeeIdLevel1: VALID_UUID,
+      approvalEmployeeIdLevel2: undefined,
+      approvalEmployeeIdLevel3: undefined,
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects payload with missing required fields', () => {
+    const result = adminCreateEmployeeSchema.safeParse({
+      employeeId: '',
+      employeeName: 'John Doe',
+      employeeEmail: 'john.doe@nxtwave.co.in',
+      designationId: VALID_UUID,
+      employeeStatusId: VALID_UUID,
+      roleId: VALID_UUID,
+      stateId: VALID_UUID,
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts empty optional approver fields from dropdown none selections', () => {
+    const result = adminCreateEmployeeSchema.safeParse({
+      employeeId: 'NXT-EMP-1002',
+      employeeName: 'Jane Doe',
+      employeeEmail: 'jane.doe@nxtwave.co.in',
+      designationId: VALID_UUID,
+      employeeStatusId: VALID_UUID,
+      roleId: VALID_UUID,
+      stateId: VALID_UUID,
+      approvalEmployeeIdLevel1: '',
+      approvalEmployeeIdLevel2: '',
+      approvalEmployeeIdLevel3: '',
+    })
+
+    expect(result.success).toBe(true)
   })
 })

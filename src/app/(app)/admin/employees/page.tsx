@@ -7,7 +7,7 @@ export default function AdminEmployeesPage() {
         Employee Management
       </h2>
       <p className="text-sm text-foreground/60">
-        Search employees to view details or reassign their approval chain.
+        Create employees, then search and reassign approval chains as needed.
       </p>
       <EmployeeManagement />
     </div>

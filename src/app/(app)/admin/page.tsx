@@ -2,31 +2,21 @@ import Link from 'next/link'
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAdminSummary } from '@/features/admin/queries'
+import { getAdminFinanceOverview } from '@/features/admin/queries/finance-overview'
+import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient()
-  const summary = await getAdminSummary(supabase)
+  const [summary, financeOverview] = await Promise.all([
+    getAdminSummary(supabase),
+    getAdminFinanceOverview(supabase),
+  ])
 
   const cards = [
     {
       label: 'Total Employees',
       value: summary.totalEmployees,
       href: '/admin/employees',
-    },
-    {
-      label: 'Total Claims',
-      value: summary.totalClaims,
-      href: '/admin/claims',
-    },
-    {
-      label: 'Pending Claims',
-      value: summary.pendingClaims,
-      href: '/admin/claims',
-    },
-    {
-      label: 'Designations',
-      value: summary.designationCount,
-      href: '/admin/designations',
     },
     {
       label: 'Work Locations',
@@ -43,6 +33,35 @@ export default async function AdminPage() {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-foreground">Overview</h2>
+
+      <ClaimAnalyticsCards
+        cards={[
+          {
+            label: 'Total Claims',
+            count: financeOverview.totalClaims.count,
+            amount: financeOverview.totalClaims.amount,
+            tone: 'neutral',
+          },
+          {
+            label: 'Pending Finance Queue',
+            count: financeOverview.pendingFinanceQueue.count,
+            amount: financeOverview.pendingFinanceQueue.amount,
+            tone: 'finance',
+          },
+          {
+            label: 'Payment Issued',
+            count: financeOverview.paymentIssued.count,
+            amount: financeOverview.paymentIssued.amount,
+            tone: 'approved',
+          },
+          {
+            label: 'Rejected Claims',
+            count: financeOverview.rejected.count,
+            amount: financeOverview.rejected.amount,
+            tone: 'rejected',
+          },
+        ]}
+      />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {cards.map((card) => (
