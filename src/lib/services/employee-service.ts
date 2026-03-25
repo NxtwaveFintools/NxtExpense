@@ -9,8 +9,6 @@ export type EmployeeRow = {
   employee_id: string
   employee_name: string
   employee_email: string
-  /** @deprecated Use designations.designation_name via join */
-  designation_code: string | null
   designation_id: string | null
   employee_status_id: string | null
   approval_employee_id_level_1: string | null
@@ -38,7 +36,7 @@ export type EmployeeRole = {
 // ────────────────────────────────────────────────────────────
 
 const EMPLOYEE_COLUMNS =
-  'id, employee_id, employee_name, employee_email, designation_code, designation_id, employee_status_id, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, created_at, employee_statuses!employee_status_id(status_code), designations!designation_id(designation_name), employee_states!employee_id(is_primary, states!state_id(state_name))'
+  'id, employee_id, employee_name, employee_email, designation_id, employee_status_id, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, created_at, employee_statuses!employee_status_id(status_code), designations!designation_id(designation_name), employee_states!employee_id(is_primary, states!state_id(state_name))'
 
 const EMPLOYEE_FETCH_MAX_RETRIES = 1
 

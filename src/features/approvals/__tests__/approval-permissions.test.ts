@@ -25,7 +25,6 @@ function makeEmployeeRow(overrides: Partial<EmployeeRow> = {}): EmployeeRow {
     employee_email: 'test.user@nxtwave.co.in',
     designation_id: 'desg-sro',
     employee_status_id: null,
-    designation_code: null,
     approval_employee_id_level_1: 'emp-id-sbh',
     approval_employee_id_level_2: null,
     approval_employee_id_level_3: 'emp-id-mansoor',
