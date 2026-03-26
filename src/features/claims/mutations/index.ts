@@ -158,16 +158,13 @@ export async function getClaimForDate(
   allow_resubmit: boolean
   is_superseded: boolean
 } | null> {
-  // Only look at the ACTIVE (non-superseded) claim — the partial unique index
-  // guarantees at most one exists per employee+date.
   const { data, error } = await supabase
     .from('expense_claims')
     .select(
-      'id, claim_number, current_approval_level, allow_resubmit, is_superseded, claim_statuses!status_id(status_code, is_rejection, is_terminal)'
+      'id, claim_number, current_approval_level, claim_statuses!status_id(status_code, is_rejection, is_terminal)'
     )
     .eq('employee_id', employeeId)
     .eq('claim_date', claimDateIso)
-    .eq('is_superseded', false)
     .maybeSingle()
 
   if (error && error.code !== 'PGRST116') {
@@ -182,8 +179,6 @@ export async function getClaimForDate(
     id: string
     claim_number: string
     current_approval_level: number | null
-    allow_resubmit: boolean
-    is_superseded: boolean
     claim_statuses:
       | { status_code: string; is_rejection: boolean; is_terminal: boolean }
       | Array<{
@@ -195,14 +190,29 @@ export async function getClaimForDate(
   const statusInfo = Array.isArray(row.claim_statuses)
     ? row.claim_statuses[0]
     : row.claim_statuses
+  const isRejection = statusInfo?.is_rejection ?? false
+
+  let allowResubmit = false
+  if (isRejection) {
+    const { data: historyData } = await supabase
+      .from('approval_history')
+      .select('allow_resubmit')
+      .eq('claim_id', row.id)
+      .not('allow_resubmit', 'is', null)
+      .order('acted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    allowResubmit = (historyData as { allow_resubmit: boolean } | null)?.allow_resubmit ?? false
+  }
+
   return {
     id: row.id,
     claim_number: row.claim_number,
     status_code: statusInfo?.status_code ?? 'UNKNOWN',
     current_approval_level: row.current_approval_level ?? null,
-    allow_resubmit: row.allow_resubmit ?? false,
-    is_superseded: row.is_superseded ?? false,
-    is_rejection: statusInfo?.is_rejection ?? false,
+    allow_resubmit: allowResubmit,
+    is_superseded: false,
+    is_rejection: isRejection,
     is_terminal: statusInfo?.is_terminal ?? false,
   }
 }
