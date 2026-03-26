@@ -54,7 +54,12 @@ export function normalizeApprovalHistoryFilters(
   return {
     employeeName: normalizeText(value.employeeName),
     claimStatus: normalizeText(value.claimStatus),
-    claimDate: value.claimDate ?? null,
+    claimDateFrom: value.claimDateFrom ?? null,
+    claimDateTo: value.claimDateTo ?? null,
+    amountOperator: value.amountOperator,
+    amountValue: value.amountValue ?? null,
+    locationType: value.locationType ?? null,
+    claimDateSort: value.claimDateSort,
     hodApprovedFrom: value.hodApprovedFrom ?? null,
     hodApprovedTo: value.hodApprovedTo ?? null,
     financeApprovedFrom: value.financeApprovedFrom ?? null,
@@ -74,8 +79,28 @@ export function addApprovalFiltersToParams(
     params.set('claimStatus', filters.claimStatus)
   }
 
-  if (filters.claimDate) {
-    params.set('claimDate', filters.claimDate)
+  if (filters.claimDateFrom) {
+    params.set('claimDateFrom', filters.claimDateFrom)
+  }
+
+  if (filters.claimDateTo) {
+    params.set('claimDateTo', filters.claimDateTo)
+  }
+
+  if (filters.amountOperator !== 'lte') {
+    params.set('amountOperator', filters.amountOperator)
+  }
+
+  if (filters.amountValue !== null) {
+    params.set('amountValue', String(filters.amountValue))
+  }
+
+  if (filters.locationType) {
+    params.set('locationType', filters.locationType)
+  }
+
+  if (filters.claimDateSort !== 'desc') {
+    params.set('claimDateSort', filters.claimDateSort)
   }
 
   if (filters.hodApprovedFrom) {

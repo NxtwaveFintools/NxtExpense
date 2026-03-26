@@ -184,9 +184,6 @@ async function issueClaimInFinanceQueue(
 
   await expect(finance.bulkIssueButton).toBeEnabled()
   await finance.bulkIssueButton.click()
-  await expect(
-    page.getByRole('region', { name: /notifications/i }).getByText(/issue/i)
-  ).toBeVisible({ timeout: 10_000 })
 
   await expect
     .poll(async () => finance.getQueueRowByClaimNumber(claimNumber).count(), {

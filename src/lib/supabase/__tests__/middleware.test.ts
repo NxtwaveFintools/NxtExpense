@@ -54,7 +54,7 @@ describe('refreshAuthSession', () => {
     expect(result.didResetSession).toBe(false)
   })
 
-  it('expires project auth cookies when Supabase reports a missing refresh token', async () => {
+  it('marks stale refresh token errors without eagerly clearing auth cookies', async () => {
     getUserMock.mockRejectedValue({
       __isAuthError: true,
       status: 400,
@@ -75,27 +75,17 @@ describe('refreshAuthSession', () => {
     const result = await refreshAuthSession(request)
 
     expect(result.user).toBeNull()
-    expect(result.didResetSession).toBe(true)
+    expect(result.didResetSession).toBe(false)
+    expect(result.didEncounterStaleRefreshToken).toBe(true)
     expect(
-      request.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token')
-    ).toBeUndefined()
+      request.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token')?.value
+    ).toBe('access-token')
     expect(
-      request.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token.0')
-    ).toBeUndefined()
-    expect(
-      request.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token-code-verifier')
-    ).toBeUndefined()
+      request.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token.0')?.value
+    ).toBe('chunk-0')
     expect(request.cookies.get('theme')?.value).toBe('dark')
     expect(
-      result.response.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token')?.value
-    ).toBe('')
-    expect(
-      result.response.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token.0')?.value
-    ).toBe('')
-    expect(
-      result.response.cookies.get(
-        'sb-acbgmixcdtfgurgbkqgh-auth-token-code-verifier'
-      )?.value
-    ).toBe('')
+      result.response.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token')
+    ).toBeUndefined()
   })
 })

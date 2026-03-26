@@ -44,13 +44,47 @@ export const approvalHistoryFiltersSchema = z
       (val) => (val === '' ? undefined : val),
       z.string().trim().uuid().optional()
     ),
-    claimDate: optionalDateField('Claim date'),
+    claimDateFrom: optionalDateField('Claim date from'),
+    claimDateTo: optionalDateField('Claim date to'),
+    amountOperator: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.enum(['lte', 'gte', 'eq']).default('lte')
+    ),
+    amountValue: z
+      .preprocess((val) => {
+        if (val === '' || val === undefined || val === null) {
+          return undefined
+        }
+
+        return Number(val)
+      }, z.number().finite().min(0).optional())
+      .optional(),
+    locationType: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.enum(['base', 'outstation']).optional()
+    ),
+    claimDateSort: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.enum(['asc', 'desc']).default('desc')
+    ),
     hodApprovedFrom: optionalDateField('HOD approval date from'),
     hodApprovedTo: optionalDateField('HOD approval date to'),
     financeApprovedFrom: optionalDateField('Finance approval date from'),
     financeApprovedTo: optionalDateField('Finance approval date to'),
   })
   .superRefine((value, context) => {
+    if (
+      value.claimDateFrom &&
+      value.claimDateTo &&
+      value.claimDateFrom > value.claimDateTo
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['claimDateTo'],
+        message: 'From Date cannot be later than To Date',
+      })
+    }
+
     function checkRange(
       from: string | undefined,
       to: string | undefined,

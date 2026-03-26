@@ -12,7 +12,12 @@ describe('approval history filter utilities', () => {
   it('normalizes DD/MM/YYYY input into ISO dates', () => {
     const normalized = normalizeApprovalHistoryFilters({
       employeeName: '  John  ',
-      claimDate: '07/03/2026',
+      claimDateFrom: '07/03/2026',
+      claimDateTo: '08/03/2026',
+      amountOperator: 'gte',
+      amountValue: '200',
+      locationType: 'base',
+      claimDateSort: 'asc',
       hodApprovedFrom: '01/03/2026',
       hodApprovedTo: '02/03/2026',
       financeApprovedFrom: '03/03/2026',
@@ -22,7 +27,12 @@ describe('approval history filter utilities', () => {
     expect(normalized).toEqual({
       employeeName: 'John',
       claimStatus: null,
-      claimDate: '2026-03-07',
+      claimDateFrom: '2026-03-07',
+      claimDateTo: '2026-03-08',
+      amountOperator: 'gte',
+      amountValue: 200,
+      locationType: 'base',
+      claimDateSort: 'asc',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-02',
       financeApprovedFrom: '2026-03-03',
@@ -32,25 +42,32 @@ describe('approval history filter utilities', () => {
 
   it('supports ISO date input from calendar pickers', () => {
     const normalized = normalizeApprovalHistoryFilters({
-      claimDate: '2026-03-07',
+      claimDateFrom: '2026-03-07',
+      claimDateTo: '2026-03-08',
     })
 
-    expect(normalized.claimDate).toBe('2026-03-07')
+    expect(normalized.claimDateFrom).toBe('2026-03-07')
+    expect(normalized.claimDateTo).toBe('2026-03-08')
   })
 
   it('throws on invalid date format', () => {
     expect(() =>
       normalizeApprovalHistoryFilters({
-        claimDate: '03-07-2026',
+        claimDateFrom: '03-07-2026',
       })
-    ).toThrowError('Claim date must be in DD/MM/YYYY format.')
+    ).toThrowError('Claim date from must be in DD/MM/YYYY format.')
   })
 
   it('adds all filter params for finance-focused filtering', () => {
     const params = addApprovalFiltersToParams(new URLSearchParams(), {
       employeeName: 'Alex',
       claimStatus: VALID_STATUS_ID,
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-31',
+      amountOperator: 'eq',
+      amountValue: 350,
+      locationType: 'outstation',
+      claimDateSort: 'asc',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-07',
       financeApprovedFrom: '2026-03-02',
@@ -59,7 +76,12 @@ describe('approval history filter utilities', () => {
 
     expect(params.get('employeeName')).toBe('Alex')
     expect(params.get('claimStatus')).toBe(VALID_STATUS_ID)
-    expect(params.get('claimDate')).toBe('2026-03-01')
+    expect(params.get('claimDateFrom')).toBe('2026-03-01')
+    expect(params.get('claimDateTo')).toBe('2026-03-31')
+    expect(params.get('amountOperator')).toBe('eq')
+    expect(params.get('amountValue')).toBe('350')
+    expect(params.get('locationType')).toBe('outstation')
+    expect(params.get('claimDateSort')).toBe('asc')
     expect(params.get('hodApprovedFrom')).toBe('2026-03-01')
     expect(params.get('hodApprovedTo')).toBe('2026-03-07')
     expect(params.get('financeApprovedFrom')).toBe('2026-03-02')
@@ -70,7 +92,12 @@ describe('approval history filter utilities', () => {
     const params = addApprovalFiltersToParams(new URLSearchParams(), {
       employeeName: null,
       claimStatus: null,
-      claimDate: null,
+      claimDateFrom: null,
+      claimDateTo: null,
+      amountOperator: 'lte',
+      amountValue: null,
+      locationType: null,
+      claimDateSort: 'desc',
       hodApprovedFrom: null,
       hodApprovedTo: null,
       financeApprovedFrom: null,
@@ -114,6 +141,11 @@ describe('approval history filter utilities', () => {
     const result = normalizeApprovalHistoryFilters({})
     expect(result.employeeName).toBeNull()
     expect(result.claimStatus).toBeNull()
-    expect(result.claimDate).toBeNull()
+    expect(result.claimDateFrom).toBeNull()
+    expect(result.claimDateTo).toBeNull()
+    expect(result.amountOperator).toBe('lte')
+    expect(result.amountValue).toBeNull()
+    expect(result.locationType).toBeNull()
+    expect(result.claimDateSort).toBe('desc')
   })
 })

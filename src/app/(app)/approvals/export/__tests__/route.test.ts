@@ -61,9 +61,13 @@ describe('approvals export route', () => {
 
     mocks.normalizeApprovalHistoryFilters.mockReturnValue({
       employeeName: null,
-      actorFilter: 'all',
       claimStatus: null,
-      claimDate: null,
+      claimDateFrom: null,
+      claimDateTo: null,
+      amountOperator: 'lte',
+      amountValue: null,
+      locationType: null,
+      claimDateSort: 'desc',
       hodApprovedFrom: null,
       hodApprovedTo: null,
       financeApprovedFrom: null,
@@ -102,7 +106,7 @@ describe('approvals export route', () => {
     expect(await response.text()).toBe('col1,col2\nval1,val2')
     const normalizeInput =
       mocks.normalizeApprovalHistoryFilters.mock.calls[0]?.[0]
-    expect(normalizeInput.actorFilter).toBeUndefined()
+    expect(normalizeInput.amountOperator).toBeUndefined()
     expect(mocks.getFilteredApprovalHistoryPaginated).toHaveBeenCalledWith(
       expect.anything(),
       null,

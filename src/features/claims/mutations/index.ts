@@ -11,6 +11,7 @@ type ClaimPayload = {
   hasIntracityTravel: boolean
   intercityOwnVehicleUsed: boolean | null
   intracityOwnVehicleUsed: boolean | null
+  intracityVehicleMode: 'OWN_VEHICLE' | 'RENTAL_VEHICLE' | null
   vehicleTypeId: string | null
   outstationStateId: string | null
   outstationCityId: string | null
@@ -46,7 +47,8 @@ function isMissingOutstationSegmentColumnsError(
     message.includes('expense_claims.has_intercity_travel') ||
     message.includes('expense_claims.has_intracity_travel') ||
     message.includes('expense_claims.intercity_own_vehicle_used') ||
-    message.includes('expense_claims.intracity_own_vehicle_used')
+    message.includes('expense_claims.intracity_own_vehicle_used') ||
+    message.includes('expense_claims.intracity_vehicle_mode')
   )
 }
 
@@ -63,6 +65,7 @@ export async function insertClaim(
     has_intracity_travel: input.hasIntracityTravel,
     intercity_own_vehicle_used: input.intercityOwnVehicleUsed,
     intracity_own_vehicle_used: input.intracityOwnVehicleUsed,
+    intracity_vehicle_mode: input.intracityVehicleMode,
     vehicle_type_id: input.vehicleTypeId,
     outstation_state_id: input.outstationStateId,
     outstation_city_id: input.outstationCityId,

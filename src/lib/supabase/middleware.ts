@@ -37,7 +37,7 @@ function isSupabaseAuthCookie(cookieName: string, projectRef: string): boolean {
   })
 }
 
-function clearSupabaseAuthCookies(
+export function clearSupabaseAuthCookies(
   request: NextRequest,
   response: NextResponse,
   supabaseUrl: string
@@ -79,6 +79,7 @@ type RefreshedSession = {
   user: User | null
   supabase: SupabaseClient
   didResetSession: boolean
+  didEncounterStaleRefreshToken: boolean
 }
 
 export async function refreshAuthSession(
@@ -105,7 +106,8 @@ export async function refreshAuthSession(
   })
 
   let user: User | null = null
-  let didResetSession = false
+  const didResetSession = false
+  let didEncounterStaleRefreshToken = false
 
   try {
     const {
@@ -115,14 +117,20 @@ export async function refreshAuthSession(
 
     if (error) {
       if (!isStaleRefreshTokenError(error)) throw error
-      didResetSession = clearSupabaseAuthCookies(request, response, url)
+      didEncounterStaleRefreshToken = true
     } else {
       user = resolvedUser
     }
   } catch (error) {
     if (!isStaleRefreshTokenError(error)) throw error
-    didResetSession = clearSupabaseAuthCookies(request, response, url)
+    didEncounterStaleRefreshToken = true
   }
 
-  return { response, user, supabase, didResetSession }
+  return {
+    response,
+    user,
+    supabase,
+    didResetSession,
+    didEncounterStaleRefreshToken,
+  }
 }

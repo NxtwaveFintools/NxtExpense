@@ -52,8 +52,7 @@ export function getClaimSummaryPreview({
     items.push({ label: 'Food allowance', amount: foodAllowance })
 
     const includesIntracityAllowance =
-      (hasIntercityTravel && intercityOwnVehicleUsed) ||
-      (hasIntracityTravel && intracityOwnVehicleUsed)
+      hasIntercityTravel || (hasIntracityTravel && intracityOwnVehicleUsed)
 
     if (hasIntercityTravel && intercityOwnVehicleUsed) {
       const intercityRate =

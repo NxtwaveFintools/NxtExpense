@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 
 import {
@@ -33,6 +33,7 @@ type ApprovalListPagination = {
 type ApprovalListProps = {
   approvals: PaginatedPendingApprovals
   pagination: ApprovalListPagination
+  dateSort: 'asc' | 'desc'
 }
 
 type ApprovalActionIntent = {
@@ -79,9 +80,15 @@ function supportsIntent(item: PendingApproval, intent: ApprovalActionIntent) {
   )
 }
 
-export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
+export function ApprovalList({
+  approvals,
+  pagination,
+  dateSort,
+}: ApprovalListProps) {
   const items = approvals.data
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [notes, setNotes] = useState('')
@@ -229,6 +236,23 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
     }
   }
 
+  function toggleDateSort() {
+    const nextSort = dateSort === 'asc' ? 'desc' : 'asc'
+    const params = new URLSearchParams(searchParams.toString())
+
+    params.delete('pendingCursor')
+    params.delete('pendingTrail')
+
+    if (nextSort === 'desc') {
+      params.delete('claimDateSort')
+    } else {
+      params.set('claimDateSort', nextSort)
+    }
+
+    const queryString = params.toString()
+    router.push(queryString ? `${pathname}?${queryString}` : pathname)
+  }
+
   if (items.length === 0) {
     return (
       <section className={`${DATA_TABLE_SECTION_CLASS} p-8 text-center`}>
@@ -284,6 +308,8 @@ export function ApprovalList({ approvals, pagination }: ApprovalListProps) {
         isProcessing={isProcessing}
         processingClaimId={processingClaimId}
         processingAction={processingAction}
+        dateSort={dateSort}
+        onToggleDateSort={toggleDateSort}
         onToggleOne={toggleOne}
         onRunSingleAction={runSingleAction}
       />

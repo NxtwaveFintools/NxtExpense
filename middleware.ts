@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
+import { getSupabasePublicEnv } from '@/lib/supabase/env'
 import { copyResponseCookies } from '@/lib/utils/session-utils'
-import { refreshAuthSession } from '@/lib/supabase/middleware'
+import {
+  clearSupabaseAuthCookies,
+  refreshAuthSession,
+} from '@/lib/supabase/middleware'
 
 const protectedRoutes = [
   '/dashboard',
@@ -12,6 +16,7 @@ const protectedRoutes = [
   '/admin',
 ]
 const publicAuthRoutes = ['/login']
+const AUTH_RETRY_PARAM = 'auth_retry'
 
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`)
@@ -29,9 +34,38 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   try {
-    const { response, user, supabase, didResetSession } =
-      await refreshAuthSession(request)
+    const {
+      response,
+      user,
+      supabase,
+      didResetSession,
+      didEncounterStaleRefreshToken,
+    } = await refreshAuthSession(request)
     const hasSession = Boolean(user)
+    const hasAuthRetryParam =
+      request.nextUrl.searchParams.get(AUTH_RETRY_PARAM) === '1'
+
+    if (didEncounterStaleRefreshToken && !hasSession) {
+      if (isProtectedRoute(pathname) && !hasAuthRetryParam) {
+        const retryUrl = request.nextUrl.clone()
+        retryUrl.searchParams.set(AUTH_RETRY_PARAM, '1')
+        const retryResponse = NextResponse.redirect(retryUrl)
+        return copyResponseCookies(response, retryResponse)
+      }
+
+      const { url } = getSupabasePublicEnv()
+      const didClearCookies = clearSupabaseAuthCookies(request, response, url)
+
+      if (didClearCookies) {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        loginUrl.search = ''
+        loginUrl.searchParams.set('message', 'session_reset')
+
+        const redirectResponse = NextResponse.redirect(loginUrl)
+        return copyResponseCookies(response, redirectResponse)
+      }
+    }
 
     let hasAllowedDomain = false
     let didDomainValidationFail = false

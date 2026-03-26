@@ -27,7 +27,7 @@ import {
   getApprovalHistoryAction,
   getPendingApprovalsAction,
 } from '@/features/approvals/actions'
-import { getPendingApprovalsSummary } from '@/features/approvals/queries/pending-summary'
+import { getApprovalStageAnalytics } from '@/features/approvals/queries/approval-analytics'
 import { ApprovalList } from '@/features/approvals/components/approval-list'
 import { ApprovalFiltersBar } from '@/features/approvals/components/approval-filters-bar'
 import { ApprovalHistoryList } from '@/features/approvals/components/approval-history-list'
@@ -41,7 +41,12 @@ type ApprovalsPageProps = {
     historyTrail?: string
     claimStatus?: string
     employeeName?: string
-    claimDate?: string
+    claimDateFrom?: string
+    claimDateTo?: string
+    amountOperator?: string
+    amountValue?: string
+    locationType?: string
+    claimDateSort?: string
     hodApprovedFrom?: string
     hodApprovedTo?: string
     financeApprovedFrom?: string
@@ -72,20 +77,34 @@ export default async function ApprovalsPage({
   const rawFilters = {
     claimStatus: resolvedSearch?.claimStatus,
     employeeName: resolvedSearch?.employeeName,
-    claimDate: resolvedSearch?.claimDate,
+    claimDateFrom: resolvedSearch?.claimDateFrom,
+    claimDateTo: resolvedSearch?.claimDateTo,
+    amountOperator: resolvedSearch?.amountOperator,
+    amountValue: resolvedSearch?.amountValue,
+    locationType: resolvedSearch?.locationType,
+    claimDateSort: resolvedSearch?.claimDateSort,
     hodApprovedFrom: resolvedSearch?.hodApprovedFrom,
     hodApprovedTo: resolvedSearch?.hodApprovedTo,
     financeApprovedFrom: resolvedSearch?.financeApprovedFrom,
     financeApprovedTo: resolvedSearch?.financeApprovedTo,
   }
+  let filterValidationError: string | null = null
   const normalizedFilters = (() => {
     try {
       return normalizeApprovalHistoryFilters(rawFilters)
-    } catch {
+    } catch (error) {
+      filterValidationError =
+        error instanceof Error ? error.message : 'Invalid filters provided.'
+
       return {
         claimStatus: null,
         employeeName: null,
-        claimDate: null,
+        claimDateFrom: null,
+        claimDateTo: null,
+        amountOperator: 'lte' as const,
+        amountValue: null,
+        locationType: null,
+        claimDateSort: 'desc' as const,
         hodApprovedFrom: null,
         hodApprovedTo: null,
         financeApprovedFrom: null,
@@ -97,7 +116,15 @@ export default async function ApprovalsPage({
   const normalizedFilterParams = {
     claimStatus: normalizedFilters.claimStatus ?? undefined,
     employeeName: normalizedFilters.employeeName ?? undefined,
-    claimDate: normalizedFilters.claimDate ?? undefined,
+    claimDateFrom: normalizedFilters.claimDateFrom ?? undefined,
+    claimDateTo: normalizedFilters.claimDateTo ?? undefined,
+    amountOperator: normalizedFilters.amountOperator,
+    amountValue:
+      normalizedFilters.amountValue === null
+        ? undefined
+        : String(normalizedFilters.amountValue),
+    locationType: normalizedFilters.locationType ?? undefined,
+    claimDateSort: normalizedFilters.claimDateSort,
     hodApprovedFrom: normalizedFilters.hodApprovedFrom ?? undefined,
     hodApprovedTo: normalizedFilters.hodApprovedTo ?? undefined,
     financeApprovedFrom: normalizedFilters.financeApprovedFrom ?? undefined,
@@ -128,6 +155,7 @@ export default async function ApprovalsPage({
 
   const currentParams = createNonEmptySearchParams(resolvedSearch)
   if (
+    !filterValidationError &&
     toSortedQueryString(currentParams) !== toSortedQueryString(canonicalParams)
   ) {
     redirect(buildPathWithSearchParams('/approvals', canonicalParams))
@@ -135,17 +163,22 @@ export default async function ApprovalsPage({
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [approvals, history, statusCatalog, pendingSummary] = await Promise.all(
-    [
+  const [approvals, history, statusCatalog, approvalAnalytics] =
+    await Promise.all([
       getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
       getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
       getClaimStatusCatalog(supabase),
-      getPendingApprovalsSummary(supabase, user.email ?? '', {
+      getApprovalStageAnalytics(supabase, user.email ?? '', {
         employeeName: normalizedFilters.employeeName,
         claimStatus: normalizedFilters.claimStatus,
+        claimDateFrom: normalizedFilters.claimDateFrom,
+        claimDateTo: normalizedFilters.claimDateTo,
+        amountOperator: normalizedFilters.amountOperator,
+        amountValue: normalizedFilters.amountValue,
+        locationType: normalizedFilters.locationType,
+        claimDateSort: normalizedFilters.claimDateSort,
       }),
-    ]
-  )
+    ])
 
   const showHistoryAmountColumn = canViewApprovalHistoryAmount(approverAccess)
 
@@ -195,23 +228,43 @@ export default async function ApprovalsPage({
             <ApprovalFiltersBar
               filters={normalizedFilters}
               statusCatalog={statusCatalog}
+              validationError={filterValidationError}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}
             />
             <ClaimAnalyticsCards
-              columnsClassName="grid grid-cols-1"
+              columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
               cards={[
                 {
+                  label: 'Total Claims',
+                  count: approvalAnalytics.total.count,
+                  amount: approvalAnalytics.total.amount,
+                  tone: 'neutral',
+                },
+                {
                   label: 'Pending Approvals',
-                  count: pendingSummary.count,
-                  amount: pendingSummary.amount,
+                  count: approvalAnalytics.pendingApprovals.count,
+                  amount: approvalAnalytics.pendingApprovals.amount,
                   tone: 'pending',
+                },
+                {
+                  label: 'Approved Claims',
+                  count: approvalAnalytics.approvedClaims.count,
+                  amount: approvalAnalytics.approvedClaims.amount,
+                  tone: 'approved',
+                },
+                {
+                  label: 'Rejected Claims',
+                  count: approvalAnalytics.rejectedClaims.count,
+                  amount: approvalAnalytics.rejectedClaims.amount,
+                  tone: 'rejected',
                 },
               ]}
             />
             <ApprovalList
               approvals={approvals}
               pagination={pendingPagination}
+              dateSort={normalizedFilters.claimDateSort}
             />
             <ApprovalHistoryList
               history={history}

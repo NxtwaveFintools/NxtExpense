@@ -216,7 +216,7 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
           async () =>
             hasMessageInMainOrToast(
               page,
-              /please select whether you travelled within the city using your own vehicle\./i
+              /please select whether you travelled within the city using your own vehicle(?:\/rental vehicle)?\./i
             ),
           { timeout: 30_000 }
         )

@@ -13,7 +13,20 @@ import type {
   PendingApprovalsFilters,
   PendingApproval,
 } from '@/features/approvals/types'
+import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
+
+function buildClaimDateCursorFilter(
+  claimDate: string,
+  claimId: string,
+  ascending: boolean
+): string {
+  if (ascending) {
+    return `claim_date.gt.${claimDate},and(claim_date.eq.${claimDate},id.gt.${claimId})`
+  }
+
+  return `claim_date.lt.${claimDate},and(claim_date.eq.${claimDate},id.lt.${claimId})`
+}
 
 export async function getPendingApprovalsPaginated(
   supabase: SupabaseClient,
@@ -23,6 +36,12 @@ export async function getPendingApprovalsPaginated(
   filters: PendingApprovalsFilters = {
     employeeName: null,
     claimStatus: null,
+    claimDateFrom: null,
+    claimDateTo: null,
+    amountOperator: 'lte',
+    amountValue: null,
+    locationType: null,
+    claimDateSort: 'desc',
   }
 ) {
   const lowerEmail = approverEmail.toLowerCase()
@@ -118,15 +137,42 @@ export async function getPendingApprovalsPaginated(
     .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
     .in('status_id', pendingStatusIds)
     .or(approvalFilters.join(','))
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
     .limit(limit + 1)
 
-  if (cursor) {
-    const decoded = decodeCursor(cursor)
-    query = query.or(
-      `created_at.lt.${decoded.created_at},and(created_at.eq.${decoded.created_at},id.lt.${decoded.id})`
+  if (filters.claimDateFrom) {
+    query = query.gte('claim_date', filters.claimDateFrom)
+  }
+
+  if (filters.claimDateTo) {
+    query = query.lte('claim_date', filters.claimDateTo)
+  }
+
+  if (filters.amountValue !== null) {
+    if (filters.amountOperator === 'gte') {
+      query = query.gte('total_amount', filters.amountValue)
+    } else if (filters.amountOperator === 'eq') {
+      query = query.eq('total_amount', filters.amountValue)
+    } else {
+      query = query.lte('total_amount', filters.amountValue)
+    }
+  }
+
+  if (filters.locationType) {
+    const scopedLocationIds = await getLocationIdsByApprovalLocationType(
+      supabase,
+      filters.locationType
     )
+
+    if (!scopedLocationIds || scopedLocationIds.length === 0) {
+      return {
+        data: [],
+        hasNextPage: false,
+        nextCursor: null,
+        limit,
+      }
+    }
+
+    query = query.in('work_location_id', scopedLocationIds)
   }
 
   const normalizedName = filters.employeeName?.trim() ?? ''
@@ -136,6 +182,23 @@ export async function getPendingApprovalsPaginated(
       .replaceAll('_', '\\_')
 
     query = query.ilike('employees.employee_name', `%${escapedName}%`)
+  }
+
+  const isClaimDateAscending = filters.claimDateSort === 'asc'
+
+  query = query
+    .order('claim_date', { ascending: isClaimDateAscending })
+    .order('id', { ascending: isClaimDateAscending })
+
+  if (cursor) {
+    const decoded = decodeCursor(cursor)
+    query = query.or(
+      buildClaimDateCursorFilter(
+        decoded.created_at,
+        decoded.id,
+        isClaimDateAscending
+      )
+    )
   }
 
   const { data, error } = await query
@@ -188,7 +251,7 @@ export async function getPendingApprovalsPaginated(
   const nextCursor =
     hasNextPage && lastRecord
       ? encodeCursor({
-          created_at: lastRecord.created_at as string,
+          created_at: lastRecord.claim_date as string,
           id: lastRecord.id as string,
         })
       : null

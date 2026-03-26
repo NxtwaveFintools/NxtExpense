@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { isAllowedCorporateEmailMock, refreshAuthSessionMock } = vi.hoisted(
-  () => ({
-    isAllowedCorporateEmailMock: vi.fn(),
-    refreshAuthSessionMock: vi.fn(),
-  })
-)
+const {
+  isAllowedCorporateEmailMock,
+  refreshAuthSessionMock,
+  clearSupabaseAuthCookiesMock,
+} = vi.hoisted(() => ({
+  isAllowedCorporateEmailMock: vi.fn(),
+  refreshAuthSessionMock: vi.fn(),
+  clearSupabaseAuthCookiesMock: vi.fn(() => true),
+}))
 
 vi.mock('@/lib/auth/allowed-email-domains', () => ({
   isAllowedCorporateEmail: isAllowedCorporateEmailMock,
 }))
 
+vi.mock('@/lib/supabase/env', () => ({
+  getSupabasePublicEnv: () => ({
+    url: 'https://acbgmixcdtfgurgbkqgh.supabase.co',
+    publishableKey: 'test-publishable-key',
+  }),
+}))
+
 vi.mock('@/lib/supabase/middleware', () => ({
   refreshAuthSession: refreshAuthSessionMock,
+  clearSupabaseAuthCookies: clearSupabaseAuthCookiesMock,
 }))
 
 import { middleware } from '../../middleware'
@@ -22,6 +33,7 @@ describe('middleware', () => {
   beforeEach(() => {
     isAllowedCorporateEmailMock.mockReset()
     refreshAuthSessionMock.mockReset()
+    clearSupabaseAuthCookiesMock.mockClear()
   })
 
   it('redirects login visits to a one-time session reset message after stale cookie cleanup', async () => {
@@ -30,6 +42,7 @@ describe('middleware', () => {
       user: null,
       supabase: {},
       didResetSession: true,
+      didEncounterStaleRefreshToken: false,
     })
 
     const request = new NextRequest('http://localhost:3000/login')
@@ -46,6 +59,7 @@ describe('middleware', () => {
       user: null,
       supabase: {},
       didResetSession: true,
+      didEncounterStaleRefreshToken: false,
     })
 
     const request = new NextRequest(
@@ -57,15 +71,40 @@ describe('middleware', () => {
     expect(response.headers.get('location')).toBeNull()
   })
 
-  it('redirects protected routes to login with the session reset message', async () => {
+  it('retries protected route once when stale refresh token is detected', async () => {
     refreshAuthSessionMock.mockResolvedValue({
       response: NextResponse.next(),
       user: null,
       supabase: {},
-      didResetSession: true,
+      didResetSession: false,
+      didEncounterStaleRefreshToken: true,
     })
 
     const request = new NextRequest('http://localhost:3000/dashboard')
+    const response = await middleware(request)
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/dashboard?auth_retry=1'
+    )
+  })
+
+  it('redirects to login with session reset after stale retry is exhausted', async () => {
+    refreshAuthSessionMock.mockResolvedValue({
+      response: NextResponse.next(),
+      user: null,
+      supabase: {},
+      didResetSession: false,
+      didEncounterStaleRefreshToken: true,
+    })
+
+    const request = new NextRequest(
+      'http://localhost:3000/dashboard?auth_retry=1',
+      {
+        headers: {
+          cookie: 'sb-acbgmixcdtfgurgbkqgh-auth-token=stale-token',
+        },
+      }
+    )
     const response = await middleware(request)
 
     expect(response.headers.get('location')).toBe(

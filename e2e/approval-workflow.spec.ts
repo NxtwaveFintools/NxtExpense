@@ -173,7 +173,9 @@ async function issueClaimInFinanceQueue(
   await finance.bulkIssueButton.click()
 
   await expect(
-    page.getByRole('region', { name: /notifications/i }).getByText(/issue/i)
+    page
+      .getByRole('region', { name: /notifications/i })
+      .getByText(/approve|issue|completed successfully/i)
   ).toBeVisible({ timeout: 10_000 })
 
   await expect

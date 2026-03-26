@@ -289,7 +289,7 @@ describe('submitClaimAction branch coverage', () => {
 
     expect(result.ok).toBe(false)
     expect(result.error).toBe(
-      'Please select whether you travelled within the city using your own vehicle.'
+      'Please select whether you travelled within the city using your own vehicle/rental vehicle.'
     )
   })
 

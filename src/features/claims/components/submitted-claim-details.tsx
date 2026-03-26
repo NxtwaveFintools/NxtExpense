@@ -31,6 +31,18 @@ function getSubmittedFields(claim: ClaimWithItems['claim']): SubmittedField[] {
           value: claim.intracity_own_vehicle_used ? 'Yes' : 'No',
         }
       : null,
+    claim.has_intracity_travel
+      ? {
+          label: 'Vehicle Type Used Within The City',
+          value: claim.intracity_vehicle_mode
+            ? claim.intracity_vehicle_mode === 'OWN_VEHICLE'
+              ? 'Own Vehicle'
+              : 'Rent Vehicle'
+            : claim.intracity_own_vehicle_used
+              ? 'Own Vehicle'
+              : 'Rent Vehicle',
+        }
+      : null,
     claim.outstation_state_name
       ? {
           label: 'State',

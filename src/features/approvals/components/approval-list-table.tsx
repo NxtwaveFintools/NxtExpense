@@ -29,6 +29,8 @@ type ApprovalListTableProps = {
   isProcessing: boolean
   processingClaimId: string | null
   processingAction: string | null
+  dateSort: 'asc' | 'desc'
+  onToggleDateSort: () => void
   onToggleOne: (claimId: string, checked: boolean) => void
   onRunSingleAction: (
     claimId: string,
@@ -57,6 +59,8 @@ export function ApprovalListTable({
   isProcessing,
   processingClaimId,
   processingAction,
+  dateSort,
+  onToggleDateSort,
   onToggleOne,
   onRunSingleAction,
 }: ApprovalListTableProps) {
@@ -70,7 +74,19 @@ export function ApprovalListTable({
               Claim ID
             </th>
             <th className={getDataTableHeadCellClass()}>Employee</th>
-            <th className={getDataTableHeadCellClass()}>Date</th>
+            <th className={getDataTableHeadCellClass()}>
+              <button
+                type="button"
+                onClick={onToggleDateSort}
+                className="inline-flex items-center gap-1"
+              >
+                Date
+                <span className="text-xs text-muted-foreground" aria-hidden>
+                  {dateSort === 'asc' ? '(Oldest)' : '(Newest)'}
+                </span>
+                <span aria-hidden>{dateSort === 'asc' ? '↑' : '↓'}</span>
+              </button>
+            </th>
             <th className={getDataTableHeadCellClass()}>Location</th>
             <th className={getDataTableHeadCellClass()}>Amount</th>
             <th className={getDataTableHeadCellClass()}>Status</th>

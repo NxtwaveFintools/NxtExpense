@@ -44,7 +44,7 @@ export class ClaimsPage {
 
   get intracityOwnVehicleGroup() {
     return this.page.getByRole('group', {
-      name: /did you travel within the city using your own vehicle\?/i,
+      name: /did you travel within the city using your own vehicle(?:\/rental vehicle)?\?/i,
     })
   }
 

@@ -12,7 +12,12 @@ describe('normalizeApprovalHistoryFilters', () => {
     const result = normalizeApprovalHistoryFilters({})
     expect(result.employeeName).toBeNull()
     expect(result.claimStatus).toBeNull()
-    expect(result.claimDate).toBeNull()
+    expect(result.claimDateFrom).toBeNull()
+    expect(result.claimDateTo).toBeNull()
+    expect(result.amountOperator).toBe('lte')
+    expect(result.amountValue).toBeNull()
+    expect(result.locationType).toBeNull()
+    expect(result.claimDateSort).toBe('desc')
     expect(result.hodApprovedFrom).toBeNull()
     expect(result.hodApprovedTo).toBeNull()
     expect(result.financeApprovedFrom).toBeNull()
@@ -30,7 +35,11 @@ describe('normalizeApprovalHistoryFilters', () => {
     const result = normalizeApprovalHistoryFilters({
       employeeName: '',
       claimStatus: '',
-      claimDate: '',
+      claimDateFrom: '',
+      claimDateTo: '',
+      amountValue: '',
+      locationType: '',
+      claimDateSort: '',
       hodApprovedFrom: '',
       hodApprovedTo: '',
       financeApprovedFrom: '',
@@ -38,7 +47,12 @@ describe('normalizeApprovalHistoryFilters', () => {
     })
     expect(result.employeeName).toBeNull()
     expect(result.claimStatus).toBeNull()
-    expect(result.claimDate).toBeNull()
+    expect(result.claimDateFrom).toBeNull()
+    expect(result.claimDateTo).toBeNull()
+    expect(result.amountOperator).toBe('lte')
+    expect(result.amountValue).toBeNull()
+    expect(result.locationType).toBeNull()
+    expect(result.claimDateSort).toBe('desc')
     expect(result.hodApprovedFrom).toBeNull()
     expect(result.hodApprovedTo).toBeNull()
     expect(result.financeApprovedFrom).toBeNull()
@@ -47,9 +61,9 @@ describe('normalizeApprovalHistoryFilters', () => {
 
   it('converts DD/MM/YYYY to ISO', () => {
     const result = normalizeApprovalHistoryFilters({
-      claimDate: '01/03/2026',
+      claimDateFrom: '01/03/2026',
     })
-    expect(result.claimDate).toBe('2026-03-01')
+    expect(result.claimDateFrom).toBe('2026-03-01')
   })
 
   it('preserves ISO dates', () => {
@@ -81,15 +95,29 @@ describe('normalizeApprovalHistoryFilters', () => {
 
   it('throws on invalid date format', () => {
     expect(() =>
-      normalizeApprovalHistoryFilters({ claimDate: '2026/03/01' })
+      normalizeApprovalHistoryFilters({ claimDateFrom: '2026/03/01' })
     ).toThrow()
+  })
+
+  it('throws when claim date from is after claim date to', () => {
+    expect(() =>
+      normalizeApprovalHistoryFilters({
+        claimDateFrom: '2026-03-08',
+        claimDateTo: '2026-03-01',
+      })
+    ).toThrowError('From Date cannot be later than To Date')
   })
 
   it('applies all filters simultaneously', () => {
     const result = normalizeApprovalHistoryFilters({
       employeeName: 'Yohan',
       claimStatus: VALID_STATUS_ID,
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-10',
+      amountOperator: 'gte',
+      amountValue: '350',
+      locationType: 'outstation',
+      claimDateSort: 'asc',
       hodApprovedFrom: '2026-03-02',
       hodApprovedTo: '2026-03-06',
       financeApprovedFrom: '2026-03-03',
@@ -97,7 +125,12 @@ describe('normalizeApprovalHistoryFilters', () => {
     })
     expect(result.employeeName).toBe('Yohan')
     expect(result.claimStatus).toBe(VALID_STATUS_ID)
-    expect(result.claimDate).toBe('2026-03-01')
+    expect(result.claimDateFrom).toBe('2026-03-01')
+    expect(result.claimDateTo).toBe('2026-03-10')
+    expect(result.amountOperator).toBe('gte')
+    expect(result.amountValue).toBe(350)
+    expect(result.locationType).toBe('outstation')
+    expect(result.claimDateSort).toBe('asc')
     expect(result.hodApprovedFrom).toBe('2026-03-02')
     expect(result.hodApprovedTo).toBe('2026-03-06')
     expect(result.financeApprovedFrom).toBe('2026-03-03')

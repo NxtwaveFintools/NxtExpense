@@ -13,6 +13,7 @@ import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summa
 import type {
   CityOption,
   ClaimFormInitialValues,
+  IntracityVehicleMode,
   ClaimFormValues,
   SelectOption,
   VehicleType,
@@ -74,18 +75,28 @@ export function useClaimSubmissionForm({
       initialValues?.ownVehicleUsed ??
       null)
     : null
-  const initialIntracityOwnVehicleUsed: boolean | null = isEditingReturnedClaim
-    ? (initialValues?.intracityOwnVehicleUsed ??
-      (initialIntercityOwnVehicleUsed
-        ? true
-        : (initialValues?.ownVehicleUsed ?? null)))
+  const initialIntracityTravelUsed: boolean | null = isEditingReturnedClaim
+    ? (initialValues?.intracityTravelUsed ??
+      initialValues?.hasIntracityTravel ??
+      (initialIntercityOwnVehicleUsed ? true : null))
     : null
+  const initialIntracityVehicleMode: IntracityVehicleMode | null =
+    isEditingReturnedClaim
+      ? (initialValues?.intracityVehicleMode ??
+        (initialValues?.intracityOwnVehicleUsed === true
+          ? 'OWN_VEHICLE'
+          : initialValues?.hasIntracityTravel
+            ? 'RENTAL_VEHICLE'
+            : null))
+      : null
   const [intercityOwnVehicleUsed, setIntercityOwnVehicleUsed] = useState<
     boolean | null
   >(initialIntercityOwnVehicleUsed)
-  const [intracityOwnVehicleUsed, setIntracityOwnVehicleUsed] = useState<
+  const [intracityTravelUsed, setIntracityTravelUsed] = useState<
     boolean | null
-  >(initialIntracityOwnVehicleUsed)
+  >(initialIntracityTravelUsed)
+  const [intracityVehicleMode, setIntracityVehicleMode] =
+    useState<IntracityVehicleMode | null>(initialIntracityVehicleMode)
   const [outstationStateId, setOutstationStateId] = useState(
     initialValues?.outstationStateId ?? ''
   )
@@ -132,8 +143,10 @@ export function useClaimSubmissionForm({
 
   const hasIntercityTravel = intercityOwnVehicleUsed === true
   const hasIntracityTravel =
-    intercityOwnVehicleUsed === true || intracityOwnVehicleUsed === true
-  const effectiveIntracityOwnVehicleUsed = hasIntracityTravel
+    intercityOwnVehicleUsed === true || intracityTravelUsed === true
+  const effectiveIntracityOwnVehicleUsed =
+    hasIntercityTravel ||
+    (hasIntracityTravel && intracityVehicleMode === 'OWN_VEHICLE')
 
   const kmValidationMessage = useMemo(() => {
     const kmValue = Number.parseFloat(kmTravelled)
@@ -190,7 +203,8 @@ export function useClaimSubmissionForm({
     setIntercityOwnVehicleUsed(value)
 
     if (value) {
-      setIntracityOwnVehicleUsed(null)
+      setIntracityTravelUsed(null)
+      setIntracityVehicleMode(null)
       setOutstationCityId('')
       return
     }
@@ -198,15 +212,17 @@ export function useClaimSubmissionForm({
     setFromCityId('')
     setToCityId('')
     setKmTravelled('')
-    setIntracityOwnVehicleUsed(null)
+    setIntracityTravelUsed(null)
+    setIntracityVehicleMode(null)
     setOutstationStateId('')
     setOutstationCityId('')
   }
 
-  function handleIntracityOwnVehicleUsedChange(value: boolean) {
-    setIntracityOwnVehicleUsed(value)
+  function handleIntracityTravelUsedChange(value: boolean) {
+    setIntracityTravelUsed(value)
 
     if (!value) {
+      setIntracityVehicleMode(null)
       setOutstationCityId('')
 
       if (intercityOwnVehicleUsed !== true) {
@@ -222,6 +238,10 @@ export function useClaimSubmissionForm({
       setFromCityId('')
       setToCityId('')
     }
+  }
+
+  function handleIntracityVehicleModeChange(value: IntracityVehicleMode) {
+    setIntracityVehicleMode(value)
   }
 
   function handleOutstationStateChange(value: string) {
@@ -264,10 +284,10 @@ export function useClaimSubmissionForm({
     if (
       requiresOutstationDetails &&
       intercityOwnVehicleUsed === false &&
-      intracityOwnVehicleUsed === null
+      intracityTravelUsed === null
     ) {
       const message =
-        'Please select whether you travelled within the city using your own vehicle.'
+        'Please select whether you travelled within the city using your own vehicle/rental vehicle.'
       setError(message)
       toast.error(message)
       return
@@ -279,19 +299,43 @@ export function useClaimSubmissionForm({
     const intercitySelection = requiresOutstationDetails
       ? intercityOwnVehicleUsed
       : null
-    const intracitySelection = requiresOutstationDetails
-      ? intercityOwnVehicleUsed === true
+    const intracitySelection =
+      requiresOutstationDetails && intercityOwnVehicleUsed === true
         ? true
-        : intracityOwnVehicleUsed
-      : null
+        : requiresOutstationDetails
+          ? intracityTravelUsed
+          : null
+
+    if (
+      requiresOutstationDetails &&
+      intercitySelection === false &&
+      intracitySelection === true &&
+      intracityVehicleMode === null
+    ) {
+      const message =
+        'Please select the vehicle type used within the city (Own Vehicle or Rent Vehicle).'
+      setError(message)
+      toast.error(message)
+      setIsSubmitting(false)
+      return
+    }
+
+    const effectiveIntracityVehicleMode =
+      requiresOutstationDetails && intracitySelection === true
+        ? intercitySelection === true
+          ? 'OWN_VEHICLE'
+          : intracityVehicleMode
+        : null
 
     const isIntercityOwnVehicle = intercitySelection === true
-    const isIntracityOwnVehicle = intracitySelection === true
+    const isIntracityOwnVehicle =
+      intracitySelection === true &&
+      effectiveIntracityVehicleMode === 'OWN_VEHICLE'
     const hasOutstationOwnVehicle =
       isIntercityOwnVehicle || isIntracityOwnVehicle
 
-    const isOutstationIntercity = isIntercityOwnVehicle
-    const isOutstationIntracity = isIntracityOwnVehicle
+    const isOutstationIntercity = intercitySelection === true
+    const isOutstationIntracity = intracitySelection === true
     const isOutstationOwnVehicle = hasOutstationOwnVehicle
 
     const derivedOutstationCityId = isOutstationIntracity
@@ -316,16 +360,26 @@ export function useClaimSubmissionForm({
         requiresOutstationDetails && intracitySelection !== null
           ? isOutstationIntracity
           : undefined,
+      intracityTravelUsed:
+        requiresOutstationDetails && intracitySelection !== null
+          ? intracitySelection
+          : undefined,
       intercityOwnVehicleUsed:
         requiresOutstationDetails && intercitySelection !== null
           ? intercitySelection
           : undefined,
       intracityOwnVehicleUsed:
         requiresOutstationDetails && intracitySelection !== null
-          ? intracitySelection
+          ? isIntracityOwnVehicle
+          : undefined,
+      intracityVehicleMode:
+        requiresOutstationDetails && intracitySelection === true
+          ? (effectiveIntracityVehicleMode ?? undefined)
           : undefined,
       vehicleType:
-        requiresVehicleSelection || isOutstationOwnVehicle
+        requiresVehicleSelection ||
+        isOutstationIntercity ||
+        isOutstationIntracity
           ? vehicleType || undefined
           : undefined,
       outstationStateId: requiresOutstationDetails
@@ -374,7 +428,8 @@ export function useClaimSubmissionForm({
     hasIntercityTravel,
     hasIntracityTravel,
     intercityOwnVehicleUsed,
-    intracityOwnVehicleUsed,
+    intracityTravelUsed,
+    intracityVehicleMode,
     outstationStateId,
     outstationCityId,
     fromCityId,
@@ -396,7 +451,8 @@ export function useClaimSubmissionForm({
     setToCityId,
     setKmTravelled,
     handleIntercityOwnVehicleUsedChange,
-    handleIntracityOwnVehicleUsedChange,
+    handleIntracityTravelUsedChange,
+    handleIntracityVehicleModeChange,
     handleOutstationStateChange,
     handleSubmit,
   }

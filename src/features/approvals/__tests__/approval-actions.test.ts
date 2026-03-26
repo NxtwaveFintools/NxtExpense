@@ -174,18 +174,44 @@ describe('approvalHistoryFiltersSchema', () => {
 
   it('accepts ISO date filters', () => {
     const parsed = approvalHistoryFiltersSchema.safeParse({
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-05',
     })
     expect(parsed.success).toBe(true)
   })
 
   it('accepts DD/MM/YYYY date filters', () => {
     const parsed = approvalHistoryFiltersSchema.safeParse({
-      claimDate: '01/03/2026',
+      claimDateFrom: '01/03/2026',
     })
     expect(parsed.success).toBe(true)
     if (parsed.success) {
-      expect(parsed.data.claimDate).toBe('2026-03-01')
+      expect(parsed.data.claimDateFrom).toBe('2026-03-01')
+    }
+  })
+
+  it('rejects inverted claim date range', () => {
+    const parsed = approvalHistoryFiltersSchema.safeParse({
+      claimDateFrom: '2026-03-08',
+      claimDateTo: '2026-03-01',
+    })
+    expect(parsed.success).toBe(false)
+  })
+
+  it('accepts amount and location filters', () => {
+    const parsed = approvalHistoryFiltersSchema.safeParse({
+      amountOperator: 'gte',
+      amountValue: '350',
+      locationType: 'outstation',
+      claimDateSort: 'asc',
+    })
+
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.amountOperator).toBe('gte')
+      expect(parsed.data.amountValue).toBe(350)
+      expect(parsed.data.locationType).toBe('outstation')
+      expect(parsed.data.claimDateSort).toBe('asc')
     }
   })
 
@@ -227,7 +253,7 @@ describe('approvalHistoryFiltersSchema', () => {
 
   it('rejects invalid date format in filters', () => {
     const parsed = approvalHistoryFiltersSchema.safeParse({
-      claimDate: '03-01-2026',
+      claimDateFrom: '03-01-2026',
     })
     expect(parsed.success).toBe(false)
   })

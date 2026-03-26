@@ -28,15 +28,16 @@ async function handleExportRequest(request: Request) {
 
     const mode = getExportMode(searchParams.get('mode'))
     const historyCursor = searchParams.get('historyCursor')
-    const claimDate =
-      searchParams.get('claimDate') ??
-      searchParams.get('claimDateFrom') ??
-      searchParams.get('claimDateTo')
 
     const filters = normalizeApprovalHistoryFilters({
       claimStatus: searchParams.get('claimStatus') ?? undefined,
       employeeName: searchParams.get('employeeName') ?? undefined,
-      claimDate: claimDate ?? undefined,
+      claimDateFrom: searchParams.get('claimDateFrom') ?? undefined,
+      claimDateTo: searchParams.get('claimDateTo') ?? undefined,
+      amountOperator: searchParams.get('amountOperator') ?? undefined,
+      amountValue: searchParams.get('amountValue') ?? undefined,
+      locationType: searchParams.get('locationType') ?? undefined,
+      claimDateSort: searchParams.get('claimDateSort') ?? undefined,
       hodApprovedFrom: searchParams.get('hodApprovedFrom') ?? undefined,
       hodApprovedTo: searchParams.get('hodApprovedTo') ?? undefined,
       financeApprovedFrom: searchParams.get('financeApprovedFrom') ?? undefined,

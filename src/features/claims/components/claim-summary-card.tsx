@@ -11,36 +11,39 @@ export function ClaimSummaryCard({
   lineItems,
 }: ClaimSummaryCardProps) {
   return (
-    <aside className="rounded-lg border border-border bg-surface p-5 lg:sticky lg:top-24 self-start">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-        Claim Summary
-      </h3>
-      <ul className="mt-4 space-y-2.5 text-sm">
-        {lineItems.map((lineItem) => (
-          <li
-            key={lineItem.label}
-            className="flex items-center justify-between"
-          >
-            <span className="text-muted-foreground">{lineItem.label}</span>
-            {typeof lineItem.amount === 'number' ? (
-              <span className="font-mono font-medium">
-                Rs. {lineItem.amount.toFixed(2)}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">-</span>
-            )}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-4 border-t border-border pt-4">
-        <p className="flex items-center justify-between text-sm font-semibold">
-          <span>Total</span>
-          <span className="text-base text-primary">
-            {typeof totalAmount === 'number'
-              ? `Rs. ${totalAmount.toFixed(2)}`
-              : 'Calculated by backend policy'}
-          </span>
-        </p>
+    <aside className="self-start rounded-2xl border border-border bg-surface p-5 shadow-sm lg:sticky lg:top-24">
+      <div className="rounded-xl border border-border bg-background p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          Claim Summary
+        </h3>
+
+        <div className="mt-4 space-y-2">
+          {lineItems.map((lineItem) => (
+            <div
+              key={lineItem.label}
+              className="grid grid-cols-[1fr_auto] items-end gap-3"
+            >
+              <p className="text-sm text-foreground">{lineItem.label}</p>
+              <p className="font-mono text-sm font-semibold text-foreground">
+                {typeof lineItem.amount === 'number'
+                  ? `Rs. ${lineItem.amount.toFixed(2)}`
+                  : 'Rs. 0.00'}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 border-t border-dashed border-border pt-3">
+          <p className="text-right text-muted-foreground">+</p>
+          <div className="mt-2 flex items-center justify-between text-sm font-semibold">
+            <span>Payable Total</span>
+            <span className="font-mono text-base text-primary">
+              {typeof totalAmount === 'number'
+                ? `Rs. ${totalAmount.toFixed(2)}`
+                : 'Rs. 0.00'}
+            </span>
+          </div>
+        </div>
       </div>
     </aside>
   )

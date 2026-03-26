@@ -17,7 +17,8 @@ describe('approvals pagination flow e2e scenario', () => {
     const normalizedFilters = normalizeApprovalHistoryFilters({
       employeeName: 'Rahul',
       claimStatus: VALID_STATUS_ID,
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-10',
       hodApprovedFrom: '2026-03-01',
       hodApprovedTo: '2026-03-31',
       financeApprovedFrom: '2026-03-02',

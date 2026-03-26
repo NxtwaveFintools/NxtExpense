@@ -180,8 +180,15 @@ export async function submitClaimAction(
 
   const hasIntercitySelection =
     typeof input.intercityOwnVehicleUsed === 'boolean'
-  const hasIntracitySelection =
-    typeof input.intracityOwnVehicleUsed === 'boolean'
+
+  const intracityTravelSelection =
+    typeof input.intracityTravelUsed === 'boolean'
+      ? input.intracityTravelUsed
+      : typeof input.intracityOwnVehicleUsed === 'boolean'
+        ? input.intracityOwnVehicleUsed
+        : undefined
+
+  const hasIntracitySelection = typeof intracityTravelSelection === 'boolean'
 
   if (wlFlags.requires_outstation_details && !hasIntercitySelection) {
     return {
@@ -199,7 +206,7 @@ export async function submitClaimAction(
     return {
       ok: false,
       error:
-        'Please select whether you travelled within the city using your own vehicle.',
+        'Please select whether you travelled within the city using your own vehicle/rental vehicle.',
     }
   }
 
@@ -212,18 +219,45 @@ export async function submitClaimAction(
     : false
 
   // Inter-city own-vehicle flow implicitly includes intra-city movement in the destination city.
+  const intracityVehicleMode = wlFlags.requires_outstation_details
+    ? hasIntercityTravel
+      ? 'OWN_VEHICLE'
+      : input.intracityTravelUsed === true
+        ? (input.intracityVehicleMode ?? null)
+        : null
+    : null
+
+  if (
+    wlFlags.requires_outstation_details &&
+    input.intercityOwnVehicleUsed === false &&
+    intracityTravelSelection === true &&
+    !intracityVehicleMode
+  ) {
+    return {
+      ok: false,
+      error:
+        'Please select the vehicle type used within the city (Own Vehicle or Rent Vehicle).',
+    }
+  }
+
+  const hasDirectIntracityTravel = wlFlags.requires_outstation_details
+    ? intracityTravelSelection === true
+    : false
+
   const intracityOwnVehicleUsed = wlFlags.requires_outstation_details
-    ? intercityOwnVehicleUsed || input.intracityOwnVehicleUsed === true
+    ? hasIntercityTravel || intracityVehicleMode === 'OWN_VEHICLE'
     : false
 
   const hasIntracityTravel = wlFlags.requires_outstation_details
-    ? intracityOwnVehicleUsed
+    ? hasIntercityTravel || hasDirectIntracityTravel
     : false
 
   const effectiveOutstationCityId = hasIntracityTravel
     ? (input.outstationCityId ??
       (hasIntercityTravel ? input.toCityId : undefined))
     : undefined
+
+  const hasAnyOutstationCityTravel = hasIntercityTravel || hasIntracityTravel
 
   const isOutstationOwnVehicle =
     intercityOwnVehicleUsed || intracityOwnVehicleUsed
@@ -324,7 +358,7 @@ export async function submitClaimAction(
   let vehicleTypeId: string | null = null
   if (
     wlFlags.requires_vehicle_selection ||
-    (wlFlags.requires_outstation_details && isOutstationOwnVehicle)
+    (wlFlags.requires_outstation_details && hasAnyOutstationCityTravel)
   ) {
     // Form sends vehicleType as UUID directly
     vehicleTypeId = input.vehicleType ?? null
@@ -439,6 +473,7 @@ export async function submitClaimAction(
   type OutstationInput = {
     hasIntercityTravel: boolean
     hasIntracityTravel: boolean
+    intracityVehicleMode: 'OWN_VEHICLE' | 'RENTAL_VEHICLE' | null
     intercityOwnVehicleUsed: boolean
     intracityOwnVehicleUsed: boolean
     outstationStateId?: string
@@ -451,6 +486,7 @@ export async function submitClaimAction(
     ? ({
         hasIntercityTravel,
         hasIntracityTravel,
+        intracityVehicleMode,
         intercityOwnVehicleUsed,
         intracityOwnVehicleUsed,
         outstationStateId: input.outstationStateId,
@@ -524,6 +560,9 @@ export async function submitClaimAction(
       intracityOwnVehicleUsed: hasIntracityScope
         ? (outstation?.intracityOwnVehicleUsed ?? false)
         : null,
+      intracityVehicleMode: hasIntracityScope
+        ? (outstation?.intracityVehicleMode ?? null)
+        : null,
       totalAmount: draft.total,
       statusId: initialWorkflowState.statusId,
       currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
@@ -574,6 +613,9 @@ export async function submitClaimAction(
       : null,
     intracityOwnVehicleUsed: hasIntracityScope
       ? (outstation?.intracityOwnVehicleUsed ?? false)
+      : null,
+    intracityVehicleMode: hasIntracityScope
+      ? (outstation?.intracityVehicleMode ?? null)
       : null,
     totalAmount: draft.total,
     statusId: initialWorkflowState.statusId,

@@ -13,7 +13,6 @@ import {
   sortFinanceActionIntents,
   type FinanceActionIntent,
 } from '@/features/finance/utils/action-intents'
-import { getWorkflowActionCtaLabel } from '@/lib/utils/workflow-action-labels'
 
 type FinanceActionsProps = {
   claimId: string

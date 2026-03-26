@@ -100,7 +100,12 @@ describe('approval actions workflow integration', () => {
     mocks.normalizeApprovalHistoryFilters.mockReturnValue({
       employeeName: null,
       claimStatus: null,
-      claimDate: null,
+      claimDateFrom: null,
+      claimDateTo: null,
+      amountOperator: 'lte',
+      amountValue: null,
+      locationType: null,
+      claimDateSort: 'desc',
       hodApprovedFrom: null,
       hodApprovedTo: null,
       financeApprovedFrom: null,
@@ -476,7 +481,7 @@ describe('approval actions workflow integration', () => {
     // Arrange
     const rawFilters = {
       employeeName: 'Yohan',
-      claimDate: '01/03/2026',
+      claimDateFrom: '01/03/2026',
     }
 
     // Act
@@ -494,6 +499,38 @@ describe('approval actions workflow integration', () => {
       {
         employeeName: null,
         claimStatus: null,
+        claimDateFrom: null,
+        claimDateTo: null,
+        amountOperator: 'lte',
+        amountValue: null,
+        locationType: null,
+        claimDateSort: 'desc',
+      }
+    )
+  })
+
+  it('should pass new amount and location filters to pending approvals query', async () => {
+    await getPendingApprovalsAction(null, 10, {
+      amountOperator: 'gte',
+      amountValue: '350',
+      locationType: 'outstation',
+      claimDateSort: 'asc',
+    })
+
+    expect(mocks.getPendingApprovalsPaginated).toHaveBeenCalledWith(
+      expect.anything(),
+      'approver@nxtwave.co.in',
+      null,
+      10,
+      {
+        employeeName: null,
+        claimStatus: null,
+        claimDateFrom: null,
+        claimDateTo: null,
+        amountOperator: 'lte',
+        amountValue: null,
+        locationType: null,
+        claimDateSort: 'desc',
       }
     )
   })
@@ -530,7 +567,8 @@ describe('approval actions workflow integration', () => {
     // Act
     await getApprovalHistoryAction('cursor-1', 20, {
       claimStatus: '7a0068ba-39c3-4229-b6f5-88559ace4e77',
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-03',
     })
 
     // Assert
@@ -541,7 +579,12 @@ describe('approval actions workflow integration', () => {
       {
         employeeName: null,
         claimStatus: null,
-        claimDate: null,
+        claimDateFrom: null,
+        claimDateTo: null,
+        amountOperator: 'lte',
+        amountValue: null,
+        locationType: null,
+        claimDateSort: 'desc',
         hodApprovedFrom: null,
         hodApprovedTo: null,
         financeApprovedFrom: null,

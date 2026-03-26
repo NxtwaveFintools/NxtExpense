@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { PendingApprovalsFilters } from '@/features/approvals/types'
+import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 
 type PendingApprovalsSummary = {
   count: number
@@ -16,6 +17,12 @@ type PendingSummaryRow = {
 const DEFAULT_PENDING_FILTERS: PendingApprovalsFilters = {
   employeeName: null,
   claimStatus: null,
+  claimDateFrom: null,
+  claimDateTo: null,
+  amountOperator: 'lte',
+  amountValue: null,
+  locationType: null,
+  claimDateSort: 'desc',
 }
 
 function toInList(ids: string[]) {
@@ -118,6 +125,18 @@ export async function getPendingApprovalsSummary(
 
   const normalizedName = filters.employeeName?.trim() ?? ''
 
+  let scopedLocationIds: string[] | null = null
+  if (filters.locationType) {
+    scopedLocationIds = await getLocationIdsByApprovalLocationType(
+      supabase,
+      filters.locationType
+    )
+
+    if (!scopedLocationIds || scopedLocationIds.length === 0) {
+      return { count: 0, amount: 0 }
+    }
+  }
+
   const pageSize = 500
 
   let nextCursor: { created_at: string; id: string } | null = null
@@ -145,6 +164,28 @@ export async function getPendingApprovalsSummary(
         .replaceAll('%', '\\%')
         .replaceAll('_', '\\_')
       query = query.ilike('employees.employee_name', `%${escapedName}%`)
+    }
+
+    if (filters.claimDateFrom) {
+      query = query.gte('claim_date', filters.claimDateFrom)
+    }
+
+    if (filters.claimDateTo) {
+      query = query.lte('claim_date', filters.claimDateTo)
+    }
+
+    if (filters.amountValue !== null) {
+      if (filters.amountOperator === 'gte') {
+        query = query.gte('total_amount', filters.amountValue)
+      } else if (filters.amountOperator === 'eq') {
+        query = query.eq('total_amount', filters.amountValue)
+      } else {
+        query = query.lte('total_amount', filters.amountValue)
+      }
+    }
+
+    if (scopedLocationIds) {
+      query = query.in('work_location_id', scopedLocationIds)
     }
 
     const { data, error } = await query

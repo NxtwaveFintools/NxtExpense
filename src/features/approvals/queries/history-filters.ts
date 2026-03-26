@@ -74,18 +74,26 @@ export async function getFilteredApprovalHistoryPaginated(
   const normalizedLimit = Math.max(1, Math.min(limit, 100))
   const decodedCursor = cursor ? decodeCursor(cursor) : null
 
-  const { data, error } = await supabase.rpc('get_filtered_approval_history', {
+  const baseArgs = {
     p_limit: normalizedLimit,
     p_cursor_acted_at: decodedCursor?.created_at ?? null,
     p_cursor_action_id: decodedCursor?.id ?? null,
     p_name_search: filters.employeeName,
     p_actor_filters: null,
     p_claim_status_id: filters.claimStatus?.trim() ?? null,
-    p_claim_date: filters.claimDate,
+    p_amount_operator: filters.amountOperator,
+    p_amount_value: filters.amountValue,
+    p_location_type: filters.locationType,
     p_hod_approved_from: toIstDayStart(filters.hodApprovedFrom),
     p_hod_approved_to: toIstDayEnd(filters.hodApprovedTo),
     p_finance_approved_from: toIstDayStart(filters.financeApprovedFrom),
     p_finance_approved_to: toIstDayEnd(filters.financeApprovedTo),
+  }
+
+  const { data, error } = await supabase.rpc('get_filtered_approval_history', {
+    ...baseArgs,
+    p_claim_date_from: filters.claimDateFrom,
+    p_claim_date_to: filters.claimDateTo,
   })
 
   if (error) {

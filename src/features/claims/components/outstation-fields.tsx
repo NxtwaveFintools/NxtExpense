@@ -1,10 +1,15 @@
 import { Car, MapPin, Route } from 'lucide-react'
 
-import type { SelectOption, VehicleType } from '@/features/claims/types'
+import type {
+  IntracityVehicleMode,
+  SelectOption,
+  VehicleType,
+} from '@/features/claims/types'
 
 type OutstationFieldsProps = {
   intercityOwnVehicleUsed: boolean | null
-  intracityOwnVehicleUsed: boolean | null
+  intracityTravelUsed: boolean | null
+  intracityVehicleMode: IntracityVehicleMode | null
   vehicleType: VehicleType
   outstationStateId: string
   outstationCityId: string
@@ -17,7 +22,8 @@ type OutstationFieldsProps = {
   stateOptions: readonly SelectOption[]
   cityOptions: readonly SelectOption[]
   onIntercityOwnVehicleUsedChange: (value: boolean) => void
-  onIntracityOwnVehicleUsedChange: (value: boolean) => void
+  onIntracityTravelUsedChange: (value: boolean) => void
+  onIntracityVehicleModeChange: (value: IntracityVehicleMode) => void
   onVehicleTypeChange: (value: VehicleType) => void
   onOutstationStateIdChange: (value: string) => void
   onOutstationCityIdChange: (value: string) => void
@@ -30,16 +36,17 @@ export function OutstationFields(props: OutstationFieldsProps) {
   const hasIntercityTravel = props.intercityOwnVehicleUsed === true
   const hasIntracityTravel =
     props.intercityOwnVehicleUsed === false &&
-    props.intracityOwnVehicleUsed === true
-  const hasAnyOwnVehicle = hasIntercityTravel || hasIntracityTravel
-  const shouldShowLocationFields = hasAnyOwnVehicle
+    props.intracityTravelUsed === true
+  const hasAnyCityTravel = hasIntercityTravel || hasIntracityTravel
+  const shouldShowLocationFields = hasIntercityTravel || hasIntracityTravel
   const shouldShowIntracityQuestion = props.intercityOwnVehicleUsed === false
 
   return (
     <div className="space-y-5">
       <fieldset className="space-y-2.5">
         <legend className="text-sm font-medium text-foreground">
-          Did you travel between cities using your own vehicle?
+          Did you travel <span className="font-semibold">between</span> cities
+          using your own vehicle?
         </legend>
         <div className="flex gap-2">
           <button
@@ -70,12 +77,13 @@ export function OutstationFields(props: OutstationFieldsProps) {
       {shouldShowIntracityQuestion ? (
         <fieldset className="space-y-2.5">
           <legend className="text-sm font-medium text-foreground">
-            Did you travel within the city using your own vehicle?
+            Did you travel <span className="font-semibold">within</span> the
+            city using your own vehicle/rental vehicle?
           </legend>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => props.onIntracityOwnVehicleUsedChange(true)}
+              onClick={() => props.onIntracityTravelUsedChange(true)}
               className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
                 hasIntracityTravel
                   ? 'border-primary bg-primary text-primary-foreground'
@@ -86,14 +94,48 @@ export function OutstationFields(props: OutstationFieldsProps) {
             </button>
             <button
               type="button"
-              onClick={() => props.onIntracityOwnVehicleUsedChange(false)}
+              onClick={() => props.onIntracityTravelUsedChange(false)}
               className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                props.intracityOwnVehicleUsed === false
+                props.intracityTravelUsed === false
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-foreground hover:bg-muted'
               }`}
             >
               No
+            </button>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {hasIntracityTravel ? (
+        <fieldset className="space-y-2.5">
+          <legend className="text-sm font-medium text-foreground">
+            Vehicle type used within the city
+          </legend>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => props.onIntracityVehicleModeChange('OWN_VEHICLE')}
+              className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
+                props.intracityVehicleMode === 'OWN_VEHICLE'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:bg-muted'
+              }`}
+            >
+              Own Vehicle
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                props.onIntracityVehicleModeChange('RENTAL_VEHICLE')
+              }
+              className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
+                props.intracityVehicleMode === 'RENTAL_VEHICLE'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:bg-muted'
+              }`}
+            >
+              Rent Vehicle
             </button>
           </div>
         </fieldset>
@@ -211,7 +253,7 @@ export function OutstationFields(props: OutstationFieldsProps) {
         </>
       ) : null}
 
-      {hasAnyOwnVehicle ? (
+      {hasAnyCityTravel ? (
         <>
           <div className="space-y-2">
             <label

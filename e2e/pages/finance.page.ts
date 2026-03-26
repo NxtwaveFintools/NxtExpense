@@ -45,7 +45,11 @@ export class FinancePage {
         .locator(`[data-claim-id="${claimId}"]`)
         .getByRole('button', { name: /issue/i })
     }
-    return this.page.getByRole('button', { name: /^Issue$/i }).first()
+    return this.page
+      .getByRole('button', {
+        name: /approve|issue|issued|payment issued|mark as issued/i,
+      })
+      .first()
   }
 
   getRejectButton(claimId?: string) {
@@ -106,7 +110,7 @@ export class FinancePage {
 
   get bulkIssueButton() {
     return this.page.getByRole('button', {
-      name: /^Issue$/i,
+      name: /approve|issue|issued|payment issued|mark as issued/i,
     })
   }
 }

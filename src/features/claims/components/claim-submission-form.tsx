@@ -39,7 +39,8 @@ export function ClaimSubmissionForm({
     claimDate,
     vehicleType,
     intercityOwnVehicleUsed,
-    intracityOwnVehicleUsed,
+    intracityTravelUsed,
+    intracityVehicleMode,
     outstationStateId,
     outstationCityId,
     fromCityId,
@@ -61,7 +62,8 @@ export function ClaimSubmissionForm({
     setToCityId,
     setKmTravelled,
     handleIntercityOwnVehicleUsedChange,
-    handleIntracityOwnVehicleUsedChange,
+    handleIntracityTravelUsedChange,
+    handleIntracityVehicleModeChange,
     handleOutstationStateChange,
     handleSubmit,
   } = useClaimSubmissionForm({
@@ -152,7 +154,8 @@ export function ClaimSubmissionForm({
         {selectedLocation?.requires_outstation_details ? (
           <OutstationFields
             intercityOwnVehicleUsed={intercityOwnVehicleUsed}
-            intracityOwnVehicleUsed={intracityOwnVehicleUsed}
+            intracityTravelUsed={intracityTravelUsed}
+            intracityVehicleMode={intracityVehicleMode}
             vehicleType={vehicleType}
             outstationStateId={outstationStateId}
             outstationCityId={outstationCityId}
@@ -167,9 +170,8 @@ export function ClaimSubmissionForm({
             onIntercityOwnVehicleUsedChange={
               handleIntercityOwnVehicleUsedChange
             }
-            onIntracityOwnVehicleUsedChange={
-              handleIntracityOwnVehicleUsedChange
-            }
+            onIntracityTravelUsedChange={handleIntracityTravelUsedChange}
+            onIntracityVehicleModeChange={handleIntracityVehicleModeChange}
             onVehicleTypeChange={setVehicleType}
             onOutstationStateIdChange={handleOutstationStateChange}
             onOutstationCityIdChange={setOutstationCityId}

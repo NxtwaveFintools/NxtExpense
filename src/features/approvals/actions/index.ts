@@ -122,6 +122,12 @@ function getPendingFilters(
   return {
     employeeName: normalizedFilters.employeeName,
     claimStatus: normalizedFilters.claimStatus,
+    claimDateFrom: normalizedFilters.claimDateFrom,
+    claimDateTo: normalizedFilters.claimDateTo,
+    amountOperator: normalizedFilters.amountOperator,
+    amountValue: normalizedFilters.amountValue,
+    locationType: normalizedFilters.locationType,
+    claimDateSort: normalizedFilters.claimDateSort,
   }
 }
 

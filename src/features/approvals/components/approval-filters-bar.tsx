@@ -7,6 +7,7 @@ import type { ApprovalHistoryFilters } from '@/features/approvals/types'
 type ApprovalFiltersBarProps = {
   filters: ApprovalHistoryFilters
   statusCatalog: ClaimStatusCatalogItem[]
+  validationError?: string | null
   exportCurrentPageHref: string
   exportAllHref: string
 }
@@ -14,6 +15,7 @@ type ApprovalFiltersBarProps = {
 export function ApprovalFiltersBar({
   filters,
   statusCatalog,
+  validationError,
   exportCurrentPageHref,
   exportAllHref,
 }: ApprovalFiltersBarProps) {
@@ -29,8 +31,14 @@ export function ApprovalFiltersBar({
       <form
         action="/approvals"
         method="get"
-        className="mt-5 grid gap-4 md:grid-cols-3"
+        className="mt-5 grid gap-4 md:grid-cols-4"
       >
+        <input
+          type="hidden"
+          name="claimDateSort"
+          value={filters.claimDateSort}
+        />
+
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Status</span>
           <select
@@ -58,16 +66,73 @@ export function ApprovalFiltersBar({
         </label>
 
         <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">Claim Date</span>
+          <span className="font-medium text-foreground">Claim Date From</span>
           <input
-            name="claimDate"
+            name="claimDateFrom"
             type="date"
-            defaultValue={filters.claimDate ?? ''}
+            defaultValue={filters.claimDateFrom ?? ''}
             className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           />
         </label>
 
-        <div className="md:col-span-3 flex flex-wrap items-center gap-2 pt-2">
+        <label className="space-y-1.5 text-sm">
+          <span className="font-medium text-foreground">Claim Date To</span>
+          <input
+            name="claimDateTo"
+            type="date"
+            defaultValue={filters.claimDateTo ?? ''}
+            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+          />
+        </label>
+
+        <label className="space-y-1.5 text-sm">
+          <span className="font-medium text-foreground">Amount Condition</span>
+          <select
+            name="amountOperator"
+            defaultValue={filters.amountOperator}
+            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+          >
+            <option value="lte">Less than or equal (≤)</option>
+            <option value="gte">Greater than or equal (≥)</option>
+            <option value="eq">Equal to (=)</option>
+          </select>
+        </label>
+
+        <label className="space-y-1.5 text-sm">
+          <span className="font-medium text-foreground">Amount Value</span>
+          <input
+            name="amountValue"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={
+              filters.amountValue === null ? '' : String(filters.amountValue)
+            }
+            placeholder="Enter amount"
+            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+
+        <label className="space-y-1.5 text-sm">
+          <span className="font-medium text-foreground">Location Type</span>
+          <select
+            name="locationType"
+            defaultValue={filters.locationType ?? ''}
+            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+          >
+            <option value="">All Location Types</option>
+            <option value="base">Base Location</option>
+            <option value="outstation">Outstation</option>
+          </select>
+        </label>
+
+        {validationError ? (
+          <p className="md:col-span-4 text-sm font-medium text-rose-600">
+            {validationError}
+          </p>
+        ) : null}
+
+        <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-2">
           <button
             type="submit"
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all duration-150 hover:bg-primary-hover hover:shadow-md"

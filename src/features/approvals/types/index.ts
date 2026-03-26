@@ -30,10 +30,21 @@ export type PendingApproval = {
 
 export type PaginatedPendingApprovals = PaginatedResult<PendingApproval>
 
+export type ApprovalAmountOperator = 'lte' | 'gte' | 'eq'
+
+export type ApprovalLocationType = 'base' | 'outstation'
+
+export type ApprovalClaimDateSort = 'asc' | 'desc'
+
 export type ApprovalHistoryFilters = {
   employeeName: string | null
   claimStatus: string | null
-  claimDate: string | null
+  claimDateFrom: string | null
+  claimDateTo: string | null
+  amountOperator: ApprovalAmountOperator
+  amountValue: number | null
+  locationType: ApprovalLocationType | null
+  claimDateSort: ApprovalClaimDateSort
   hodApprovedFrom: string | null
   hodApprovedTo: string | null
   financeApprovedFrom: string | null
@@ -43,6 +54,12 @@ export type ApprovalHistoryFilters = {
 export type PendingApprovalsFilters = {
   employeeName: string | null
   claimStatus: string | null
+  claimDateFrom: string | null
+  claimDateTo: string | null
+  amountOperator: ApprovalAmountOperator
+  amountValue: number | null
+  locationType: ApprovalLocationType | null
+  claimDateSort: ApprovalClaimDateSort
 }
 
 export type ApprovalHistoryRecord = {
