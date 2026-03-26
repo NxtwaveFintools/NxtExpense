@@ -232,7 +232,6 @@ AS $function$
           where wlb.id = c.work_location_id
             and wlb.requires_outstation_details = false
             and wlb.requires_vehicle_selection = true
-            and wlb.allows_expenses = true
         )
       )
     )

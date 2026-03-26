@@ -23,8 +23,7 @@ export async function getLocationIdsByApprovalLocationType(
     .filter(
       (location) =>
         !location.requires_outstation_details &&
-        location.requires_vehicle_selection &&
-        location.allows_expenses
+        location.requires_vehicle_selection
     )
     .map((location) => location.id)
 }

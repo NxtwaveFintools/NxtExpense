@@ -7,7 +7,7 @@ export default async function AdminWorkLocationsPage() {
   const { data: workLocations, error } = await supabase
     .from('work_locations')
     .select(
-      'id, location_code, location_name, requires_vehicle_selection, requires_outstation_details, allows_expenses, display_order, is_active'
+      'id, location_code, location_name, requires_vehicle_selection, requires_outstation_details, display_order, is_active'
     )
     .order('display_order')
 

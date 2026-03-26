@@ -12,7 +12,6 @@ type WorkLocation = {
   location_name: string
   requires_vehicle_selection: boolean
   requires_outstation_details: boolean
-  allows_expenses: boolean
   display_order: number
   is_active: boolean
 }
@@ -60,9 +59,6 @@ export function WorkLocationTable({ workLocations }: Props) {
               Outstation
             </th>
             <th className="px-3 py-2 text-center font-medium text-foreground/70">
-              Expenses
-            </th>
-            <th className="px-3 py-2 text-center font-medium text-foreground/70">
               Order
             </th>
             <th className="px-3 py-2 text-center font-medium text-foreground/70">
@@ -85,9 +81,6 @@ export function WorkLocationTable({ workLocations }: Props) {
               </td>
               <td className="px-3 py-2 text-center">
                 {boolIcon(wl.requires_outstation_details)}
-              </td>
-              <td className="px-3 py-2 text-center">
-                {boolIcon(wl.allows_expenses)}
               </td>
               <td className="px-3 py-2 text-center">{wl.display_order}</td>
               <td className="px-3 py-2 text-center">

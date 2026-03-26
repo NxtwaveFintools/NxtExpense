@@ -35,7 +35,6 @@ export type WorkLocation = {
   location_name: string
   requires_vehicle_selection: boolean
   requires_outstation_details: boolean
-  allows_expenses: boolean
   display_order: number
   is_active: boolean
 }
@@ -131,7 +130,7 @@ export async function getAllWorkLocations(
   const { data, error } = await supabase
     .from('work_locations')
     .select(
-      'id, location_code, location_name, requires_vehicle_selection, requires_outstation_details, allows_expenses, display_order, is_active'
+      'id, location_code, location_name, requires_vehicle_selection, requires_outstation_details, display_order, is_active'
     )
     .eq('is_active', true)
     .order('display_order')
