@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getFinanceQueuePaginated: vi.fn(),
   getFinanceHistoryPaginated: vi.fn(),
   getClaimAvailableActions: vi.fn(),
+  getClaimAvailableActionsByClaimIds: vi.fn(),
   normalizeFinanceFilters: vi.fn(),
   getMaxNotesLength: vi.fn(),
 }))
@@ -37,6 +38,7 @@ vi.mock('@/features/finance/queries', () => ({
 
 vi.mock('@/features/claims/queries', () => ({
   getClaimAvailableActions: mocks.getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds: mocks.getClaimAvailableActionsByClaimIds,
 }))
 
 vi.mock('@/features/finance/utils/filters', () => ({
@@ -100,7 +102,7 @@ describe('finance actions workflow integration', () => {
       dateTo: null,
     })
 
-    mocks.getClaimAvailableActions.mockResolvedValue([
+    const defaultActions = [
       {
         action: 'issued',
         display_label: 'Issue Payment',
@@ -115,7 +117,14 @@ describe('finance actions workflow integration', () => {
         supports_allow_resubmit: true,
         actor_scope: 'finance',
       },
-    ])
+    ]
+
+    mocks.getClaimAvailableActions.mockResolvedValue(defaultActions)
+    mocks.getClaimAvailableActionsByClaimIds.mockImplementation(
+      async (_supabase, claimIds: string[]) => {
+        return new Map(claimIds.map((claimId) => [claimId, defaultActions]))
+      }
+    )
 
     mocks.getMaxNotesLength.mockResolvedValue(500)
 

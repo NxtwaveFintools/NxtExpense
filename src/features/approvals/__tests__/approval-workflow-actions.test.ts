@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getPendingApprovalsPaginated: vi.fn(),
   getFilteredApprovalHistoryPaginated: vi.fn(),
   getClaimAvailableActions: vi.fn(),
+  getClaimAvailableActionsByClaimIds: vi.fn(),
   normalizeApprovalHistoryFilters: vi.fn(),
   getMaxNotesLength: vi.fn(),
 }))
@@ -43,6 +44,7 @@ vi.mock('@/features/approvals/queries/history-filters', () => ({
 
 vi.mock('@/features/claims/queries', () => ({
   getClaimAvailableActions: mocks.getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds: mocks.getClaimAvailableActionsByClaimIds,
 }))
 
 vi.mock('@/features/approvals/utils/history-filters', () => ({
@@ -126,7 +128,7 @@ describe('approval actions workflow integration', () => {
       limit: 10,
     })
 
-    mocks.getClaimAvailableActions.mockResolvedValue([
+    const defaultActions = [
       {
         action: 'approved',
         display_label: 'Approve',
@@ -141,7 +143,14 @@ describe('approval actions workflow integration', () => {
         supports_allow_resubmit: true,
         actor_scope: 'approver',
       },
-    ])
+    ]
+
+    mocks.getClaimAvailableActions.mockResolvedValue(defaultActions)
+    mocks.getClaimAvailableActionsByClaimIds.mockImplementation(
+      async (_supabase, claimIds: string[]) => {
+        return new Map(claimIds.map((claimId) => [claimId, defaultActions]))
+      }
+    )
 
     mocks.getMaxNotesLength.mockResolvedValue(500)
   })

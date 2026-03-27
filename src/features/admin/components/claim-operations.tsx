@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 import {
@@ -16,14 +17,7 @@ import { formatDate } from '@/lib/utils/date'
 
 export function ClaimOperations() {
   const [query, setQuery] = useState('')
-  const [claims, setClaims] = useState<AdminClaimRow[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
-
-  const [statusOptions, setStatusOptions] = useState<AdminClaimStatusOption[]>(
-    []
-  )
-  const [isLoadingStatusOptions, setIsLoadingStatusOptions] = useState(false)
+  const [submittedQuery, setSubmittedQuery] = useState('')
 
   // Status change state
   const [selectedClaim, setSelectedClaim] = useState<AdminClaimRow | null>(null)
@@ -31,45 +25,49 @@ export function ClaimOperations() {
   const [statusChangeReason, setStatusChangeReason] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadStatusOptions() {
-      setIsLoadingStatusOptions(true)
+  const statusOptionsQuery = useQuery<AdminClaimStatusOption[], Error>({
+    queryKey: ['admin-claim-status-options'],
+    queryFn: async () => {
       const result = await getClaimStatusOptionsAction()
-      setIsLoadingStatusOptions(false)
-
-      if (!isMounted) {
-        return
-      }
 
       if (!result.ok) {
-        toast.error(result.error ?? 'Failed to load status options.')
-        return
+        throw new Error(result.error ?? 'Failed to load status options.')
       }
 
-      setStatusOptions(result.data)
-    }
+      return result.data
+    },
+    gcTime: 5 * 60 * 1000,
+  })
 
-    loadStatusOptions()
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  const claimsQuery = useQuery<AdminClaimRow[], Error>({
+    queryKey: ['admin-claims-search', submittedQuery],
+    queryFn: async () => {
+      const result = await searchClaimsAction(submittedQuery)
+
+      if (!result.ok) {
+        throw new Error(result.error ?? 'Search failed.')
+      }
+
+      return result.data
+    },
+    enabled: submittedQuery.length > 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+  })
+
+  const claims = claimsQuery.data ?? []
+  const isSearching = claimsQuery.isFetching
+  const searchError = claimsQuery.isError ? claimsQuery.error.message : null
+  const statusOptions = statusOptionsQuery.data ?? []
+  const isLoadingStatusOptions = statusOptionsQuery.isFetching
 
   async function handleSearch() {
-    if (!query.trim()) return
-    setIsSearching(true)
-    setSearchError(null)
-
-    const result = await searchClaimsAction(query.trim())
-    setIsSearching(false)
-
-    if (!result.ok) {
-      setSearchError(result.error)
+    const normalizedQuery = query.trim()
+    if (!normalizedQuery) {
       return
     }
-    setClaims(result.data)
+
+    setSubmittedQuery(normalizedQuery)
   }
 
   async function handleStatusChange() {
@@ -99,8 +97,10 @@ export function ClaimOperations() {
     setSelectedClaim(null)
     setTargetStatusId('')
     setStatusChangeReason('')
-    // Re-search to refresh statuses
-    handleSearch()
+
+    if (submittedQuery) {
+      void claimsQuery.refetch()
+    }
   }
 
   return (
@@ -125,6 +125,11 @@ export function ClaimOperations() {
       </div>
 
       {searchError && <p className="text-sm text-red-600">{searchError}</p>}
+      {statusOptionsQuery.isError ? (
+        <p className="text-sm text-red-600">
+          {statusOptionsQuery.error.message}
+        </p>
+      ) : null}
 
       {/* Results table */}
       {claims.length > 0 && (

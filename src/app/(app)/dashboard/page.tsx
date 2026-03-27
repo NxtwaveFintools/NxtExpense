@@ -41,10 +41,8 @@ export default async function DashboardPage() {
     approverAccess
   )
 
-  const [stats, recentClaims] = await Promise.all([
-    getEmployeeClaimStats(supabase, employee.id),
-    getRecentClaims(supabase, employee.id),
-  ])
+  const statsPromise = getEmployeeClaimStats(supabase, employee.id)
+  const recentClaimsPromise = getRecentClaims(supabase, employee.id)
 
   return (
     <DashboardContent
@@ -55,8 +53,8 @@ export default async function DashboardPage() {
         employeeName: employee.employee_name,
         designationName: employee.designations?.designation_name ?? null,
       }}
-      stats={stats}
-      recentClaims={recentClaims}
+      statsPromise={statsPromise}
+      recentClaimsPromise={recentClaimsPromise}
     />
   )
 }

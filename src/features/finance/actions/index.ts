@@ -4,7 +4,10 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
-import { getClaimAvailableActions } from '@/features/claims/queries'
+import {
+  getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds,
+} from '@/features/claims/queries'
 import type { FinanceFilters } from '@/features/finance/types'
 import {
   bulkFinanceActionSchema,
@@ -144,8 +147,13 @@ export async function bulkFinanceClaimsAction(payload: {
       }
     }
 
+    const actionsByClaimId = await getClaimAvailableActionsByClaimIds(
+      supabase,
+      parsed.data.claimIds
+    )
+
     for (const claimId of parsed.data.claimIds) {
-      const availableActions = await getClaimAvailableActions(supabase, claimId)
+      const availableActions = actionsByClaimId.get(claimId) ?? []
       const canRunAction = availableActions.some(
         (action) => action.action === parsed.data.action
       )

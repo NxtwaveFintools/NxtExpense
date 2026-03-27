@@ -19,7 +19,10 @@ import {
   getPendingApprovalsPaginated,
 } from '@/features/approvals/queries'
 import { getFilteredApprovalHistoryPaginated } from '@/features/approvals/queries/history-filters'
-import { getClaimAvailableActions } from '@/features/claims/queries'
+import {
+  getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds,
+} from '@/features/claims/queries'
 import { normalizeApprovalHistoryFilters } from '@/features/approvals/utils/history-filters'
 import {
   getMaxNotesLength,
@@ -256,8 +259,13 @@ export async function submitBulkApprovalAction(payload: {
     errors: [],
   }
 
+  const actionsByClaimId = await getClaimAvailableActionsByClaimIds(
+    supabase,
+    parsed.data.claimIds
+  )
+
   for (const claimId of parsed.data.claimIds) {
-    const availableActions = await getClaimAvailableActions(supabase, claimId)
+    const availableActions = actionsByClaimId.get(claimId) ?? []
     const canRunAction = availableActions.some(
       (action) => action.action === parsed.data.action
     )
