@@ -9,6 +9,7 @@ import {
   buildCursorNavigationLinks,
   decodeCursorTrail,
   encodeCursorTrail,
+  getCursorTotalPages,
 } from '@/lib/utils/pagination'
 import {
   getFinanceHistoryAction,
@@ -16,6 +17,10 @@ import {
 } from '@/features/finance/actions'
 import { getFinanceFilterOptions } from '@/features/finance/queries'
 import { getFinanceQueueAnalytics } from '@/features/finance/queries/analytics'
+import {
+  getFinanceHistoryTotalCount,
+  getFinanceQueueTotalCount,
+} from '@/features/finance/queries'
 import {
   addFinanceFiltersToParams,
   normalizeFinanceFilters,
@@ -129,11 +134,20 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [queue, history, filterOptions, analytics] = await Promise.all([
+  const [
+    queue,
+    history,
+    filterOptions,
+    analytics,
+    queueTotalCount,
+    historyTotalCount,
+  ] = await Promise.all([
     getFinanceQueueAction(queueCursor, 10, normalizedFilterParams),
     getFinanceHistoryAction(historyCursor, 10, normalizedFilterParams),
     getFinanceFilterOptions(supabase),
     getFinanceQueueAnalytics(supabase, normalizedFilters),
+    getFinanceQueueTotalCount(supabase, normalizedFilters),
+    getFinanceHistoryTotalCount(supabase, normalizedFilters),
   ])
 
   const queuePagination = buildCursorNavigationLinks({
@@ -155,6 +169,12 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     currentTrail: historyTrail,
     nextCursor: history.nextCursor,
   })
+
+  const queueTotalPages = getCursorTotalPages(queueTotalCount, queue.limit)
+  const historyTotalPages = getCursorTotalPages(
+    historyTotalCount,
+    history.limit
+  )
 
   const currentPageCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
@@ -213,10 +233,23 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
                 },
               ]}
             />
-            <FinanceQueue queue={queue} pagination={queuePagination} />
+            <FinanceQueue
+              queue={queue}
+              pagination={{
+                ...queuePagination,
+                pageSize: queue.limit,
+                totalPages: queueTotalPages,
+                totalItems: queueTotalCount,
+              }}
+            />
             <FinanceHistoryList
               history={history}
-              pagination={historyPagination}
+              pagination={{
+                ...historyPagination,
+                pageSize: history.limit,
+                totalPages: historyTotalPages,
+                totalItems: historyTotalCount,
+              }}
             />
           </div>
         </div>

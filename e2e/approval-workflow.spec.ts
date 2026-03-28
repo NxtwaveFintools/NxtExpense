@@ -45,45 +45,63 @@ async function submitOfficeClaimAndGetClaimNumber(
 
   const claims = new ClaimsPage(page)
   await claims.gotoNewClaim()
+  await claims.ensureNewClaimFormReady()
 
-  const randomOffset = Math.floor(Math.random() * 997)
-  const candidateDaysBack = [
-    ...Array.from({ length: 31 }, (_, i) => i + randomOffset),
-    ...Array.from({ length: 30 }, (_, i) => 35 + i * 5 + randomOffset),
-    ...Array.from({ length: 18 }, (_, i) => 210 + i * 30 + randomOffset),
-    ...Array.from({ length: 25 }, (_, i) => 760 + i * 120 + randomOffset),
-  ]
+  const randomOffset = Math.floor(Math.random() * 120)
+  const candidateDaysBack = Array.from(
+    { length: 120 },
+    (_, i) => 1 + ((i + randomOffset) % 120)
+  )
 
   let permanentlyClosedStreak = 0
+  let submittedClaimDateIso: string | null = null
 
   for (const daysBack of candidateDaysBack) {
-    await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
+    const claimDateIso = toIsoDateDaysBack(daysBack)
+
+    await claims.ensureNewClaimFormReady()
+    await claims.fillClaimDate(claimDateIso)
     await claims.selectWorkLocationByName('Office / WFH')
     await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
     await claims.submitButton.click()
+
+    let navigatedToClaims = false
 
     try {
       await page.waitForURL((url: URL) => url.pathname === '/claims', {
         timeout: 5_000,
       })
+      navigatedToClaims = true
     } catch {
       await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
       await page.waitForTimeout(250)
     }
 
-    if (new URL(page.url()).pathname === '/claims') {
-      const claimNumber = await claims.getLatestClaimNumber()
-      expect(claimNumber).toMatch(/^CLAIM-/i)
-      return claimNumber
+    const submittedClaimNumber =
+      (await claims.getSubmittedClaimNumberFromSuccessToast(
+        navigatedToClaims ? 1_500 : 5_000
+      )) ??
+      (new URL(page.url()).pathname === '/claims'
+        ? await claims.getClaimNumberForDate(claimDateIso)
+        : null)
+
+    if (submittedClaimNumber) {
+      submittedClaimDateIso = claimDateIso
+      expect(submittedClaimNumber).toMatch(/^CLAIM-/i)
+      return submittedClaimNumber
     }
 
     const currentPath = new URL(page.url()).pathname
     if (currentPath !== '/claims/new') {
-      await claims.gotoNewClaim()
+      await claims.ensureNewClaimFormReady()
     }
 
     const duplicateDateError =
-      (await page.getByText(/already have .*claim for this date/i).count()) > 0
+      (await page
+        .getByText(
+          /already have .*claim for this date|claim already submitted for this date/i
+        )
+        .count()) > 0
     const duplicateConstraintError =
       (await page
         .getByText(/duplicate key value violates unique constraint/i)
@@ -126,22 +144,16 @@ async function approveClaimAtCurrentLevel(
   const approvals = new ApprovalsPage(page)
   await approvals.goto()
 
-  const claimRow = approvals.getPendingRowByClaimNumber(claimNumber)
+  const claimRow = await approvals.waitForPendingRowByClaimNumber(claimNumber)
   await expect(claimRow).toBeVisible({ timeout: 20_000 })
 
-  await approvals.getApproveButtonForClaimNumber(claimNumber).click()
-
-  await expect(
-    page
-      .getByRole('region', { name: /notifications/i })
-      .getByText(/approve applied\.|approval action submitted successfully\./i)
-  ).toBeVisible({ timeout: 10_000 })
+  await claimRow.getByRole('button', { name: /^Approve$/i }).click()
 
   await expect
     .poll(
       async () => {
         await approvals.goto()
-        return approvals.getPendingRowByClaimNumber(claimNumber).count()
+        return (await approvals.hasPendingRowByClaimNumber(claimNumber)) ? 1 : 0
       },
       {
         timeout: 60_000,

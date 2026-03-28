@@ -2,20 +2,31 @@ import { formatDate } from '@/lib/utils/date'
 
 import { SubmittedClaimDetails } from '@/features/claims/components/submitted-claim-details'
 import type { ClaimWithItems } from '@/features/claims/types'
+import { getClaimItemPresentation } from '@/features/claims/utils/claim-item-display'
 import type { EmployeeRow } from '@/lib/services/employee-service'
+
+type PendingApproverNames = {
+  level1: string | null
+  level2: string | null
+}
 
 function resolveNextApprover(
   claim: ClaimWithItems['claim'],
-  owner: EmployeeRow | null
+  owner: EmployeeRow | null,
+  pendingApproverNames: PendingApproverNames | null
 ): string | null {
   if (!owner) return null
   const level = claim.current_approval_level
   if (!level || level > 2 || claim.is_terminal || claim.is_rejection)
     return null
   if (level === 1)
-    return owner.approval_employee_id_level_1 ? 'Level 1 Approver (SBH)' : null
+    return owner.approval_employee_id_level_1
+      ? (pendingApproverNames?.level1 ?? 'Level 1 Approver (SBH)')
+      : null
   if (level === 2)
-    return owner.approval_employee_id_level_3 ? 'Level 2 Approver (HOD)' : null
+    return owner.approval_employee_id_level_3
+      ? (pendingApproverNames?.level2 ?? 'Level 2 Approver (HOD)')
+      : null
   return null
 }
 
@@ -24,6 +35,7 @@ type ClaimDetailProps = {
   items: ClaimWithItems['items']
   employeeName: string
   owner?: EmployeeRow | null
+  pendingApproverNames?: PendingApproverNames | null
 }
 
 export function ClaimDetail({
@@ -31,8 +43,9 @@ export function ClaimDetail({
   items,
   employeeName,
   owner = null,
+  pendingApproverNames = null,
 }: ClaimDetailProps) {
-  const nextApprover = resolveNextApprover(claim, owner)
+  const nextApprover = resolveNextApprover(claim, owner, pendingApproverNames)
 
   return (
     <section className="rounded-lg border border-border bg-surface p-6 animate-fade-in">
@@ -113,19 +126,28 @@ export function ClaimDetail({
         Line Items
       </h3>
       <ul className="mt-3 space-y-2 text-sm">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className="flex items-center justify-between rounded-md border border-border bg-background p-4"
-          >
-            <span className="capitalize font-medium">
-              {item.item_type.replaceAll('_', ' ')}
-            </span>
-            <span className="font-mono font-medium">
-              Rs. {Number(item.amount).toFixed(2)}
-            </span>
-          </li>
-        ))}
+        {items.map((item) => {
+          const display = getClaimItemPresentation(claim, item)
+
+          return (
+            <li
+              key={item.id}
+              className="flex items-start justify-between rounded-md border border-border bg-background p-4"
+            >
+              <div className="pr-4">
+                <p className="font-medium">{display.label}</p>
+                {display.detail ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {display.detail}
+                  </p>
+                ) : null}
+              </div>
+              <span className="font-mono font-medium">
+                Rs. {Number(item.amount).toFixed(2)}
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

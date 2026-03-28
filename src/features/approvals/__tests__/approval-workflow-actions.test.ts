@@ -220,6 +220,21 @@ describe('approval actions workflow integration', () => {
     })
   })
 
+  it('should require notes for rejection action', async () => {
+    // Act
+    const result = await submitApprovalAction({
+      claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      action: 'rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
   it('should block wrong approval level (EDGE-012)', async () => {
     // Arrange
     rpcMock.mockResolvedValue({
@@ -434,6 +449,38 @@ describe('approval actions workflow integration', () => {
       claimId: '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
       message: 'Claim already finalized.',
     })
+  })
+
+  it('should require notes for bulk rejection actions', async () => {
+    // Act
+    const result = await submitBulkApprovalAction({
+      claimIds: [
+        '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+        '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
+      ],
+      action: 'rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.succeeded).toBe(0)
+    expect(result.failed).toBe(2)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(result.errors).toEqual([
+      {
+        claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+        message:
+          'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.',
+      },
+      {
+        claimId: '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
+        message:
+          'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.',
+      },
+    ])
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should block bulk actions for unauthorized users', async () => {

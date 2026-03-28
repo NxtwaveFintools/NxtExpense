@@ -62,7 +62,34 @@ describe('getClaimSummaryPreview', () => {
 
     expect(result.items).toEqual([
       { label: 'Food allowance', amount: 350 },
-      { label: 'Two Wheeler intra-city allowance', amount: 180 },
+      { label: 'Two Wheeler fixed intra-city fuel allowance', amount: 180 },
+    ])
+    expect(result.total).toBe(530)
+  })
+
+  it('includes fixed fuel allowance when intra-city rented vehicle is selected', () => {
+    const result = getClaimSummaryPreview({
+      workLocation: 'wl-outstation',
+      requiresVehicleSelection: false,
+      requiresOutstationDetails: true,
+      hasIntercityTravel: false,
+      hasIntracityTravel: true,
+      intercityOwnVehicleUsed: false,
+      intracityOwnVehicleUsed: false,
+      vehicleType: 'veh-2w',
+      vehicleTypeName: 'Two Wheeler',
+      kmTravelled: '',
+      foodWithPrincipalsAmount: '',
+      claimRateSnapshot: RATE_SNAPSHOT,
+    })
+
+    expect(result.items).toEqual([
+      { label: 'Food allowance', amount: 350 },
+      {
+        label:
+          'Two Wheeler fixed intra-city fuel allowance (rented vehicle travel)',
+        amount: 180,
+      },
     ])
     expect(result.total).toBe(530)
   })
@@ -86,7 +113,7 @@ describe('getClaimSummaryPreview', () => {
     expect(result.items).toEqual([
       { label: 'Food allowance', amount: 350 },
       { label: 'Intercity travel (100.00 KM @ 5.00/KM)', amount: 500 },
-      { label: 'Two Wheeler intra-city allowance', amount: 180 },
+      { label: 'Two Wheeler fixed intra-city fuel allowance', amount: 180 },
     ])
     expect(result.total).toBe(1030)
   })

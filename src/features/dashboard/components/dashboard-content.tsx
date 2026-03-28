@@ -116,6 +116,7 @@ function DashboardClaimSummarySections({
     <>
       {stats.total.count > 0 ? (
         <ClaimAnalyticsCards
+          columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5"
           className="animate-slide-up stagger-4"
           cards={[
             {
@@ -141,6 +142,12 @@ function DashboardClaimSummarySections({
               count: stats.rejected.count,
               amount: stats.rejected.amount,
               tone: 'rejected',
+            },
+            {
+              label: 'Rejected - Allow Reclaim',
+              count: stats.rejectedAllowReclaim.count,
+              amount: stats.rejectedAllowReclaim.amount,
+              tone: 'finance',
             },
           ]}
         />

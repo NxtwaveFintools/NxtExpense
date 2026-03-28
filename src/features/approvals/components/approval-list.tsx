@@ -23,11 +23,15 @@ import {
   getWorkflowActionAllowReclaimLabel,
   getWorkflowActionCtaLabel,
 } from '@/lib/utils/workflow-action-labels'
+import { getCursorPageStartIndex } from '@/lib/utils/pagination'
 
 type ApprovalListPagination = {
   backHref: string | null
   nextHref: string | null
   pageNumber: number
+  pageSize: number
+  totalPages?: number
+  totalItems?: number
 }
 
 type ApprovalListProps = {
@@ -85,6 +89,11 @@ export function ApprovalList({
   pagination,
   dateSort,
 }: ApprovalListProps) {
+  const pageStartIndex = getCursorPageStartIndex(
+    pagination.pageNumber,
+    pagination.pageSize
+  )
+
   const items = approvals.data
   const router = useRouter()
   const pathname = usePathname()
@@ -299,11 +308,14 @@ export function ApprovalList({
           backHref={pagination.backHref}
           nextHref={pagination.nextHref}
           pageNumber={pagination.pageNumber}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
         />
       </div>
 
       <ApprovalListTable
         approvals={approvals}
+        pageStartIndex={pageStartIndex}
         selected={selected}
         isProcessing={isProcessing}
         processingClaimId={processingClaimId}

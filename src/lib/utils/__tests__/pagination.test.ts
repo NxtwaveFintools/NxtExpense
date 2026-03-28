@@ -6,6 +6,8 @@ import {
   decodeCursorTrail,
   encodeCursor,
   encodeCursorTrail,
+  getCursorPageStartIndex,
+  getCursorTotalPages,
 } from '@/lib/utils/pagination'
 
 describe('pagination cursor utils', () => {
@@ -131,5 +133,19 @@ describe('pagination cursor utils', () => {
 
     expect(links.nextHref).toBeNull()
     expect(links.backHref).toBe('/approvals?actorFilter=finance')
+  })
+
+  it('computes total pages from total items and page size', () => {
+    expect(getCursorTotalPages(0, 10)).toBe(1)
+    expect(getCursorTotalPages(1, 10)).toBe(1)
+    expect(getCursorTotalPages(20, 10)).toBe(2)
+    expect(getCursorTotalPages(21, 10)).toBe(3)
+  })
+
+  it('computes page start index for row serial numbering', () => {
+    expect(getCursorPageStartIndex(1, 10)).toBe(1)
+    expect(getCursorPageStartIndex(2, 10)).toBe(11)
+    expect(getCursorPageStartIndex(3, 25)).toBe(51)
+    expect(getCursorPageStartIndex(0, 10)).toBe(1)
   })
 })

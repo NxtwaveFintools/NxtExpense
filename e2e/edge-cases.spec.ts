@@ -97,7 +97,9 @@ test.describe('Edge Cases', () => {
 
       const duplicateDateError =
         (await page
-          .getByText(/already have a pending or approved claim for this date/i)
+          .getByText(
+            /already have a pending or approved claim for this date|claim already submitted for this date/i
+          )
           .count()) > 0
 
       if (duplicateDateError) {

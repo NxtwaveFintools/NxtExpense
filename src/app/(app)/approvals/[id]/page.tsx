@@ -72,7 +72,17 @@ export default async function ApprovalDetailsPage({
                 claimId={claimWithItems.claim.id}
                 availableActions={availableActions}
               />
-              <ApprovalHistoryTimeline history={history} />
+              <ApprovalHistoryTimeline
+                history={history}
+                claimLocation={{
+                  workLocation: claimWithItems.claim.work_location,
+                  outstationStateName:
+                    claimWithItems.claim.outstation_state_name,
+                  outstationCityName: claimWithItems.claim.outstation_city_name,
+                  fromCityName: claimWithItems.claim.from_city_name,
+                  toCityName: claimWithItems.claim.to_city_name,
+                }}
+              />
             </div>
           </div>
         </div>

@@ -149,5 +149,6 @@ export type PaginatedClaims = PaginatedResult<Claim>
 export type MyClaimsFilters = {
   claimStatus: ClaimStatusId | null
   workLocation: string | null
-  claimDate: string | null
+  claimDateFrom: string | null
+  claimDateTo: string | null
 }

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 type WorkLocationOption = {
   value: string
@@ -9,7 +9,12 @@ export class ClaimsPage {
   constructor(private page: Page) {}
 
   private normalizeOptionLabel(value: string): string {
-    return value.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().toLowerCase()
+    return value
+      .replace(/[–—]/g, '-')
+      .replace(/\s*\/\s*/g, '/')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
   }
 
   async goto() {
@@ -22,14 +27,71 @@ export class ClaimsPage {
     await this.page.waitForLoadState('networkidle')
   }
 
+  async ensureNewClaimFormReady(timeoutMs = 20_000) {
+    const currentPath = new URL(this.page.url()).pathname
+    if (currentPath !== '/claims/new') {
+      await this.gotoNewClaim()
+    }
+
+    await expect(this.page).toHaveURL(/\/claims\/new(?:\?.*)?$/, {
+      timeout: timeoutMs,
+    })
+    await this.dateInput.waitFor({ state: 'visible', timeout: timeoutMs })
+    await this.workLocationSelect.waitFor({
+      state: 'visible',
+      timeout: timeoutMs,
+    })
+  }
+
+  async fillClaimDate(dateIso: string, maxAttempts = 4) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await this.ensureNewClaimFormReady()
+
+      try {
+        await this.dateInput.fill(dateIso)
+        return
+      } catch (error) {
+        if (attempt === maxAttempts - 1) {
+          throw error
+        }
+
+        await this.page.waitForTimeout(150)
+      }
+    }
+  }
+
+  async getSubmittedClaimNumberFromSuccessToast(
+    timeoutMs = 6_000
+  ): Promise<string | null> {
+    const deadline = Date.now() + timeoutMs
+    const successPattern = /claim submitted successfully\s*\((claim-[^)]+)\)/i
+
+    while (Date.now() < deadline) {
+      const toastTexts = await this.page
+        .getByText(/claim submitted successfully/i)
+        .allTextContents()
+
+      for (const toastText of toastTexts) {
+        const match = toastText.match(successPattern)
+        if (match?.[1]) {
+          return match[1]
+        }
+      }
+
+      await this.page.waitForTimeout(120)
+    }
+
+    return null
+  }
+
   // ── Form elements ──────────────────────────────────────────────────────
 
   get dateInput() {
-    return this.page.getByLabel(/date/i).first()
+    return this.page.locator('input[name="claimDate"]')
   }
 
   get workLocationSelect() {
-    return this.page.getByLabel(/work location/i)
+    return this.page.locator('select[name="workLocation"]')
   }
 
   get vehicleTypeSelect() {
@@ -52,6 +114,12 @@ export class ClaimsPage {
     return this.page.locator('select[name="outstationCityId"]')
   }
 
+  get intracityVehicleModeGroup() {
+    return this.page.getByRole('group', {
+      name: /vehicle type used within the city/i,
+    })
+  }
+
   // Outstation own-vehicle selections are represented as yes/no button groups.
   get intercityOwnVehicleYesButton() {
     return this.intercityOwnVehicleGroup.getByRole('button', { name: 'Yes' })
@@ -67,6 +135,18 @@ export class ClaimsPage {
 
   get intracityOwnVehicleNoButton() {
     return this.intracityOwnVehicleGroup.getByRole('button', { name: 'No' })
+  }
+
+  get intracityVehicleModeOwnButton() {
+    return this.intracityVehicleModeGroup.getByRole('button', {
+      name: /own vehicle/i,
+    })
+  }
+
+  get intracityVehicleModeRentalButton() {
+    return this.intracityVehicleModeGroup.getByRole('button', {
+      name: /rent vehicle/i,
+    })
   }
 
   get kmInput() {
@@ -155,14 +235,24 @@ export class ClaimsPage {
 
   // ── List elements ──────────────────────────────────────────────────────
 
+  get claimsSection() {
+    return this.page.locator('section:has(h2:has-text("My Claims"))').first()
+  }
+
   get claimRows() {
-    return this.page.locator('table tbody tr, [data-testid="claim-row"]')
+    return this.claimsSection.locator(
+      'table tbody tr, [data-testid="claim-row"]'
+    )
   }
 
   get claimNumberLinks() {
-    return this.page.locator(
-      'table tbody tr td:first-child a[href*="/claims/"]'
+    return this.claimsSection.locator(
+      'table tbody tr td a[href*="/claims/"], [data-testid="claim-row"] a[href*="/claims/"]'
     )
+  }
+
+  get claimsNextLink() {
+    return this.claimsSection.getByRole('link', { name: /^Next$/i }).first()
   }
 
   get emptyState() {
@@ -173,11 +263,39 @@ export class ClaimsPage {
     return this.claimRows.filter({ hasText: claimNumber }).first()
   }
 
+  private async moveToNextClaimsPage(
+    visitedNextHrefs: Set<string>
+  ): Promise<boolean> {
+    if ((await this.claimsNextLink.count()) === 0) {
+      return false
+    }
+
+    const nextHref = await this.claimsNextLink.getAttribute('href')
+    if (!nextHref || visitedNextHrefs.has(nextHref)) {
+      return false
+    }
+
+    const previousUrl = this.page.url()
+    visitedNextHrefs.add(nextHref)
+
+    await this.claimsNextLink.click()
+    await this.page.waitForLoadState('networkidle')
+
+    return this.page.url() !== previousUrl
+  }
+
   async openClaimByNumber(claimNumber: string) {
+    if (new URL(this.page.url()).pathname !== '/claims') {
+      await this.goto()
+    }
+
     const claimRow = this.getClaimRowByNumber(claimNumber)
     await claimRow.locator('a[href*="/claims/"]').first().click()
     await this.page.waitForURL(/\/claims\//)
     await this.page.waitForLoadState('networkidle')
+    await expect(
+      this.page.getByRole('heading', { name: /^Claim Details$/i })
+    ).toBeVisible({ timeout: 20_000 })
   }
 
   async getLatestClaimNumber(timeoutMs = 30_000): Promise<string> {
@@ -190,6 +308,61 @@ export class ClaimsPage {
     }
 
     return claimNumber
+  }
+
+  private toDisplayDate(dateIso: string): string {
+    const [yyyy, mm, dd] = dateIso.split('-')
+    if (!yyyy || !mm || !dd) {
+      throw new Error(`Invalid ISO date value: ${dateIso}`)
+    }
+
+    return `${dd}/${mm}/${yyyy}`
+  }
+
+  async getClaimNumberForDate(
+    claimDateIso: string,
+    timeoutMs = 30_000
+  ): Promise<string> {
+    const displayDate = this.toDisplayDate(claimDateIso)
+    const deadline = Date.now() + timeoutMs
+
+    while (Date.now() < deadline) {
+      if (new URL(this.page.url()).pathname !== '/claims') {
+        await this.goto()
+      }
+
+      const visitedNextHrefs = new Set<string>()
+
+      for (;;) {
+        const matchingRow = this.claimRows
+          .filter({ hasText: displayDate })
+          .first()
+
+        if ((await matchingRow.count()) > 0) {
+          const claimLink = matchingRow.locator('a[href*="/claims/"]').first()
+
+          if ((await claimLink.count()) > 0) {
+            const claimNumber = (await claimLink.textContent())?.trim()
+            if (claimNumber) {
+              return claimNumber
+            }
+          }
+        }
+
+        const movedToNextPage =
+          await this.moveToNextClaimsPage(visitedNextHrefs)
+        if (!movedToNextPage) {
+          break
+        }
+      }
+
+      await this.page.waitForTimeout(300)
+      await this.page.reload({ waitUntil: 'networkidle' })
+    }
+
+    throw new Error(
+      `Claim number not found for date ${displayDate} in claims list within ${timeoutMs}ms.`
+    )
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────

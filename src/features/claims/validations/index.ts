@@ -68,14 +68,29 @@ export const claimSubmissionSchema = z.object({
     .optional(),
 })
 
-export const myClaimsFiltersSchema = z.object({
-  claimStatus: z.preprocess(
-    (val) => (val === '' ? undefined : val),
-    z.string().trim().uuid().optional()
-  ),
-  workLocation: z.preprocess(
-    (val) => (val === '' ? undefined : val),
-    z.string().trim().max(100).optional()
-  ),
-  claimDate: optionalDateField('Claim date'),
-})
+export const myClaimsFiltersSchema = z
+  .object({
+    claimStatus: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().trim().uuid().optional()
+    ),
+    workLocation: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().trim().max(100).optional()
+    ),
+    claimDateFrom: optionalDateField('Claim date from'),
+    claimDateTo: optionalDateField('Claim date to'),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.claimDateFrom &&
+      value.claimDateTo &&
+      value.claimDateFrom > value.claimDateTo
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['claimDateTo'],
+        message: 'From Date cannot be later than To Date',
+      })
+    }
+  })

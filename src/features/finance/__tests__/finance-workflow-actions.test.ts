@@ -186,6 +186,21 @@ describe('finance actions workflow integration', () => {
     })
   })
 
+  it('should require notes for finance rejection action', async () => {
+    // Act
+    const result = await submitFinanceAction({
+      claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      action: 'finance_rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
   it('should block Finance approval before HOD approval', async () => {
     // Arrange
     rpcMock.mockResolvedValue({
@@ -308,6 +323,24 @@ describe('finance actions workflow integration', () => {
       p_notes: 'Bulk payout release',
       p_allow_resubmit: false,
     })
+  })
+
+  it('should require notes for bulk finance rejection actions', async () => {
+    // Act
+    const result = await bulkFinanceClaimsAction({
+      claimIds: [
+        '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+        '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
+      ],
+      action: 'finance_rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should validate bulk payload before DB path', async () => {

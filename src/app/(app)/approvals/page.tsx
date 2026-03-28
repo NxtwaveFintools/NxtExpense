@@ -1,8 +1,23 @@
-import { requireCurrentUser } from '@/features/auth/queries'
 import { redirect } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { canAccessApprovals } from '@/features/employees/permissions'
+
+import {
+  getApprovalHistoryAction,
+  getPendingApprovalsAction,
+} from '@/features/approvals/actions'
+import { ApprovalFiltersBar } from '@/features/approvals/components/approval-filters-bar'
+import { ApprovalHistoryList } from '@/features/approvals/components/approval-history-list'
+import { ApprovalList } from '@/features/approvals/components/approval-list'
+import { getApprovalStageAnalytics } from '@/features/approvals/queries/approval-analytics'
+import { getFilteredApprovalHistoryCount } from '@/features/approvals/queries/history-filters'
+import { canViewApprovalHistoryAmount } from '@/features/approvals/utils/amount-visibility'
+import {
+  addApprovalFiltersToParams,
+  normalizeApprovalHistoryFilters,
+} from '@/features/approvals/utils/history-filters'
+import { requireCurrentUser } from '@/features/auth/queries'
 import { getClaimStatusCatalog } from '@/features/claims/queries'
+import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
+import { canAccessApprovals } from '@/features/employees/permissions'
 import {
   getEmployeeByEmail,
   hasApproverAssignments,
@@ -11,27 +26,14 @@ import {
   buildCursorNavigationLinks,
   decodeCursorTrail,
   encodeCursorTrail,
+  getCursorTotalPages,
 } from '@/lib/utils/pagination'
-import {
-  addApprovalFiltersToParams,
-  normalizeApprovalHistoryFilters,
-} from '@/features/approvals/utils/history-filters'
-import { canViewApprovalHistoryAmount } from '@/features/approvals/utils/amount-visibility'
 import {
   buildPathWithSearchParams,
   createNonEmptySearchParams,
   toSortedQueryString,
 } from '@/lib/utils/search-params'
-
-import {
-  getApprovalHistoryAction,
-  getPendingApprovalsAction,
-} from '@/features/approvals/actions'
-import { getApprovalStageAnalytics } from '@/features/approvals/queries/approval-analytics'
-import { ApprovalList } from '@/features/approvals/components/approval-list'
-import { ApprovalFiltersBar } from '@/features/approvals/components/approval-filters-bar'
-import { ApprovalHistoryList } from '@/features/approvals/components/approval-history-list'
-import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 type ApprovalsPageProps = {
   searchParams?: Promise<{
@@ -69,6 +71,7 @@ export default async function ApprovalsPage({
     supabase,
     employee.employee_email
   )
+
   if (!canAccessApprovals(approverAccess)) {
     redirect('/dashboard')
   }
@@ -88,6 +91,7 @@ export default async function ApprovalsPage({
     financeApprovedFrom: resolvedSearch?.financeApprovedFrom,
     financeApprovedTo: resolvedSearch?.financeApprovedTo,
   }
+
   let filterValidationError: string | null = null
   const normalizedFilters = (() => {
     try {
@@ -140,6 +144,7 @@ export default async function ApprovalsPage({
     new URLSearchParams(),
     normalizedFilters
   )
+
   if (pendingCursor) {
     canonicalParams.set('pendingCursor', pendingCursor)
   }
@@ -163,22 +168,28 @@ export default async function ApprovalsPage({
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [approvals, history, statusCatalog, approvalAnalytics] =
-    await Promise.all([
-      getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
-      getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
-      getClaimStatusCatalog(supabase),
-      getApprovalStageAnalytics(supabase, user.email ?? '', {
-        employeeName: normalizedFilters.employeeName,
-        claimStatus: normalizedFilters.claimStatus,
-        claimDateFrom: normalizedFilters.claimDateFrom,
-        claimDateTo: normalizedFilters.claimDateTo,
-        amountOperator: normalizedFilters.amountOperator,
-        amountValue: normalizedFilters.amountValue,
-        locationType: normalizedFilters.locationType,
-        claimDateSort: normalizedFilters.claimDateSort,
-      }),
-    ])
+  const [
+    approvals,
+    history,
+    statusCatalog,
+    approvalAnalytics,
+    historyTotalCount,
+  ] = await Promise.all([
+    getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
+    getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
+    getClaimStatusCatalog(supabase),
+    getApprovalStageAnalytics(supabase, user.email ?? '', {
+      employeeName: normalizedFilters.employeeName,
+      claimStatus: normalizedFilters.claimStatus,
+      claimDateFrom: normalizedFilters.claimDateFrom,
+      claimDateTo: normalizedFilters.claimDateTo,
+      amountOperator: normalizedFilters.amountOperator,
+      amountValue: normalizedFilters.amountValue,
+      locationType: normalizedFilters.locationType,
+      claimDateSort: normalizedFilters.claimDateSort,
+    }),
+    getFilteredApprovalHistoryCount(supabase, normalizedFilters),
+  ])
 
   const showHistoryAmountColumn = canViewApprovalHistoryAmount(approverAccess)
 
@@ -201,6 +212,16 @@ export default async function ApprovalsPage({
     currentTrail: historyTrail,
     nextCursor: history.nextCursor,
   })
+
+  const pendingTotalCount = approvalAnalytics.pendingApprovals.count
+  const pendingTotalPages = getCursorTotalPages(
+    pendingTotalCount,
+    approvals.limit
+  )
+  const historyTotalPages = getCursorTotalPages(
+    historyTotalCount,
+    history.limit
+  )
 
   const currentPageCsvParams = addApprovalFiltersToParams(
     new URLSearchParams(),
@@ -233,7 +254,7 @@ export default async function ApprovalsPage({
               exportAllHref={exportAllHref}
             />
             <ClaimAnalyticsCards
-              columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
               cards={[
                 {
                   label: 'Total Claims',
@@ -254,6 +275,12 @@ export default async function ApprovalsPage({
                   tone: 'approved',
                 },
                 {
+                  label: 'Payment Issued',
+                  count: approvalAnalytics.paymentIssuedClaims.count,
+                  amount: approvalAnalytics.paymentIssuedClaims.amount,
+                  tone: 'finance',
+                },
+                {
                   label: 'Rejected Claims',
                   count: approvalAnalytics.rejectedClaims.count,
                   amount: approvalAnalytics.rejectedClaims.amount,
@@ -263,13 +290,23 @@ export default async function ApprovalsPage({
             />
             <ApprovalList
               approvals={approvals}
-              pagination={pendingPagination}
+              pagination={{
+                ...pendingPagination,
+                pageSize: approvals.limit,
+                totalPages: pendingTotalPages,
+                totalItems: pendingTotalCount,
+              }}
               dateSort={normalizedFilters.claimDateSort}
             />
             <ApprovalHistoryList
               history={history}
               showAmountColumn={showHistoryAmountColumn}
-              pagination={historyPagination}
+              pagination={{
+                ...historyPagination,
+                pageSize: history.limit,
+                totalPages: historyTotalPages,
+                totalItems: historyTotalCount,
+              }}
             />
           </div>
         </div>

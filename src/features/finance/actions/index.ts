@@ -28,6 +28,25 @@ type FinanceActionResult = {
   error: string | null
 }
 
+function normalizeNotes(notes: string | undefined): string {
+  return notes?.trim() ?? ''
+}
+
+function getRequiredNotesError(
+  action: { require_notes: boolean } | undefined,
+  notes: string | undefined
+): string | null {
+  if (!action?.require_notes) {
+    return null
+  }
+
+  if (normalizeNotes(notes).length > 0) {
+    return null
+  }
+
+  return 'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+}
+
 type RawFinanceFilters = Partial<Record<keyof FinanceFilters, string>>
 
 async function getFinanceEmployeeContext() {
@@ -82,14 +101,27 @@ export async function submitFinanceAction(payload: {
       supabase,
       parsed.data.claimId
     )
-    const canRunAction = availableActions.some(
+    const selectedAction = availableActions.find(
       (action) => action.action === parsed.data.action
     )
+    const canRunAction = Boolean(selectedAction)
 
     if (!canRunAction) {
       return {
         ok: false,
         error: 'This workflow action is not available for the claim state.',
+      }
+    }
+
+    const notesRequiredError = getRequiredNotesError(
+      selectedAction,
+      parsed.data.notes
+    )
+
+    if (notesRequiredError) {
+      return {
+        ok: false,
+        error: notesRequiredError,
       }
     }
 
@@ -154,15 +186,28 @@ export async function bulkFinanceClaimsAction(payload: {
 
     for (const claimId of parsed.data.claimIds) {
       const availableActions = actionsByClaimId.get(claimId) ?? []
-      const canRunAction = availableActions.some(
+      const selectedAction = availableActions.find(
         (action) => action.action === parsed.data.action
       )
+      const canRunAction = Boolean(selectedAction)
 
       if (!canRunAction) {
         return {
           ok: false,
           error:
             'One or more selected claims do not allow this workflow action.',
+        }
+      }
+
+      const notesRequiredError = getRequiredNotesError(
+        selectedAction,
+        parsed.data.notes
+      )
+
+      if (notesRequiredError) {
+        return {
+          ok: false,
+          error: notesRequiredError,
         }
       }
     }

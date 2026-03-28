@@ -3,6 +3,13 @@ import { formatDatetime } from '@/lib/utils/date'
 
 type ApprovalHistoryTimelineProps = {
   history: ApprovalAction[]
+  claimLocation?: {
+    workLocation: string
+    outstationStateName?: string | null
+    outstationCityName?: string | null
+    fromCityName?: string | null
+    toCityName?: string | null
+  }
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -16,9 +23,50 @@ function formatActionLabel(action: string) {
   return action.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return value?.trim() ?? ''
+}
+
+function formatClaimLocationLabel(
+  claimLocation: ApprovalHistoryTimelineProps['claimLocation']
+): string | null {
+  if (!claimLocation) {
+    return null
+  }
+
+  const workLocation = normalizeText(claimLocation.workLocation)
+  const fromCity = normalizeText(claimLocation.fromCityName)
+  const toCity = normalizeText(claimLocation.toCityName)
+  const outstationCity = normalizeText(claimLocation.outstationCityName)
+  const outstationState = normalizeText(claimLocation.outstationStateName)
+
+  const locationParts: string[] = []
+
+  if (fromCity && toCity) {
+    locationParts.push(`${fromCity} -> ${toCity}`)
+  } else if (outstationCity && outstationState) {
+    locationParts.push(`${outstationCity}, ${outstationState}`)
+  } else if (outstationCity) {
+    locationParts.push(outstationCity)
+  } else if (outstationState) {
+    locationParts.push(outstationState)
+  }
+
+  if (locationParts.length === 0) {
+    return workLocation || null
+  }
+
+  return workLocation
+    ? `${workLocation} (${locationParts.join(' | ')})`
+    : locationParts.join(' | ')
+}
+
 export function ApprovalHistoryTimeline({
   history,
+  claimLocation,
 }: ApprovalHistoryTimelineProps) {
+  const locationLabel = formatClaimLocationLabel(claimLocation)
+
   return (
     <section className="rounded-lg border border-border bg-surface p-6">
       <h3 className="text-base font-semibold">Approval History</h3>
@@ -28,12 +76,12 @@ export function ApprovalHistoryTimeline({
         </p>
       ) : (
         <div className="mt-5 relative">
-          <div className="absolute top-2 left-[7px] bottom-2 w-px bg-border" />
+          <div className="absolute top-2 left-1.75 bottom-2 w-px bg-border" />
           <ul className="space-y-4">
             {history.map((entry) => (
               <li key={entry.id} className="relative pl-7">
                 <div
-                  className={`absolute left-0 top-1.5 size-[15px] rounded-full border-2 border-surface ${
+                  className={`absolute left-0 top-1.5 size-3.75 rounded-full border-2 border-surface ${
                     ACTION_COLORS[entry.action] ?? 'bg-zinc-400'
                   }`}
                 />
@@ -52,6 +100,11 @@ export function ApprovalHistoryTimeline({
                   <p className="text-muted-foreground text-xs mt-0.5">
                     {formatDatetime(entry.acted_at)}
                   </p>
+                  {locationLabel ? (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Location: {locationLabel}
+                    </p>
+                  ) : null}
                   {entry.rejection_notes ? (
                     <p className="mt-2 rounded-lg border border-rose-200 bg-error-light px-3 py-2 text-xs text-rose-600 dark:border-rose-500/20 dark:text-rose-400">
                       Rejection notes: {entry.rejection_notes}

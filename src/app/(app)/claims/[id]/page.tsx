@@ -75,10 +75,40 @@ export default async function ClaimDetailPage({
     backLabel = hasClaimAccess ? 'Back to My Claims' : 'Back to Dashboard'
   }
 
-  const [history, availableActions] = await Promise.all([
-    getClaimHistory(supabase, id),
-    getClaimAvailableActions(supabase, id),
-  ])
+  const needsLevel1Approver =
+    claimWithItems.claim.current_approval_level === 1 &&
+    !claimWithItems.claim.is_terminal &&
+    !claimWithItems.claim.is_rejection &&
+    Boolean(owner.approval_employee_id_level_1)
+
+  const needsLevel2Approver =
+    claimWithItems.claim.current_approval_level === 2 &&
+    !claimWithItems.claim.is_terminal &&
+    !claimWithItems.claim.is_rejection &&
+    Boolean(owner.approval_employee_id_level_3)
+
+  const [history, availableActions, level1Approver, level2Approver] =
+    await Promise.all([
+      getClaimHistory(supabase, id),
+      getClaimAvailableActions(supabase, id),
+      needsLevel1Approver
+        ? getEmployeeById(
+            supabase,
+            owner.approval_employee_id_level_1 as string
+          )
+        : Promise.resolve(null),
+      needsLevel2Approver
+        ? getEmployeeById(
+            supabase,
+            owner.approval_employee_id_level_3 as string
+          )
+        : Promise.resolve(null),
+    ])
+
+  const pendingApproverNames = {
+    level1: level1Approver?.employee_name ?? null,
+    level2: level2Approver?.employee_name ?? null,
+  }
 
   const timelineHistory = withSubmittedHistoryFallback({
     claimId: claimWithItems.claim.id,
@@ -113,6 +143,7 @@ export default async function ClaimDetailPage({
               items={claimWithItems.items}
               employeeName={owner.employee_name}
               owner={owner}
+              pendingApproverNames={pendingApproverNames}
             />
             <div className="space-y-6">
               <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
@@ -139,7 +170,10 @@ export default async function ClaimDetailPage({
                 />
               ) : null}
 
-              <ClaimHistoryTimeline history={timelineHistory} />
+              <ClaimHistoryTimeline
+                history={timelineHistory}
+                claimLocation={claimWithItems.claim}
+              />
             </div>
           </div>
         </div>
