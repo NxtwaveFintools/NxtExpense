@@ -13,6 +13,7 @@ type ApprovalAnalytics = {
   total: ClaimMetricSummary
   pendingApprovals: ClaimMetricSummary
   approvedClaims: ClaimMetricSummary
+  paymentIssuedClaims: ClaimMetricSummary
   rejectedClaims: ClaimMetricSummary
 }
 
@@ -25,6 +26,12 @@ type ApprovalActionRow = {
 type ClaimAmountRow = {
   id: string
   total_amount: number | string
+  status_id: string
+}
+
+type ClaimStatusRow = {
+  id: string
+  is_payment_issued: boolean
 }
 
 const DEFAULT_PENDING_FILTERS: PendingApprovalsFilters = {
@@ -50,6 +57,7 @@ function createEmptyAnalytics(): ApprovalAnalytics {
     total: createMetricSummary(),
     pendingApprovals: createMetricSummary(),
     approvedClaims: createMetricSummary(),
+    paymentIssuedClaims: createMetricSummary(),
     rejectedClaims: createMetricSummary(),
   }
 }
@@ -77,7 +85,9 @@ async function getFilteredClaimsByIds(
 
   let query = supabase
     .from('expense_claims')
-    .select('id, total_amount, employees!employee_id!inner(employee_name)')
+    .select(
+      'id, total_amount, status_id, employees!employee_id!inner(employee_name)'
+    )
     .in('id', claimIds)
 
   if (filters.claimStatus) {
@@ -156,6 +166,21 @@ export async function getApprovalStageAnalytics(
     return analytics
   }
 
+  const { data: statusRows, error: statusError } = await supabase
+    .from('claim_statuses')
+    .select('id, is_payment_issued')
+    .eq('is_active', true)
+
+  if (statusError) {
+    throw new Error(statusError.message)
+  }
+
+  const paymentIssuedStatusIds = new Set(
+    ((statusRows ?? []) as ClaimStatusRow[])
+      .filter((status) => status.is_payment_issued)
+      .map((status) => status.id)
+  )
+
   const { data: actionRows, error: actionError } = await supabase
     .from('approval_history')
     .select('claim_id, action, acted_at')
@@ -208,6 +233,12 @@ export async function getApprovalStageAnalytics(
     if (action === 'approved') {
       analytics.approvedClaims.count += 1
       analytics.approvedClaims.amount += amount
+
+      if (paymentIssuedStatusIds.has(claim.status_id)) {
+        analytics.paymentIssuedClaims.count += 1
+        analytics.paymentIssuedClaims.amount += amount
+      }
+
       continue
     }
 

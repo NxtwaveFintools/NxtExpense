@@ -13,6 +13,8 @@ type ClaimsFiltersBarProps = {
   workLocationOptions: WorkLocationOption[]
   exportCurrentPageHref: string
   exportAllHref: string
+  canExportCsv: boolean
+  validationError?: string | null
 }
 
 export function ClaimsFiltersBar({
@@ -21,6 +23,8 @@ export function ClaimsFiltersBar({
   workLocationOptions,
   exportCurrentPageHref,
   exportAllHref,
+  canExportCsv,
+  validationError,
 }: ClaimsFiltersBarProps) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -69,14 +73,32 @@ export function ClaimsFiltersBar({
         </label>
 
         <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">Claim Date</span>
+          <span className="font-medium text-foreground">From Date</span>
           <input
-            name="claimDate"
+            name="claimDateFrom"
             type="date"
-            defaultValue={filters.claimDate ?? ''}
+            defaultValue={filters.claimDateFrom ?? ''}
+            max={filters.claimDateTo ?? undefined}
             className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           />
         </label>
+
+        <label className="space-y-1.5 text-sm">
+          <span className="font-medium text-foreground">To Date</span>
+          <input
+            name="claimDateTo"
+            type="date"
+            defaultValue={filters.claimDateTo ?? ''}
+            min={filters.claimDateFrom ?? undefined}
+            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+          />
+        </label>
+
+        {validationError ? (
+          <p className="md:col-span-4 rounded-xl border border-rose-200 bg-error-light px-3 py-2 text-xs font-medium text-rose-700 dark:border-rose-500/20 dark:text-rose-400">
+            {validationError}
+          </p>
+        ) : null}
 
         <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-2">
           <button
@@ -91,22 +113,24 @@ export function ClaimsFiltersBar({
           >
             Clear
           </Link>
-          <div className="ml-auto flex items-center gap-2">
-            <Link
-              href={exportCurrentPageHref}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
-            >
-              <Download className="size-3.5" />
-              Page CSV
-            </Link>
-            <Link
-              href={exportAllHref}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
-            >
-              <Download className="size-3.5" />
-              All CSV
-            </Link>
-          </div>
+          {canExportCsv ? (
+            <div className="ml-auto flex items-center gap-2">
+              <Link
+                href={exportCurrentPageHref}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
+              >
+                <Download className="size-3.5" />
+                Page CSV
+              </Link>
+              <Link
+                href={exportAllHref}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
+              >
+                <Download className="size-3.5" />
+                All CSV
+              </Link>
+            </div>
+          ) : null}
         </div>
       </form>
     </section>

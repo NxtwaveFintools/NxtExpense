@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { formatDate, formatDatetime } from '@/lib/utils/date'
 import { CursorPaginationControls } from '@/components/ui/cursor-pagination-controls'
+import { getCursorPageStartIndex } from '@/lib/utils/pagination'
 import {
   DATA_TABLE_BODY_CLASS,
   DATA_TABLE_CLASS,
@@ -26,6 +27,9 @@ type ApprovalHistoryListProps = {
     backHref: string | null
     nextHref: string | null
     pageNumber: number
+    pageSize: number
+    totalPages?: number
+    totalItems?: number
   }
   showAmountColumn?: boolean
 }
@@ -35,6 +39,11 @@ export function ApprovalHistoryList({
   pagination,
   showAmountColumn = true,
 }: ApprovalHistoryListProps) {
+  const pageStartIndex = getCursorPageStartIndex(
+    pagination.pageNumber,
+    pagination.pageSize
+  )
+
   if (history.data.length === 0) {
     return (
       <section className="rounded-lg border border-border bg-surface p-8 text-center">
@@ -57,18 +66,22 @@ export function ApprovalHistoryList({
           backHref={pagination.backHref}
           nextHref={pagination.nextHref}
           pageNumber={pagination.pageNumber}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
         />
       </div>
 
       <div className={DATA_TABLE_SCROLL_WRAPPER_CLASS}>
-        <table className={`${DATA_TABLE_CLASS} min-w-210`}>
+        <table className={`${DATA_TABLE_CLASS} min-w-230`}>
           <thead>
             <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
+              <th className={getDataTableHeadCellClass({ nowrap: true })}>#</th>
               <th className={getDataTableHeadCellClass({ nowrap: true })}>
                 Claim ID
               </th>
               <th className={getDataTableHeadCellClass()}>Employee</th>
               <th className={getDataTableHeadCellClass()}>Claim Date</th>
+              <th className={getDataTableHeadCellClass()}>Location</th>
               {showAmountColumn ? (
                 <th className={getDataTableHeadCellClass()}>Amount</th>
               ) : null}
@@ -78,8 +91,17 @@ export function ApprovalHistoryList({
             </tr>
           </thead>
           <tbody className={DATA_TABLE_BODY_CLASS}>
-            {history.data.map((row: ApprovalHistoryRecord) => (
+            {history.data.map((row: ApprovalHistoryRecord, index) => (
               <tr key={row.actionId} className={DATA_TABLE_ROW_CLASS}>
+                <td
+                  className={getDataTableCellClass({
+                    mono: true,
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {pageStartIndex + index}
+                </td>
                 <td
                   className={getDataTableCellClass({
                     weight: 'medium',
@@ -108,6 +130,14 @@ export function ApprovalHistoryList({
                   })}
                 >
                   {formatDate(row.claimDate)}
+                </td>
+                <td
+                  className={getDataTableCellClass({
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {row.workLocation}
                 </td>
                 {showAmountColumn ? (
                   <td

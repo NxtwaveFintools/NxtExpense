@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { Loader2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -59,66 +60,77 @@ const inputClassName =
 const selectClassName =
   'h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none'
 
+const EMPTY_APPROVERS_BY_LEVEL: AdminEmployeeFormOptions['approversByLevel'] = {
+  level1: [],
+  level2: [],
+  level3: [],
+}
+
 export function EmployeeCreateForm({
   onCreated,
   replacementDraft = null,
   onReplacementCompleted,
 }: EmployeeCreateFormProps) {
-  const [options, setOptions] = useState<AdminEmployeeFormOptions | null>(null)
-  const [isLoadingOptions, setIsLoadingOptions] = useState(false)
   const [isFormVisible, setIsFormVisible] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoadingApprovers, setIsLoadingApprovers] = useState(false)
   const [enablePasswordLogin, setEnablePasswordLogin] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(INITIAL_FORM_STATE)
-  const [approversByLevel, setApproversByLevel] = useState<
-    AdminEmployeeFormOptions['approversByLevel']
-  >({
-    level1: [],
-    level2: [],
-    level3: [],
-  })
 
   const isReplacementMode = Boolean(replacementDraft)
+  const shouldLoadOptions = isFormVisible || isReplacementMode
+  const effectiveStateId =
+    form.stateId || replacementDraft?.defaultStateId || ''
 
-  const loadFormOptions = useCallback(async () => {
-    if (options || isLoadingOptions) {
-      return
-    }
+  const formOptionsQuery = useQuery<AdminEmployeeFormOptions, Error>({
+    queryKey: ['admin-employee-form-options'],
+    queryFn: async () => {
+      const result = await getEmployeeFormOptionsAction()
 
-    setIsLoadingOptions(true)
-    const result = await getEmployeeFormOptionsAction()
-    setIsLoadingOptions(false)
+      if (!result.ok || !result.data) {
+        throw new Error(result.error ?? 'Failed to load employee form options.')
+      }
 
-    if (!result.ok || !result.data) {
-      setErrorMessage(result.error ?? 'Failed to load employee form options.')
-      return
-    }
+      return result.data
+    },
+    enabled: shouldLoadOptions,
+    gcTime: 5 * 60 * 1000,
+  })
 
-    setOptions(result.data)
-    setErrorMessage(null)
-  }, [isLoadingOptions, options])
+  const options = formOptionsQuery.data ?? null
+  const isLoadingOptions =
+    shouldLoadOptions && !options && formOptionsQuery.isFetching
 
-  async function handleToggleForm() {
+  const approversQuery = useQuery<
+    AdminEmployeeFormOptions['approversByLevel'],
+    Error
+  >({
+    queryKey: ['admin-approvers-by-state', effectiveStateId],
+    queryFn: async () => {
+      const result = await getApproverOptionsByStateAction(effectiveStateId)
+
+      if (!result.ok || !result.data) {
+        throw new Error(result.error ?? 'Failed to load approver options.')
+      }
+
+      return result.data
+    },
+    enabled: shouldLoadOptions && Boolean(options) && Boolean(effectiveStateId),
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+  })
+
+  const approversByLevel = approversQuery.data ?? EMPTY_APPROVERS_BY_LEVEL
+  const isLoadingApprovers = approversQuery.isFetching
+
+  function handleToggleForm() {
     if (isFormVisible) {
       setIsFormVisible(false)
       return
     }
 
     setIsFormVisible(true)
-    await loadFormOptions()
   }
-
-  useEffect(() => {
-    if (!isReplacementMode || options || isLoadingOptions) {
-      return
-    }
-
-    queueMicrotask(() => {
-      void loadFormOptions()
-    })
-  }, [isReplacementMode, options, isLoadingOptions, loadFormOptions])
 
   const level1Options = useMemo(
     () =>
@@ -153,44 +165,6 @@ export function EmployeeCreateForm({
     level3: [],
   }
 
-  useEffect(() => {
-    let isMounted = true
-
-    const effectiveStateId =
-      form.stateId || replacementDraft?.defaultStateId || ''
-
-    async function loadApproversForState() {
-      if (!effectiveStateId) {
-        setApproversByLevel({ level1: [], level2: [], level3: [] })
-        return
-      }
-
-      setIsLoadingApprovers(true)
-      const result = await getApproverOptionsByStateAction(effectiveStateId)
-
-      if (!isMounted) {
-        return
-      }
-
-      setIsLoadingApprovers(false)
-
-      if (!result.ok || !result.data) {
-        setApproversByLevel({ level1: [], level2: [], level3: [] })
-        setErrorMessage(result.error ?? 'Failed to load approver options.')
-        return
-      }
-
-      setApproversByLevel(result.data)
-      setErrorMessage(null)
-    }
-
-    loadApproversForState()
-
-    return () => {
-      isMounted = false
-    }
-  }, [form.stateId, replacementDraft?.defaultStateId])
-
   const replacementActiveStatusId =
     options?.statuses.find((status) => status.status_code === 'ACTIVE')?.id ??
     ''
@@ -202,6 +176,14 @@ export function EmployeeCreateForm({
   const selectedEmployeeStatusId =
     form.employeeStatusId ||
     (isReplacementMode ? replacementActiveStatusId : '')
+
+  const resolvedErrorMessage =
+    errorMessage ??
+    (formOptionsQuery.isError
+      ? formOptionsQuery.error.message
+      : approversQuery.isError
+        ? approversQuery.error.message
+        : null)
 
   const setField = (field: keyof FormState, value: string) => {
     setForm((current) => {
@@ -286,9 +268,9 @@ export function EmployeeCreateForm({
         </button>
       </div>
 
-      {errorMessage && (
+      {resolvedErrorMessage && (
         <p className="mt-4 rounded-md border border-error/20 bg-error-light px-3 py-2 text-sm text-error">
-          {errorMessage}
+          {resolvedErrorMessage}
         </p>
       )}
 
@@ -591,7 +573,9 @@ export function EmployeeCreateForm({
         <div className="mt-4 flex items-center gap-2">
           <button
             type="button"
-            onClick={loadFormOptions}
+            onClick={() => {
+              void formOptionsQuery.refetch()
+            }}
             className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
           >
             Retry Loading Form

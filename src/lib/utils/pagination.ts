@@ -16,6 +16,39 @@ export type PaginatedResult<T> = {
   limit: number
 }
 
+function normalizePositiveInteger(value: number, fallback = 1): number {
+  if (!Number.isFinite(value)) {
+    return fallback
+  }
+
+  const normalized = Math.trunc(value)
+  return normalized > 0 ? normalized : fallback
+}
+
+export function getCursorTotalPages(
+  totalItems: number,
+  pageSize: number
+): number {
+  const normalizedTotalItems = Math.max(0, Math.trunc(totalItems))
+  const normalizedPageSize = normalizePositiveInteger(pageSize)
+
+  if (normalizedTotalItems === 0) {
+    return 1
+  }
+
+  return Math.ceil(normalizedTotalItems / normalizedPageSize)
+}
+
+export function getCursorPageStartIndex(
+  pageNumber: number,
+  pageSize: number
+): number {
+  const normalizedPageNumber = normalizePositiveInteger(pageNumber)
+  const normalizedPageSize = normalizePositiveInteger(pageSize)
+
+  return (normalizedPageNumber - 1) * normalizedPageSize + 1
+}
+
 export function encodeCursor(payload: CursorPayload): string {
   const json = JSON.stringify(payload)
   return Buffer.from(json, 'utf-8').toString('base64')

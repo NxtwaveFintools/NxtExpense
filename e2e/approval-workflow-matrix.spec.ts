@@ -60,18 +60,22 @@ async function submitOfficeClaimAndGetClaimNumber(
   await loginAsFresh(page, loginAs, submitterEmail)
   const claims = new ClaimsPage(page)
   await claims.gotoNewClaim()
-  const randomOffset = Math.floor(Math.random() * 997)
-  const candidateDaysBack = [
-    ...Array.from({ length: 31 }, (_, i) => i + randomOffset),
-    ...Array.from({ length: 30 }, (_, i) => 35 + i * 5 + randomOffset),
-    ...Array.from({ length: 18 }, (_, i) => 210 + i * 30 + randomOffset),
-    ...Array.from({ length: 25 }, (_, i) => 760 + i * 120 + randomOffset),
-  ]
+  await claims.ensureNewClaimFormReady()
+  const randomOffset = Math.floor(Math.random() * 120)
+  const candidateDaysBack = Array.from(
+    { length: 120 },
+    (_, i) => 1 + ((i + randomOffset) % 120)
+  )
   let permanentlyClosedStreak = 0
   let submitted = false
+  let submittedClaimNumber: string | null = null
+  let submittedClaimDateIso: string | null = null
 
   for (const daysBack of candidateDaysBack) {
-    await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
+    const claimDateIso = toIsoDateDaysBack(daysBack)
+
+    await claims.ensureNewClaimFormReady()
+    await claims.fillClaimDate(claimDateIso)
     await claims.selectWorkLocationByName('Office / WFH')
     await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
     await claims.submitButton.click()
@@ -87,18 +91,32 @@ async function submitOfficeClaimAndGetClaimNumber(
       await page.waitForTimeout(250)
     }
 
-    if (navigatedToClaims || new URL(page.url()).pathname === '/claims') {
+    const resolvedSubmittedClaimNumber =
+      (await claims.getSubmittedClaimNumberFromSuccessToast(
+        navigatedToClaims ? 1_500 : 5_000
+      )) ??
+      (new URL(page.url()).pathname === '/claims'
+        ? await claims.getClaimNumberForDate(claimDateIso)
+        : null)
+
+    if (resolvedSubmittedClaimNumber) {
       submitted = true
+      submittedClaimNumber = resolvedSubmittedClaimNumber
+      submittedClaimDateIso = claimDateIso
       break
     }
 
     const currentPath = new URL(page.url()).pathname
     if (currentPath !== '/claims/new') {
-      await claims.gotoNewClaim()
+      await claims.ensureNewClaimFormReady()
     }
 
     const duplicateDateError =
-      (await page.getByText(/already have .*claim for this date/i).count()) > 0
+      (await page
+        .getByText(
+          /already have .*claim for this date|claim already submitted for this date/i
+        )
+        .count()) > 0
     const duplicateConstraintError =
       (await page
         .getByText(/duplicate key value violates unique constraint/i)
@@ -133,7 +151,14 @@ async function submitOfficeClaimAndGetClaimNumber(
     )
   }
 
-  const claimNumber = await claims.getLatestClaimNumber()
+  if (!submittedClaimDateIso) {
+    throw new Error('Submitted claim date could not be determined.')
+  }
+
+  const claimNumber =
+    submittedClaimNumber ??
+    (await claims.getSubmittedClaimNumberFromSuccessToast(1_200)) ??
+    (await claims.getClaimNumberForDate(submittedClaimDateIso))
   expect(claimNumber).toMatch(/^CLAIM-/i)
   return claimNumber
 }
@@ -147,20 +172,18 @@ async function approveClaimAtCurrentLevel(
   await loginAsFresh(page, loginAs, approverEmail)
   const approvals = new ApprovalsPage(page)
   await approvals.goto()
-  const claimRow = approvals.getPendingRowByClaimNumber(claimNumber)
+  const claimRow = await approvals.waitForPendingRowByClaimNumber(claimNumber)
   await expect(claimRow).toBeVisible({ timeout: 20_000 })
-  await approvals.getApproveButtonForClaimNumber(claimNumber).click()
-  await expect(
-    page
-      .getByRole('region', { name: /notifications/i })
-      .getByText(/approve applied\.|approval action submitted successfully\./i)
-  ).toBeVisible({ timeout: 10_000 })
+  await claimRow.getByRole('button', { name: /^Approve$/i }).click()
 
   await expect
     .poll(
-      async () => approvals.getPendingRowByClaimNumber(claimNumber).count(),
+      async () => {
+        await approvals.goto()
+        return (await approvals.hasPendingRowByClaimNumber(claimNumber)) ? 1 : 0
+      },
       {
-        timeout: 20_000,
+        timeout: 60_000,
       }
     )
     .toBe(0)

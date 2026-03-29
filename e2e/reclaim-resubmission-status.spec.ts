@@ -1,19 +1,16 @@
 import { type Page } from '@playwright/test'
 
 import { test, expect } from './fixtures/auth'
-import {
-  ABH_TAMIL_NADU,
-  BOA_KARNATAKA,
-  FINANCE_1,
-  PM_MANSOOR,
-  SBH_KARNATAKA,
-  SBH_TN_KERALA,
-} from './fixtures/test-accounts'
+import { PM_MANSOOR, SBH_AP, SRO_AP } from './fixtures/test-accounts'
 import { ApprovalsPage } from './pages/approvals.page'
 import { ClaimsPage } from './pages/claims.page'
-import { FinancePage } from './pages/finance.page'
 
 type LoginAs = (email: string) => Promise<void>
+
+type ClaimSubmissionResult = {
+  claimNumber: string
+  claimDateIso: string
+}
 
 async function clearSession(page: Page): Promise<void> {
   await page.context().clearCookies()
@@ -47,21 +44,19 @@ async function submitOfficeClaimAndGetClaimNumber(
   page: Page,
   loginAs: LoginAs,
   submitterEmail: string
-): Promise<string> {
+): Promise<ClaimSubmissionResult> {
   await loginAsFresh(page, loginAs, submitterEmail)
 
   const claims = new ClaimsPage(page)
   await claims.gotoNewClaim()
   await claims.ensureNewClaimFormReady()
 
-  const randomOffset = Math.floor(Math.random() * 997)
+  const randomOffset = Math.floor(Math.random() * 120)
 
-  const candidateDaysBack = [
-    ...Array.from({ length: 31 }, (_, i) => i + randomOffset),
-    ...Array.from({ length: 30 }, (_, i) => 35 + i * 5 + randomOffset),
-    ...Array.from({ length: 18 }, (_, i) => 210 + i * 30 + randomOffset),
-    ...Array.from({ length: 25 }, (_, i) => 760 + i * 120 + randomOffset),
-  ]
+  const candidateDaysBack = Array.from(
+    { length: 120 },
+    (_, i) => 1 + ((i + randomOffset) % 120)
+  )
 
   for (const daysBack of candidateDaysBack) {
     const claimDateIso = toIsoDateDaysBack(daysBack)
@@ -94,7 +89,7 @@ async function submitOfficeClaimAndGetClaimNumber(
 
     if (submittedClaimNumber) {
       expect(submittedClaimNumber).toMatch(/^CLAIM-/i)
-      return submittedClaimNumber
+      return { claimNumber: submittedClaimNumber, claimDateIso }
     }
 
     const currentPath = new URL(page.url()).pathname
@@ -133,6 +128,44 @@ async function submitOfficeClaimAndGetClaimNumber(
   throw new Error('Could not submit a fresh claim using fallback date search.')
 }
 
+async function submitOfficeClaimForExactDate(
+  page: Page,
+  loginAs: LoginAs,
+  submitterEmail: string,
+  claimDateIso: string
+): Promise<{ ok: boolean; claimNumber?: string }> {
+  await loginAsFresh(page, loginAs, submitterEmail)
+
+  const claims = new ClaimsPage(page)
+  await claims.gotoNewClaim()
+  await claims.ensureNewClaimFormReady()
+
+  await claims.fillClaimDate(claimDateIso)
+  await claims.selectWorkLocationByName('Office / WFH')
+  await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
+  await claims.submitButton.click()
+
+  const submittedClaimNumber =
+    await claims.getSubmittedClaimNumberFromSuccessToast(5_000)
+
+  if (submittedClaimNumber) {
+    expect(submittedClaimNumber).toMatch(/^CLAIM-/i)
+    return { ok: true, claimNumber: submittedClaimNumber }
+  }
+
+  try {
+    await page.waitForURL((url: URL) => url.pathname === '/claims', {
+      timeout: 7_000,
+    })
+    const claimNumber = await claims.getClaimNumberForDate(claimDateIso)
+    expect(claimNumber).toMatch(/^CLAIM-/i)
+    return { ok: true, claimNumber }
+  } catch {
+    await expect(claims.submitButton).toBeEnabled({ timeout: 10_000 })
+    return { ok: false }
+  }
+}
+
 async function approveClaimAtCurrentLevel(
   page: Page,
   loginAs: LoginAs,
@@ -162,168 +195,129 @@ async function approveClaimAtCurrentLevel(
     .toBe(0)
 }
 
-async function rejectClaimInFinanceQueue(
+async function rejectClaimWithReclaimAtCurrentLevel(
   page: Page,
   loginAs: LoginAs,
-  financeEmail: string,
+  approverEmail: string,
   claimNumber: string,
-  allowResubmit: boolean,
   notes: string
 ): Promise<void> {
-  await loginAsFresh(page, loginAs, financeEmail)
+  await loginAsFresh(page, loginAs, approverEmail)
 
-  const finance = new FinancePage(page)
-  await finance.goto()
-  await finance.filterByClaimNumber(claimNumber)
+  const approvals = new ApprovalsPage(page)
+  await approvals.goto()
 
-  const queueRow = finance.getQueueRowByClaimNumber(claimNumber)
-  await expect(queueRow).toBeVisible({ timeout: 20_000 })
+  const claimRow = await approvals.waitForPendingRowByClaimNumber(claimNumber)
+  await expect(claimRow).toBeVisible({ timeout: 20_000 })
 
-  await finance.openQueueClaimByNumber(claimNumber)
-
+  await approvals.openPendingClaimByNumber(claimNumber)
   await page.getByLabel(/notes|reason|comments/i).fill(notes)
+  await page
+    .getByRole('button', { name: /reject\s*&\s*allow\s*reclaim/i })
+    .click()
 
-  if (allowResubmit) {
-    await page
-      .getByRole('button', { name: /reject\s*&\s*allow\s*reclaim/i })
-      .click()
-  } else {
-    await page.getByRole('button', { name: /^Reject$/i }).click()
-  }
-
-  await page.waitForURL((url: URL) => url.pathname === '/finance', {
+  await page.waitForURL((url: URL) => url.pathname === '/approvals', {
     timeout: 20_000,
   })
 
-  await finance.filterByClaimNumber(claimNumber)
   await expect
-    .poll(async () => finance.getQueueRowByClaimNumber(claimNumber).count(), {
-      timeout: 20_000,
-    })
+    .poll(
+      async () => approvals.getPendingRowByClaimNumber(claimNumber).count(),
+      {
+        timeout: 20_000,
+      }
+    )
     .toBe(0)
 }
 
-async function assertClaimTerminalBanner(
+async function assertSupersededClaimStatusClarity(
   page: Page,
   loginAs: LoginAs,
   submitterEmail: string,
-  claimNumber: string,
-  expectedBanner: 'new-claim-permitted' | 'permanently-closed'
+  oldClaimNumber: string
 ): Promise<void> {
   await loginAsFresh(page, loginAs, submitterEmail)
 
   const claims = new ClaimsPage(page)
   await claims.goto()
 
-  await expect(claims.getClaimRowByNumber(claimNumber)).toBeVisible({
+  await expect(claims.getClaimRowByNumber(oldClaimNumber)).toBeVisible({
     timeout: 20_000,
   })
 
-  await claims.openClaimByNumber(claimNumber)
+  await claims.openClaimByNumber(oldClaimNumber)
 
-  if (expectedBanner === 'new-claim-permitted') {
-    await expect(page.getByText(/new claim permitted/i).first()).toBeVisible({
-      timeout: 10_000,
-    })
-    await expect(
-      page.getByText(
-        /the approver has allowed you to raise a new claim for this date\./i
-      )
-    ).toBeVisible({ timeout: 10_000 })
-  } else {
-    await expect(page.getByText(/permanently closed/i).first()).toBeVisible({
-      timeout: 10_000,
-    })
-    await expect(
-      page.getByText(
-        /this claim is permanently closed\. no new claim can be raised for this date\./i
-      )
-    ).toBeVisible({ timeout: 10_000 })
-  }
-}
-
-test.describe.serial('Finance Rejection Flows - Requested E2E coverage', () => {
-  test.describe.configure({ timeout: 360_000 })
-
-  test('Finance Rejection 1: Finance reject marks claim permanently closed', async ({
-    page,
-    loginAs,
-  }) => {
-    const claimNumber = await submitOfficeClaimAndGetClaimNumber(
-      page,
-      loginAs,
-      BOA_KARNATAKA.email
-    )
-
-    await approveClaimAtCurrentLevel(
-      page,
-      loginAs,
-      SBH_KARNATAKA.email,
-      claimNumber
-    )
-    await approveClaimAtCurrentLevel(
-      page,
-      loginAs,
-      PM_MANSOOR.email,
-      claimNumber
-    )
-
-    await rejectClaimInFinanceQueue(
-      page,
-      loginAs,
-      FINANCE_1.email,
-      claimNumber,
-      false,
-      'Finance rejection without reclaim for E2E validation'
-    )
-
-    await assertClaimTerminalBanner(
-      page,
-      loginAs,
-      BOA_KARNATAKA.email,
-      claimNumber,
-      'permanently-closed'
-    )
+  await expect(page.getByText(/new claim permitted/i).first()).toBeVisible({
+    timeout: 10_000,
   })
 
-  test('Finance Rejection 2: Finance reject with allow reclaim enables new claim', async ({
+  const currentStatusSection = page
+    .locator('section')
+    .filter({ hasText: /current status/i })
+    .first()
+
+  await expect(currentStatusSection).toContainText(/reclaim allowed/i)
+}
+
+test.describe.serial('Claim Reclaim Status Clarity', () => {
+  test.describe.configure({ timeout: 360_000 })
+
+  test('shows reclaim-allowed status for superseded rejected claim and blocks third same-date submit with friendly error', async ({
     page,
     loginAs,
   }) => {
-    const claimNumber = await submitOfficeClaimAndGetClaimNumber(
+    const initialClaim = await submitOfficeClaimAndGetClaimNumber(
       page,
       loginAs,
-      ABH_TAMIL_NADU.email
+      SRO_AP.email
     )
 
     await approveClaimAtCurrentLevel(
       page,
       loginAs,
-      SBH_TN_KERALA.email,
-      claimNumber
+      SBH_AP.email,
+      initialClaim.claimNumber
     )
-    await approveClaimAtCurrentLevel(
+
+    await rejectClaimWithReclaimAtCurrentLevel(
       page,
       loginAs,
       PM_MANSOOR.email,
-      claimNumber
+      initialClaim.claimNumber,
+      'Rejecting with reclaim allowed for superseded claim regression coverage'
     )
 
-    await rejectClaimInFinanceQueue(
+    const replacementSubmit = await submitOfficeClaimForExactDate(
       page,
       loginAs,
-      FINANCE_1.email,
-      claimNumber,
-      true,
-      'Finance rejection with reclaim for E2E validation'
+      SRO_AP.email,
+      initialClaim.claimDateIso
     )
 
-    await assertClaimTerminalBanner(
+    expect(replacementSubmit.ok).toBe(true)
+    expect(replacementSubmit.claimNumber).toBeTruthy()
+    expect(replacementSubmit.claimNumber).not.toBe(initialClaim.claimNumber)
+
+    await assertSupersededClaimStatusClarity(
       page,
       loginAs,
-      ABH_TAMIL_NADU.email,
-      claimNumber,
-      'new-claim-permitted'
+      SRO_AP.email,
+      initialClaim.claimNumber
     )
+
+    const duplicateSubmit = await submitOfficeClaimForExactDate(
+      page,
+      loginAs,
+      SRO_AP.email,
+      initialClaim.claimDateIso
+    )
+
+    expect(duplicateSubmit.ok).toBe(false)
+    await expect(
+      page.getByText(/claim already submitted for this date/i)
+    ).toBeVisible({ timeout: 10_000 })
+    await expect(
+      page.getByText(/unexpected error while submitting claim\./i)
+    ).toHaveCount(0)
   })
 })

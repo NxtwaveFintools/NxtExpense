@@ -4,6 +4,7 @@ import { Geist, Geist_Mono, Plus_Jakarta_Sans } from 'next/font/google'
 import { LenisProvider } from '@/components/ui/lenis-provider'
 import { SonnerToaster } from '@/components/ui/sonner-toaster'
 import { ThemeProvider } from '@/components/ui/theme-provider'
+import { ReactQueryProvider } from '@/components/providers/react-query-provider'
 
 import './globals.css'
 
@@ -47,9 +48,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <LenisProvider />
-          {children}
-          <SonnerToaster />
+          <ReactQueryProvider>
+            <LenisProvider />
+            {children}
+            <SonnerToaster />
+          </ReactQueryProvider>
         </ThemeProvider>
       </body>
     </html>

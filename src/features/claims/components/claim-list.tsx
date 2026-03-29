@@ -16,11 +16,15 @@ import {
   getDataTableHeadCellClass,
 } from '@/components/ui/data-table-tokens'
 import { formatDate, formatDatetime } from '@/lib/utils/date'
+import { getCursorPageStartIndex } from '@/lib/utils/pagination'
 
 type ClaimListPagination = {
   backHref: string | null
   nextHref: string | null
   pageNumber: number
+  pageSize: number
+  totalPages?: number
+  totalItems?: number
 }
 
 type ClaimListProps = {
@@ -29,6 +33,11 @@ type ClaimListProps = {
 }
 
 export function ClaimList({ claims, pagination }: ClaimListProps) {
+  const pageStartIndex = getCursorPageStartIndex(
+    pagination.pageNumber,
+    pagination.pageSize
+  )
+
   if (claims.data.length === 0) {
     return (
       <section className="rounded-2xl border border-border bg-surface p-8 shadow-sm text-center">
@@ -70,6 +79,8 @@ export function ClaimList({ claims, pagination }: ClaimListProps) {
           backHref={pagination.backHref}
           nextHref={pagination.nextHref}
           pageNumber={pagination.pageNumber}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
         />
       </div>
 
@@ -77,6 +88,14 @@ export function ClaimList({ claims, pagination }: ClaimListProps) {
         <table className={`${DATA_TABLE_CLASS} min-w-230`}>
           <thead>
             <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
+              <th
+                className={getDataTableHeadCellClass({
+                  weight: 'semibold',
+                  nowrap: true,
+                })}
+              >
+                #
+              </th>
               <th
                 className={getDataTableHeadCellClass({
                   nowrap: true,
@@ -123,8 +142,17 @@ export function ClaimList({ claims, pagination }: ClaimListProps) {
             </tr>
           </thead>
           <tbody className={DATA_TABLE_BODY_CLASS}>
-            {claims.data.map((claim) => (
+            {claims.data.map((claim, index) => (
               <tr key={claim.id} className={DATA_TABLE_ROW_CLASS}>
+                <td
+                  className={getDataTableCellClass({
+                    mono: true,
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {pageStartIndex + index}
+                </td>
                 <td
                   className={getDataTableCellClass({
                     weight: 'medium',

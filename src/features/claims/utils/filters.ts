@@ -32,7 +32,8 @@ export function normalizeMyClaimsFilters(
   return {
     claimStatus: normalizeText(value.claimStatus),
     workLocation: value.workLocation ?? null,
-    claimDate: value.claimDate ?? null,
+    claimDateFrom: value.claimDateFrom ?? null,
+    claimDateTo: value.claimDateTo ?? null,
   }
 }
 
@@ -48,8 +49,12 @@ export function addMyClaimsFiltersToParams(
     params.set('workLocation', filters.workLocation)
   }
 
-  if (filters.claimDate) {
-    params.set('claimDate', filters.claimDate)
+  if (filters.claimDateFrom) {
+    params.set('claimDateFrom', filters.claimDateFrom)
+  }
+
+  if (filters.claimDateTo) {
+    params.set('claimDateTo', filters.claimDateTo)
   }
 
   return params

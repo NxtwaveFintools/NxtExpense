@@ -1,7 +1,10 @@
 import { ClaimList } from '@/features/claims/components/claim-list'
 import { ClaimsFiltersBar } from '@/features/claims/components/claims-filters-bar'
+import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 import {
   getClaimStatusCatalog,
+  getMyClaimsStats,
+  getMyClaimsTotalCount,
   getMyClaimsPaginated,
 } from '@/features/claims/queries'
 import { requireCurrentUser } from '@/features/auth/queries'
@@ -13,10 +16,12 @@ import {
   addMyClaimsFiltersToParams,
   normalizeMyClaimsFilters,
 } from '@/features/claims/utils/filters'
+import { canDownloadClaimsCsv } from '@/features/claims/utils/export-permissions'
 import {
   buildCursorNavigationLinks,
   decodeCursorTrail,
   encodeCursorTrail,
+  getCursorTotalPages,
 } from '@/lib/utils/pagination'
 import {
   buildPathWithSearchParams,
@@ -49,26 +54,42 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
   }
 
   const resolvedSearch = await searchParams
-  const claimDate =
-    resolvedSearch?.claimDate ??
-    (resolvedSearch?.claimDateFrom && resolvedSearch?.claimDateTo
-      ? resolvedSearch.claimDateFrom === resolvedSearch.claimDateTo
-        ? resolvedSearch.claimDateFrom
-        : undefined
-      : (resolvedSearch?.claimDateFrom ?? resolvedSearch?.claimDateTo))
+  const claimDateFrom =
+    resolvedSearch?.claimDateFrom ?? resolvedSearch?.claimDate
+  const claimDateTo = resolvedSearch?.claimDateTo ?? resolvedSearch?.claimDate
 
   const rawFilters = {
     claimStatus: resolvedSearch?.claimStatus,
     workLocation: resolvedSearch?.workLocation,
-    claimDate,
+    claimDateFrom,
+    claimDateTo,
   }
+
+  let filterValidationError: string | null = null
+
   const normalizedFilters: MyClaimsFilters = (() => {
     try {
       return normalizeMyClaimsFilters(rawFilters)
-    } catch {
-      return normalizeMyClaimsFilters({})
+    } catch (error) {
+      filterValidationError =
+        error instanceof Error
+          ? error.message
+          : 'Invalid claim filters provided.'
+
+      return normalizeMyClaimsFilters({
+        claimStatus: rawFilters.claimStatus,
+        workLocation: rawFilters.workLocation,
+      })
     }
   })()
+
+  const filterFormValues: MyClaimsFilters = filterValidationError
+    ? {
+        ...normalizedFilters,
+        claimDateFrom: claimDateFrom ?? null,
+        claimDateTo: claimDateTo ?? null,
+      }
+    : normalizedFilters
 
   const cursor = resolvedSearch?.cursor ?? null
   const trail = decodeCursorTrail(resolvedSearch?.trail ?? null)
@@ -86,6 +107,7 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
 
   const currentParams = createNonEmptySearchParams(resolvedSearch)
   if (
+    !filterValidationError &&
     toSortedQueryString(currentParams) !== toSortedQueryString(canonicalParams)
   ) {
     redirect(buildPathWithSearchParams('/claims', canonicalParams))
@@ -93,11 +115,20 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [claims, statusCatalog, workLocations] = await Promise.all([
-    getMyClaimsPaginated(supabase, employee.id, cursor, 10, normalizedFilters),
-    getClaimStatusCatalog(supabase),
-    getAllWorkLocations(supabase),
-  ])
+  const [claims, statusCatalog, workLocations, stats, claimsTotalCount] =
+    await Promise.all([
+      getMyClaimsPaginated(
+        supabase,
+        employee.id,
+        cursor,
+        10,
+        normalizedFilters
+      ),
+      getClaimStatusCatalog(supabase),
+      getAllWorkLocations(supabase),
+      getMyClaimsStats(supabase, employee.id, normalizedFilters),
+      getMyClaimsTotalCount(supabase, employee.id, normalizedFilters),
+    ])
 
   const workLocationOptions = workLocations
 
@@ -110,6 +141,8 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
     currentTrail: trail,
     nextCursor: claims.nextCursor,
   })
+
+  const claimsTotalPages = getCursorTotalPages(claimsTotalCount, claims.limit)
 
   const currentPageCsvParams = addMyClaimsFiltersToParams(
     new URLSearchParams(),
@@ -128,6 +161,9 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
 
   const exportCurrentPageHref = `/claims/export?${currentPageCsvParams.toString()}`
   const exportAllHref = `/claims/export?${allRowsCsvParams.toString()}`
+  const canExportCsv = canDownloadClaimsCsv(
+    employee.designations?.designation_name
+  )
 
   return (
     <>
@@ -135,14 +171,55 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
         <div className="mx-auto w-full max-w-6xl">
           <div className="mb-6">
             <ClaimsFiltersBar
-              filters={normalizedFilters}
+              filters={filterFormValues}
               statusCatalog={statusCatalog}
               workLocationOptions={workLocationOptions}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}
+              canExportCsv={canExportCsv}
+              validationError={filterValidationError}
             />
           </div>
-          <ClaimList claims={claims} pagination={claimsPagination} />
+
+          <ClaimAnalyticsCards
+            className="mb-6"
+            cards={[
+              {
+                label: 'Total Claims',
+                count: stats.total.count,
+                amount: stats.total.amount,
+                tone: 'neutral',
+              },
+              {
+                label: 'Pending',
+                count: stats.pending.count,
+                amount: stats.pending.amount,
+                tone: 'pending',
+              },
+              {
+                label: 'Rejected',
+                count: stats.rejected.count,
+                amount: stats.rejected.amount,
+                tone: 'rejected',
+              },
+              {
+                label: 'Rejected - Allow Reclaim',
+                count: stats.rejectedAllowReclaim.count,
+                amount: stats.rejectedAllowReclaim.amount,
+                tone: 'finance',
+              },
+            ]}
+          />
+
+          <ClaimList
+            claims={claims}
+            pagination={{
+              ...claimsPagination,
+              pageSize: claims.limit,
+              totalPages: claimsTotalPages,
+              totalItems: claimsTotalCount,
+            }}
+          />
         </div>
       </main>
     </>

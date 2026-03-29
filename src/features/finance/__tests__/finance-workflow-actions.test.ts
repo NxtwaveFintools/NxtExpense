@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getFinanceQueuePaginated: vi.fn(),
   getFinanceHistoryPaginated: vi.fn(),
   getClaimAvailableActions: vi.fn(),
+  getClaimAvailableActionsByClaimIds: vi.fn(),
   normalizeFinanceFilters: vi.fn(),
   getMaxNotesLength: vi.fn(),
 }))
@@ -37,6 +38,7 @@ vi.mock('@/features/finance/queries', () => ({
 
 vi.mock('@/features/claims/queries', () => ({
   getClaimAvailableActions: mocks.getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds: mocks.getClaimAvailableActionsByClaimIds,
 }))
 
 vi.mock('@/features/finance/utils/filters', () => ({
@@ -100,7 +102,7 @@ describe('finance actions workflow integration', () => {
       dateTo: null,
     })
 
-    mocks.getClaimAvailableActions.mockResolvedValue([
+    const defaultActions = [
       {
         action: 'issued',
         display_label: 'Issue Payment',
@@ -115,7 +117,14 @@ describe('finance actions workflow integration', () => {
         supports_allow_resubmit: true,
         actor_scope: 'finance',
       },
-    ])
+    ]
+
+    mocks.getClaimAvailableActions.mockResolvedValue(defaultActions)
+    mocks.getClaimAvailableActionsByClaimIds.mockImplementation(
+      async (_supabase, claimIds: string[]) => {
+        return new Map(claimIds.map((claimId) => [claimId, defaultActions]))
+      }
+    )
 
     mocks.getMaxNotesLength.mockResolvedValue(500)
 
@@ -175,6 +184,21 @@ describe('finance actions workflow integration', () => {
       p_notes: 'Missing bank details',
       p_allow_resubmit: true,
     })
+  })
+
+  it('should require notes for finance rejection action', async () => {
+    // Act
+    const result = await submitFinanceAction({
+      claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      action: 'finance_rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should block Finance approval before HOD approval', async () => {
@@ -299,6 +323,24 @@ describe('finance actions workflow integration', () => {
       p_notes: 'Bulk payout release',
       p_allow_resubmit: false,
     })
+  })
+
+  it('should require notes for bulk finance rejection actions', async () => {
+    // Act
+    const result = await bulkFinanceClaimsAction({
+      claimIds: [
+        '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+        '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
+      ],
+      action: 'finance_rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should validate bulk payload before DB path', async () => {

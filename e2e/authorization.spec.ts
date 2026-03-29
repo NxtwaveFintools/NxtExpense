@@ -1,3 +1,5 @@
+import { type Page } from '@playwright/test'
+
 import { test, expect } from './fixtures/auth'
 import { SRO_AP, SBH_AP, FINANCE_1 } from './fixtures/test-accounts'
 
@@ -5,6 +7,30 @@ import { SRO_AP, SBH_AP, FINANCE_1 } from './fixtures/test-accounts'
  * E2E: Authorization boundaries — ensures users cannot access
  * routes or perform actions outside their role.
  */
+
+async function navigateAndExpectUrl(
+  page: Page,
+  pathname: string,
+  expectedUrl: RegExp,
+  timeoutMs = 20_000
+): Promise<void> {
+  const maxAttempts = 3
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    await page.goto(pathname)
+
+    try {
+      await page.waitForURL(expectedUrl, { timeout: timeoutMs })
+      return
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error
+      }
+
+      await page.waitForTimeout(500)
+    }
+  }
+}
 
 test.describe('Authorization Boundaries', () => {
   test('unauthenticated user is redirected to /login from protected routes', async ({
@@ -18,20 +44,16 @@ test.describe('Authorization Boundaries', () => {
     })
     await page.context().clearCookies()
 
-    await page.goto('/dashboard')
-    await page.waitForURL(/\/login/, { timeout: 20_000 })
+    await navigateAndExpectUrl(page, '/dashboard', /\/login/)
     expect(page.url()).toContain('/login')
 
-    await page.goto('/claims')
-    await page.waitForURL(/\/login/, { timeout: 20_000 })
+    await navigateAndExpectUrl(page, '/claims', /\/login/)
     expect(page.url()).toContain('/login')
 
-    await page.goto('/approvals')
-    await page.waitForURL(/\/login/, { timeout: 20_000 })
+    await navigateAndExpectUrl(page, '/approvals', /\/login/)
     expect(page.url()).toContain('/login')
 
-    await page.goto('/finance')
-    await page.waitForURL(/\/login/, { timeout: 20_000 })
+    await navigateAndExpectUrl(page, '/finance', /\/login/)
     expect(page.url()).toContain('/login')
   })
 
@@ -52,8 +74,7 @@ test.describe('Authorization Boundaries', () => {
     loginAs,
   }) => {
     await loginAs(SRO_AP.email)
-    await page.goto('/approvals')
-    await page.waitForLoadState('networkidle')
+    await navigateAndExpectUrl(page, '/approvals', /\/dashboard/)
 
     // SRO without approver assignments should be redirected
     expect(page.url()).toContain('/dashboard')
@@ -61,24 +82,21 @@ test.describe('Authorization Boundaries', () => {
 
   test('SRO cannot access /finance', async ({ page, loginAs }) => {
     await loginAs(SRO_AP.email)
-    await page.goto('/finance')
-    await page.waitForLoadState('networkidle')
+    await navigateAndExpectUrl(page, '/finance', /\/dashboard/)
 
     expect(page.url()).toContain('/dashboard')
   })
 
   test('Finance user cannot access /claims', async ({ page, loginAs }) => {
     await loginAs(FINANCE_1.email)
-    await page.goto('/claims')
-    await page.waitForLoadState('networkidle')
+    await navigateAndExpectUrl(page, '/claims', /\/dashboard/)
 
     expect(page.url()).toContain('/dashboard')
   })
 
   test('Finance user cannot access /claims/new', async ({ page, loginAs }) => {
     await loginAs(FINANCE_1.email)
-    await page.goto('/claims/new')
-    await page.waitForLoadState('networkidle')
+    await navigateAndExpectUrl(page, '/claims/new', /\/dashboard/)
 
     expect(page.url()).toContain('/dashboard')
   })

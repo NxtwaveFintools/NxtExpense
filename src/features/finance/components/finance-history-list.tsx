@@ -25,6 +25,9 @@ type FinanceHistoryListProps = {
     backHref: string | null
     nextHref: string | null
     pageNumber: number
+    pageSize: number
+    totalPages?: number
+    totalItems?: number
   }
 }
 
@@ -54,6 +57,8 @@ export function FinanceHistoryList({
           backHref={pagination.backHref}
           nextHref={pagination.nextHref}
           pageNumber={pagination.pageNumber}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
         />
       </div>
 

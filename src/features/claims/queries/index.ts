@@ -11,10 +11,13 @@ import type {
   PaginatedClaims,
 } from '@/features/claims/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
-import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
+import {
+  getClaimStatusDisplay,
+  getClaimStatusDisplayLabel,
+} from '@/lib/utils/claim-status'
 
 const LEGACY_CLAIM_COLUMNS =
-  'id, claim_number, employee_id, claim_date, work_location_id, work_locations(location_name), own_vehicle_used, vehicle_type_id, vehicle_types(vehicle_name), outstation_state_id, outstation_city_id, from_city_id, to_city_id, outstation_state:states!outstation_state_id(state_name), outstation_city:cities!outstation_city_id(city_name), from_city_data:cities!from_city_id(city_name), to_city_data:cities!to_city_id(city_name), km_travelled, total_amount, status_id, claim_statuses!status_id(status_code, status_name, display_color, is_terminal, is_rejection), current_approval_level, submitted_at, created_at, updated_at, resubmission_count, last_rejection_notes, last_rejected_at, accommodation_nights, food_with_principals_amount'
+  'id, claim_number, employee_id, claim_date, work_location_id, work_locations(location_name), own_vehicle_used, vehicle_type_id, vehicle_types(vehicle_name), outstation_state_id, outstation_city_id, from_city_id, to_city_id, outstation_state:states!outstation_state_id(state_name), outstation_city:cities!outstation_city_id(city_name), from_city_data:cities!from_city_id(city_name), to_city_data:cities!to_city_id(city_name), km_travelled, total_amount, status_id, claim_statuses!status_id(status_code, status_name, display_color, allow_resubmit_status_name, allow_resubmit_display_color, is_terminal, is_rejection), allow_resubmit, is_superseded, current_approval_level, submitted_at, created_at, updated_at, resubmission_count, last_rejection_notes, last_rejected_at, accommodation_nights, food_with_principals_amount'
 
 const SEGMENT_CLAIM_COLUMNS =
   'has_intercity_travel, has_intracity_travel, intercity_own_vehicle_used, intracity_own_vehicle_used, intracity_vehicle_mode'
@@ -48,6 +51,14 @@ export function mapClaimRow(raw: Record<string, unknown>): Claim {
     ? r.claim_statuses[0]
     : r.claim_statuses
   const statusCode = statusInfo?.status_code
+  const statusDisplay = getClaimStatusDisplay({
+    statusCode,
+    statusName: statusInfo?.status_name,
+    statusDisplayColor: statusInfo?.display_color,
+    allowResubmit: Boolean(r.allow_resubmit),
+    allowResubmitStatusName: statusInfo?.allow_resubmit_status_name,
+    allowResubmitDisplayColor: statusInfo?.allow_resubmit_display_color,
+  })
   const outstationCity = Array.isArray(r.outstation_city)
     ? r.outstation_city[0]
     : r.outstation_city
@@ -69,8 +80,8 @@ export function mapClaimRow(raw: Record<string, unknown>): Claim {
     intracity_vehicle_mode: r.intracity_vehicle_mode ?? null,
     allow_resubmit: r.allow_resubmit ?? false,
     is_superseded: r.is_superseded ?? false,
-    statusName: getClaimStatusDisplayLabel(statusCode, statusInfo?.status_name),
-    statusDisplayColor: statusInfo?.display_color ?? 'neutral',
+    statusName: statusDisplay.label,
+    statusDisplayColor: statusDisplay.colorToken,
     is_terminal: statusInfo?.is_terminal ?? false,
     is_rejection: statusInfo?.is_rejection ?? false,
     outstation_state_name: outstationState?.state_name ?? null,
@@ -85,7 +96,35 @@ export function mapClaimRow(raw: Record<string, unknown>): Claim {
 const DEFAULT_MY_CLAIMS_FILTERS: MyClaimsFilters = {
   claimStatus: null,
   workLocation: null,
-  claimDate: null,
+  claimDateFrom: null,
+  claimDateTo: null,
+}
+
+type ClaimsFilterQuery = {
+  eq: (column: string, value: unknown) => unknown
+  gte: (column: string, value: unknown) => unknown
+  lte: (column: string, value: unknown) => unknown
+}
+
+function applyMyClaimsFilters(
+  query: ClaimsFilterQuery,
+  filters: MyClaimsFilters
+): void {
+  if (filters.claimStatus) {
+    query.eq('status_id', filters.claimStatus)
+  }
+
+  if (filters.workLocation) {
+    query.eq('work_location_id', filters.workLocation)
+  }
+
+  if (filters.claimDateFrom) {
+    query.gte('claim_date', filters.claimDateFrom)
+  }
+
+  if (filters.claimDateTo) {
+    query.lte('claim_date', filters.claimDateTo)
+  }
 }
 
 export async function getMyClaimsPaginated(
@@ -111,18 +150,7 @@ export async function getMyClaimsPaginated(
       )
     }
 
-    if (filters.claimStatus) {
-      query = query.eq('status_id', filters.claimStatus)
-    }
-
-    if (filters.workLocation) {
-      query = query.eq('work_location_id', filters.workLocation)
-    }
-
-    if (filters.claimDate) {
-      query = query.eq('claim_date', filters.claimDate)
-    }
-
+    applyMyClaimsFilters(query, filters)
     return query
   }
 
@@ -372,4 +400,159 @@ export async function getAllFilteredMyClaims(
   }
 
   return allRows
+}
+
+export async function getMyClaimsTotalCount(
+  supabase: SupabaseClient,
+  employeeId: string,
+  filters: MyClaimsFilters
+): Promise<number> {
+  const query = supabase
+    .from('expense_claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('employee_id', employeeId)
+
+  applyMyClaimsFilters(query, filters)
+
+  const { count, error } = await query
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return count ?? 0
+}
+
+export type MyClaimsMetricSummary = {
+  count: number
+  amount: number
+}
+
+export type MyClaimsStats = {
+  total: MyClaimsMetricSummary
+  pending: MyClaimsMetricSummary
+  rejected: MyClaimsMetricSummary
+  rejectedAllowReclaim: MyClaimsMetricSummary
+}
+
+type ClaimStatusSummaryRow = {
+  id: string
+  is_rejection: boolean
+  is_payment_issued: boolean
+}
+
+type MyClaimStatsRow = {
+  id: string
+  created_at: string
+  status_id: string
+  total_amount: number | string
+  allow_resubmit: boolean
+}
+
+function createMetricSummary(): MyClaimsMetricSummary {
+  return { count: 0, amount: 0 }
+}
+
+function addToMetric(metric: MyClaimsMetricSummary, amount: number) {
+  metric.count += 1
+  metric.amount += amount
+}
+
+export async function getMyClaimsStats(
+  supabase: SupabaseClient,
+  employeeId: string,
+  filters: MyClaimsFilters
+): Promise<MyClaimsStats> {
+  const { data: statusRows, error: statusError } = await supabase
+    .from('claim_statuses')
+    .select('id, is_rejection, is_payment_issued')
+    .eq('is_active', true)
+
+  if (statusError) {
+    throw new Error(statusError.message)
+  }
+
+  const rejectedStatusIds = new Set(
+    ((statusRows ?? []) as ClaimStatusSummaryRow[])
+      .filter((status) => status.is_rejection)
+      .map((status) => status.id)
+  )
+
+  const approvedStatusIds = new Set(
+    ((statusRows ?? []) as ClaimStatusSummaryRow[])
+      .filter((status) => status.is_payment_issued)
+      .map((status) => status.id)
+  )
+
+  const stats: MyClaimsStats = {
+    total: createMetricSummary(),
+    pending: createMetricSummary(),
+    rejected: createMetricSummary(),
+    rejectedAllowReclaim: createMetricSummary(),
+  }
+
+  const pageSize = 500
+  let lastCursor: { createdAt: string; id: string } | null = null
+
+  for (;;) {
+    let query = supabase
+      .from('expense_claims')
+      .select('id, created_at, status_id, total_amount, allow_resubmit')
+      .eq('employee_id', employeeId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(pageSize)
+
+    if (lastCursor) {
+      query = query.or(
+        `created_at.lt.${lastCursor.createdAt},and(created_at.eq.${lastCursor.createdAt},id.lt.${lastCursor.id})`
+      )
+    }
+
+    applyMyClaimsFilters(query, filters)
+
+    const { data, error } = await query
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const claimRows = (data ?? []) as MyClaimStatsRow[]
+
+    if (claimRows.length === 0) {
+      break
+    }
+
+    for (const row of claimRows) {
+      const amount = Number(row.total_amount ?? 0)
+      addToMetric(stats.total, amount)
+
+      if (rejectedStatusIds.has(row.status_id)) {
+        if (row.allow_resubmit) {
+          addToMetric(stats.rejectedAllowReclaim, amount)
+        } else {
+          addToMetric(stats.rejected, amount)
+        }
+        continue
+      }
+
+      if (approvedStatusIds.has(row.status_id)) {
+        continue
+      }
+
+      addToMetric(stats.pending, amount)
+    }
+
+    if (claimRows.length < pageSize) {
+      break
+    }
+
+    const lastRow = claimRows[claimRows.length - 1]
+    lastCursor = {
+      createdAt: lastRow.created_at,
+      id: lastRow.id,
+    }
+  }
+
+  return stats
 }

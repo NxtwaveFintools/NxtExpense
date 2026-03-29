@@ -168,7 +168,7 @@ export async function calculateBaseLocationItems(
  * Calculate expense items for outstation with inter-city/intra-city segments.
  * - Food allowance is always added once for outstation claims.
  * - Inter-city own vehicle adds per-km reimbursement.
- * - Intra-city city-travel (own/rental) adds daily allowance from vehicle_types.base_fuel_rate_per_day.
+ * - Intra-city city-travel (own/rental) adds a fixed daily fuel allowance from vehicle_types.base_fuel_rate_per_day.
  * - Inter-city own vehicle implies intra-city allowance for the same day/vehicle.
  */
 export async function calculateOutstationTravelItems(
@@ -220,12 +220,18 @@ export async function calculateOutstationTravelItems(
 
   if (includesIntracityAllowance && input.vehicleType) {
     const intracityAllowance = Number(input.vehicleType.base_fuel_rate_per_day)
+    const isRentalIntracityTravel =
+      input.hasIntracityTravel &&
+      !input.hasIntercityTravel &&
+      !input.intracityOwnVehicleUsed
 
     if (intracityAllowance > 0) {
       items.push({
         expense_type: CLAIM_ITEM_TYPES.INTRACITY_ALLOWANCE,
         amount: intracityAllowance,
-        description: `${input.vehicleType.vehicle_name} intra-city allowance`,
+        description: isRentalIntracityTravel
+          ? `${input.vehicleType.vehicle_name} fixed intra-city fuel allowance (rented vehicle travel)`
+          : `${input.vehicleType.vehicle_name} fixed intra-city fuel allowance`,
       })
     }
   }

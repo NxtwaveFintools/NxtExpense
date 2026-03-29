@@ -115,6 +115,23 @@ async function validateCitiesForSelectedState(
     : null
 }
 
+function mapClaimInsertErrorToUserMessage(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : ''
+  const normalizedMessage = message.toLowerCase()
+
+  if (
+    normalizedMessage.includes('expense_claims_one_active_per_employee_date') ||
+    (normalizedMessage.includes(
+      'duplicate key value violates unique constraint'
+    ) &&
+      normalizedMessage.includes('expense_claims'))
+  ) {
+    return 'Claim already submitted for this date. Please open My Claims to view the existing claim.'
+  }
+
+  return null
+}
+
 export async function submitClaimAction(
   rawInput: ClaimFormValues
 ): Promise<ClaimActionResult> {
@@ -165,7 +182,7 @@ export async function submitClaimAction(
   if (existingClaim && !existingClaim.is_rejection) {
     return {
       ok: false,
-      error: `You already have a pending or approved claim for this date (${existingClaim.claim_number}). Please wait for it to be processed.`,
+      error: `Claim already submitted for this date (${existingClaim.claim_number}). Please open My Claims to view its status.`,
     }
   }
 
@@ -538,7 +555,74 @@ export async function submitClaimAction(
     }
 
     // Insert a brand-new claim row — the INSERT trigger assigns a fresh claim_number
-    const newClaim = await insertClaim(supabase, {
+    let newClaim: { id: string; claim_number: string }
+
+    try {
+      newClaim = await insertClaim(supabase, {
+        employeeId: employee.id,
+        claimDateIso: input.claimDate.iso,
+        workLocationId,
+        ownVehicleUsed: isOutstation ? hasOwnVehicle : null,
+        vehicleTypeId: isBaseLocation || hasOwnVehicle ? vehicleTypeId : null,
+        outstationStateId: outstation?.outstationStateId ?? null,
+        outstationCityId: derivedOutstationCityId,
+        fromCityId: hasIntercityScope ? (outstation?.fromCityId ?? null) : null,
+        toCityId: hasIntercityScope ? (outstation?.toCityId ?? null) : null,
+        kmTravelled:
+          hasIntercityScope && outstation?.intercityOwnVehicleUsed
+            ? (outstation?.kmTravelled ?? null)
+            : null,
+        hasIntercityTravel: isOutstation ? hasIntercityScope : false,
+        hasIntracityTravel: isOutstation ? hasIntracityScope : false,
+        intercityOwnVehicleUsed: hasIntercityScope
+          ? (outstation?.intercityOwnVehicleUsed ?? false)
+          : null,
+        intracityOwnVehicleUsed: hasIntracityScope
+          ? (outstation?.intracityOwnVehicleUsed ?? false)
+          : null,
+        intracityVehicleMode: hasIntracityScope
+          ? (outstation?.intracityVehicleMode ?? null)
+          : null,
+        totalAmount: draft.total,
+        statusId: initialWorkflowState.statusId,
+        currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
+        submittedAt: new Date().toISOString(),
+        designationId: employee.designation_id,
+        accommodationNights: null,
+        foodWithPrincipalsAmount: isOutstation
+          ? (input.foodWithPrincipalsAmount ?? null)
+          : null,
+      })
+    } catch (error) {
+      const userMessage = mapClaimInsertErrorToUserMessage(error)
+      if (userMessage) {
+        return { ok: false, error: userMessage }
+      }
+      throw error
+    }
+
+    await insertClaimItems(
+      supabase,
+      draft.items.map((item) => ({
+        claimId: newClaim.id,
+        itemType: item.expense_type,
+        amount: item.amount,
+        description: item.description,
+      }))
+    )
+
+    return {
+      ok: true,
+      error: null,
+      claimId: newClaim.id,
+      claimNumber: newClaim.claim_number,
+    }
+  }
+
+  let claim: { id: string; claim_number: string }
+
+  try {
+    claim = await insertClaim(supabase, {
       employeeId: employee.id,
       claimDateIso: input.claimDate.iso,
       workLocationId,
@@ -573,60 +657,13 @@ export async function submitClaimAction(
         ? (input.foodWithPrincipalsAmount ?? null)
         : null,
     })
-
-    await insertClaimItems(
-      supabase,
-      draft.items.map((item) => ({
-        claimId: newClaim.id,
-        itemType: item.expense_type,
-        amount: item.amount,
-        description: item.description,
-      }))
-    )
-
-    return {
-      ok: true,
-      error: null,
-      claimId: newClaim.id,
-      claimNumber: newClaim.claim_number,
+  } catch (error) {
+    const userMessage = mapClaimInsertErrorToUserMessage(error)
+    if (userMessage) {
+      return { ok: false, error: userMessage }
     }
+    throw error
   }
-
-  const claim = await insertClaim(supabase, {
-    employeeId: employee.id,
-    claimDateIso: input.claimDate.iso,
-    workLocationId,
-    ownVehicleUsed: isOutstation ? hasOwnVehicle : null,
-    vehicleTypeId: isBaseLocation || hasOwnVehicle ? vehicleTypeId : null,
-    outstationStateId: outstation?.outstationStateId ?? null,
-    outstationCityId: derivedOutstationCityId,
-    fromCityId: hasIntercityScope ? (outstation?.fromCityId ?? null) : null,
-    toCityId: hasIntercityScope ? (outstation?.toCityId ?? null) : null,
-    kmTravelled:
-      hasIntercityScope && outstation?.intercityOwnVehicleUsed
-        ? (outstation?.kmTravelled ?? null)
-        : null,
-    hasIntercityTravel: isOutstation ? hasIntercityScope : false,
-    hasIntracityTravel: isOutstation ? hasIntracityScope : false,
-    intercityOwnVehicleUsed: hasIntercityScope
-      ? (outstation?.intercityOwnVehicleUsed ?? false)
-      : null,
-    intracityOwnVehicleUsed: hasIntracityScope
-      ? (outstation?.intracityOwnVehicleUsed ?? false)
-      : null,
-    intracityVehicleMode: hasIntracityScope
-      ? (outstation?.intracityVehicleMode ?? null)
-      : null,
-    totalAmount: draft.total,
-    statusId: initialWorkflowState.statusId,
-    currentApprovalLevel: initialWorkflowState.currentApprovalLevel,
-    submittedAt: new Date().toISOString(),
-    designationId: employee.designation_id,
-    accommodationNights: null,
-    foodWithPrincipalsAmount: isOutstation
-      ? (input.foodWithPrincipalsAmount ?? null)
-      : null,
-  })
 
   await insertClaimItems(
     supabase,

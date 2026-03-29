@@ -25,6 +25,7 @@ import {
 
 type ApprovalListTableProps = {
   approvals: PaginatedPendingApprovals
+  pageStartIndex: number
   selected: Set<string>
   isProcessing: boolean
   processingClaimId: string | null
@@ -55,6 +56,7 @@ function getActionIntentKey(
 
 export function ApprovalListTable({
   approvals,
+  pageStartIndex,
   selected,
   isProcessing,
   processingClaimId,
@@ -70,6 +72,7 @@ export function ApprovalListTable({
         <thead>
           <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
             <th className="w-10 px-4 py-3" />
+            <th className={getDataTableHeadCellClass({ nowrap: true })}>#</th>
             <th className={getDataTableHeadCellClass({ nowrap: true })}>
               Claim ID
             </th>
@@ -96,7 +99,7 @@ export function ApprovalListTable({
           </tr>
         </thead>
         <tbody className={DATA_TABLE_BODY_CLASS}>
-          {approvals.data.map((item: PendingApproval) => {
+          {approvals.data.map((item: PendingApproval, index) => {
             const isSelectable = item.availableActions.length > 0
             const isRowProcessing =
               isProcessing && processingClaimId === item.claim.id
@@ -113,6 +116,15 @@ export function ApprovalListTable({
                     }
                     className="size-4 rounded border-border accent-primary"
                   />
+                </td>
+                <td
+                  className={getDataTableCellClass({
+                    mono: true,
+                    muted: true,
+                    nowrap: true,
+                  })}
+                >
+                  {pageStartIndex + index}
                 </td>
                 <td
                   className={getDataTableCellClass({

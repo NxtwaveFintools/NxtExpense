@@ -234,13 +234,29 @@ describe('submitClaimAction', () => {
 
     // Assert
     expect(result.ok).toBe(false)
-    expect(result.error).toContain(
-      'You already have a pending or approved claim for this date'
-    )
+    expect(result.error).toContain('Claim already submitted for this date')
     expect(mocks.getClaimForDate).toHaveBeenCalledWith(
       expect.anything(),
       'emp-1',
       '2026-03-06'
+    )
+  })
+
+  it('should surface duplicate insert conflicts as already-submitted errors', async () => {
+    // Arrange
+    mocks.insertClaim.mockRejectedValueOnce(
+      new Error(
+        'duplicate key value violates unique constraint "expense_claims_one_active_per_employee_date"'
+      )
+    )
+
+    // Act
+    const result = await submitClaimAction(VALID_FORM_INPUT)
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Claim already submitted for this date. Please open My Claims to view the existing claim.'
     )
   })
 

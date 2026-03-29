@@ -1,7 +1,41 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 export class ApprovalsPage {
   constructor(private page: Page) {}
+
+  private get claimDateFromInput() {
+    return this.page.locator('input[name="claimDateFrom"]')
+  }
+
+  private get claimDateToInput() {
+    return this.page.locator('input[name="claimDateTo"]')
+  }
+
+  private get applyFiltersButton() {
+    return this.page.getByRole('button', { name: /apply filters/i })
+  }
+
+  private parseClaimDateIsoFromClaimNumber(claimNumber: string): string | null {
+    const dateMatch = claimNumber.match(/-(\d{2})(\d{2})(\d{2})-\d+$/)
+    if (!dateMatch) {
+      return null
+    }
+
+    const [, dd, mm, yy] = dateMatch
+    return `20${yy}-${mm}-${dd}`
+  }
+
+  private async applyClaimDateFilterForClaimNumber(claimNumber: string) {
+    const claimDateIso = this.parseClaimDateIsoFromClaimNumber(claimNumber)
+    if (!claimDateIso) {
+      return
+    }
+
+    await this.claimDateFromInput.fill(claimDateIso)
+    await this.claimDateToInput.fill(claimDateIso)
+    await this.applyFiltersButton.click()
+    await this.page.waitForLoadState('networkidle')
+  }
 
   async goto() {
     await this.page.goto('/approvals')
@@ -10,10 +44,18 @@ export class ApprovalsPage {
 
   // ── Pending approvals ─────────────────────────────────────────────────
 
+  get pendingSection() {
+    return this.page
+      .locator('section:has(h2:has-text("Pending Approvals"))')
+      .first()
+  }
+
   get pendingRows() {
-    return this.page.locator(
-      '[data-testid="pending-row"], table:has(th:has-text("Actions")) tbody tr'
-    )
+    return this.pendingSection.locator('table tbody tr')
+  }
+
+  get pendingNextLink() {
+    return this.pendingSection.getByRole('link', { name: /^Next$/i }).first()
   }
 
   getPendingRowByClaimNumber(claimNumber: string) {
@@ -24,8 +66,70 @@ export class ApprovalsPage {
     return this.pendingRows.filter({ hasText: employeeName }).first()
   }
 
+  private async moveToNextPendingPage(
+    visitedNextHrefs: Set<string>
+  ): Promise<boolean> {
+    if ((await this.pendingNextLink.count()) === 0) {
+      return false
+    }
+
+    const nextHref = await this.pendingNextLink.getAttribute('href')
+    if (!nextHref || visitedNextHrefs.has(nextHref)) {
+      return false
+    }
+
+    const previousUrl = this.page.url()
+    visitedNextHrefs.add(nextHref)
+
+    await this.pendingNextLink.click()
+    await this.page.waitForLoadState('networkidle')
+
+    return this.page.url() !== previousUrl
+  }
+
+  async hasPendingRowByClaimNumber(claimNumber: string): Promise<boolean> {
+    const visitedNextHrefs = new Set<string>()
+    const maxPendingPageHops = 250
+
+    for (let hop = 0; hop <= maxPendingPageHops; hop += 1) {
+      if ((await this.getPendingRowByClaimNumber(claimNumber).count()) > 0) {
+        return true
+      }
+
+      const movedToNextPage = await this.moveToNextPendingPage(visitedNextHrefs)
+      if (!movedToNextPage) {
+        return false
+      }
+    }
+
+    return false
+  }
+
+  async waitForPendingRowByClaimNumber(
+    claimNumber: string,
+    timeoutMs = 90_000
+  ): Promise<Locator> {
+    const deadline = Date.now() + timeoutMs
+
+    while (Date.now() < deadline) {
+      await this.goto()
+      await this.applyClaimDateFilterForClaimNumber(claimNumber)
+
+      const hasPendingRow = await this.hasPendingRowByClaimNumber(claimNumber)
+      if (hasPendingRow) {
+        return this.getPendingRowByClaimNumber(claimNumber)
+      }
+
+      await this.page.waitForTimeout(250)
+    }
+
+    throw new Error(
+      `Pending approvals row not found for claim number ${claimNumber}.`
+    )
+  }
+
   async openPendingClaimByNumber(claimNumber: string) {
-    const claimRow = this.getPendingRowByClaimNumber(claimNumber)
+    const claimRow = await this.waitForPendingRowByClaimNumber(claimNumber)
     const claimLink = claimRow.locator('a[href*="/claims/"]').first()
     await claimLink.waitFor({ state: 'visible', timeout: 20_000 })
 

@@ -19,7 +19,10 @@ import {
   getPendingApprovalsPaginated,
 } from '@/features/approvals/queries'
 import { getFilteredApprovalHistoryPaginated } from '@/features/approvals/queries/history-filters'
-import { getClaimAvailableActions } from '@/features/claims/queries'
+import {
+  getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds,
+} from '@/features/claims/queries'
 import { normalizeApprovalHistoryFilters } from '@/features/approvals/utils/history-filters'
 import {
   getMaxNotesLength,
@@ -29,6 +32,28 @@ import {
 type ApprovalActionResult = {
   ok: boolean
   error: string | null
+}
+
+const REQUIRED_NOTES_ERROR_MESSAGE =
+  'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+
+function normalizeNotes(notes: string | undefined): string {
+  return notes?.trim() ?? ''
+}
+
+function getRequiredNotesError(
+  action: { require_notes: boolean } | undefined,
+  notes: string | undefined
+): string | null {
+  if (!action?.require_notes) {
+    return null
+  }
+
+  if (normalizeNotes(notes).length > 0) {
+    return null
+  }
+
+  return REQUIRED_NOTES_ERROR_MESSAGE
 }
 
 export async function submitApprovalAction(payload: {
@@ -80,15 +105,25 @@ export async function submitApprovalAction(payload: {
     supabase,
     claimWithOwner.claim.id
   )
-  const canRunAction = availableActions.some(
+  const selectedAction = availableActions.find(
     (action) => action.action === parsed.data.action
   )
+  const canRunAction = Boolean(selectedAction)
 
   if (!canRunAction) {
     return {
       ok: false,
       error: 'This workflow action is not available for the claim state.',
     }
+  }
+
+  const notesRequiredError = getRequiredNotesError(
+    selectedAction,
+    parsed.data.notes
+  )
+
+  if (notesRequiredError) {
+    return { ok: false, error: notesRequiredError }
   }
 
   const { error: approvalError } = await supabase.rpc(
@@ -256,11 +291,17 @@ export async function submitBulkApprovalAction(payload: {
     errors: [],
   }
 
+  const actionsByClaimId = await getClaimAvailableActionsByClaimIds(
+    supabase,
+    parsed.data.claimIds
+  )
+
   for (const claimId of parsed.data.claimIds) {
-    const availableActions = await getClaimAvailableActions(supabase, claimId)
-    const canRunAction = availableActions.some(
+    const availableActions = actionsByClaimId.get(claimId) ?? []
+    const selectedAction = availableActions.find(
       (action) => action.action === parsed.data.action
     )
+    const canRunAction = Boolean(selectedAction)
 
     if (!canRunAction) {
       result.ok = false
@@ -268,6 +309,21 @@ export async function submitBulkApprovalAction(payload: {
       result.errors.push({
         claimId,
         message: 'This workflow action is not available for the claim state.',
+      })
+      continue
+    }
+
+    const notesRequiredError = getRequiredNotesError(
+      selectedAction,
+      parsed.data.notes
+    )
+
+    if (notesRequiredError) {
+      result.ok = false
+      result.failed += 1
+      result.errors.push({
+        claimId,
+        message: notesRequiredError,
       })
       continue
     }
@@ -299,7 +355,22 @@ export async function submitBulkApprovalAction(payload: {
   }
 
   if (result.failed > 0 && result.errors.length > 0) {
-    result.error = `${result.failed} claim(s) failed to update.`
+    const uniqueMessages = [
+      ...new Set(
+        result.errors
+          .map((entry) => entry.message?.trim())
+          .filter((message): message is string => Boolean(message))
+      ),
+    ]
+
+    if (
+      uniqueMessages.length === 1 &&
+      uniqueMessages[0] === REQUIRED_NOTES_ERROR_MESSAGE
+    ) {
+      result.error = REQUIRED_NOTES_ERROR_MESSAGE
+    } else {
+      result.error = `${result.failed} claim(s) failed to update.`
+    }
   }
 
   return result

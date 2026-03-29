@@ -262,7 +262,11 @@ export async function getFinanceFilterOptions(
         .select('id, status_code, status_name, display_order')
         .eq('is_active', true)
         .order('display_order', { ascending: true }),
-      supabase.from('finance_actions').select('action'),
+      supabase
+        .from('finance_actions')
+        .select('action')
+        .order('acted_at', { ascending: false })
+        .limit(1000),
     ])
 
   if (statusResult.error) {

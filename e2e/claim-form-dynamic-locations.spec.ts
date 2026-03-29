@@ -35,11 +35,10 @@ async function isVisible(locator: Locator): Promise<boolean> {
 async function hasDateCollisionMessage(page: Page): Promise<boolean> {
   const duplicateDateError =
     (await page
-      .getByText(/already have a pending or approved claim for this date/i)
+      .getByText(
+        /already have a pending or approved claim for this date|already have .*claim for this date|claim already submitted for this date/i
+      )
       .count()) > 0
-
-  const duplicateDateErrorLegacy =
-    (await page.getByText(/already have .*claim for this date/i).count()) > 0
 
   const duplicateConstraintError =
     (await page
@@ -50,10 +49,7 @@ async function hasDateCollisionMessage(page: Page): Promise<boolean> {
     (await page.getByText(/permanently closed/i).count()) > 0
 
   return (
-    duplicateDateError ||
-    duplicateDateErrorLegacy ||
-    duplicateConstraintError ||
-    permanentlyClosedError
+    duplicateDateError || duplicateConstraintError || permanentlyClosedError
   )
 }
 

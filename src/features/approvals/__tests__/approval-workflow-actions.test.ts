@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getPendingApprovalsPaginated: vi.fn(),
   getFilteredApprovalHistoryPaginated: vi.fn(),
   getClaimAvailableActions: vi.fn(),
+  getClaimAvailableActionsByClaimIds: vi.fn(),
   normalizeApprovalHistoryFilters: vi.fn(),
   getMaxNotesLength: vi.fn(),
 }))
@@ -43,6 +44,7 @@ vi.mock('@/features/approvals/queries/history-filters', () => ({
 
 vi.mock('@/features/claims/queries', () => ({
   getClaimAvailableActions: mocks.getClaimAvailableActions,
+  getClaimAvailableActionsByClaimIds: mocks.getClaimAvailableActionsByClaimIds,
 }))
 
 vi.mock('@/features/approvals/utils/history-filters', () => ({
@@ -126,7 +128,7 @@ describe('approval actions workflow integration', () => {
       limit: 10,
     })
 
-    mocks.getClaimAvailableActions.mockResolvedValue([
+    const defaultActions = [
       {
         action: 'approved',
         display_label: 'Approve',
@@ -141,7 +143,14 @@ describe('approval actions workflow integration', () => {
         supports_allow_resubmit: true,
         actor_scope: 'approver',
       },
-    ])
+    ]
+
+    mocks.getClaimAvailableActions.mockResolvedValue(defaultActions)
+    mocks.getClaimAvailableActionsByClaimIds.mockImplementation(
+      async (_supabase, claimIds: string[]) => {
+        return new Map(claimIds.map((claimId) => [claimId, defaultActions]))
+      }
+    )
 
     mocks.getMaxNotesLength.mockResolvedValue(500)
   })
@@ -209,6 +218,21 @@ describe('approval actions workflow integration', () => {
       p_notes: 'Travel proof is missing.',
       p_allow_resubmit: true,
     })
+  })
+
+  it('should require notes for rejection action', async () => {
+    // Act
+    const result = await submitApprovalAction({
+      claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      action: 'rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should block wrong approval level (EDGE-012)', async () => {
@@ -425,6 +449,38 @@ describe('approval actions workflow integration', () => {
       claimId: '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
       message: 'Claim already finalized.',
     })
+  })
+
+  it('should require notes for bulk rejection actions', async () => {
+    // Act
+    const result = await submitBulkApprovalAction({
+      claimIds: [
+        '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+        '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
+      ],
+      action: 'rejected',
+    })
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.succeeded).toBe(0)
+    expect(result.failed).toBe(2)
+    expect(result.error).toBe(
+      'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
+    )
+    expect(result.errors).toEqual([
+      {
+        claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+        message:
+          'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.',
+      },
+      {
+        claimId: '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
+        message:
+          'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.',
+      },
+    ])
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('should block bulk actions for unauthorized users', async () => {

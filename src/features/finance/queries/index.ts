@@ -208,6 +208,52 @@ export async function getFinanceQueuePaginated(
   }
 }
 
+export async function getFinanceQueueTotalCount(
+  supabase: SupabaseClient,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+): Promise<number> {
+  const { data: financeStatusRow } = await supabase
+    .from('claim_statuses')
+    .select('id')
+    .eq('approval_level', 3)
+    .eq('is_rejection', false)
+    .eq('is_terminal', false)
+    .eq('is_approval', false)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!financeStatusRow) {
+    return 0
+  }
+
+  const filteredClaimIds = await getFilteredClaimIdsForFinance(
+    supabase,
+    filters,
+    { requiredStatusId: financeStatusRow.id }
+  )
+
+  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
+    return 0
+  }
+
+  let query = supabase
+    .from('expense_claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('status_id', financeStatusRow.id)
+
+  if (Array.isArray(filteredClaimIds)) {
+    query = query.in('id', filteredClaimIds)
+  }
+
+  const { count, error } = await query
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return count ?? 0
+}
+
 export async function getFinanceHistoryPaginated(
   supabase: SupabaseClient,
   cursor: string | null,
@@ -387,6 +433,63 @@ export async function getFinanceHistoryPaginated(
     nextCursor,
     limit,
   }
+}
+
+export async function getFinanceHistoryTotalCount(
+  supabase: SupabaseClient,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+): Promise<number> {
+  const filteredClaimIds = await getFilteredClaimIdsForFinance(
+    supabase,
+    filters
+  )
+
+  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
+    return 0
+  }
+
+  const filterByApprovedDate =
+    filters.dateFilterField === 'finance_approved_date' &&
+    (filters.dateFrom || filters.dateTo)
+
+  let query = supabase
+    .from('finance_actions')
+    .select('id', { count: 'exact', head: true })
+
+  if (filterByApprovedDate) {
+    const paymentIssuedActions = await getPaymentIssuedHistoryActions(supabase)
+
+    if (paymentIssuedActions.length === 0) {
+      return 0
+    }
+
+    query = query.in('action', paymentIssuedActions)
+
+    const dateFrom = toIstDayStart(filters.dateFrom)
+    const dateTo = toIstDayEnd(filters.dateTo)
+
+    if (dateFrom) {
+      query = query.gte('acted_at', dateFrom)
+    }
+
+    if (dateTo) {
+      query = query.lte('acted_at', dateTo)
+    }
+  } else if (filters.actionFilter) {
+    query = query.eq('action', filters.actionFilter)
+  }
+
+  if (Array.isArray(filteredClaimIds)) {
+    query = query.in('claim_id', filteredClaimIds)
+  }
+
+  const { count, error } = await query
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return count ?? 0
 }
 
 export async function getAllFilteredFinanceHistory(

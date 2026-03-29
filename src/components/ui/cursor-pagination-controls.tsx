@@ -5,6 +5,8 @@ type CursorPaginationControlsProps = {
   backHref: string | null
   nextHref: string | null
   pageNumber: number
+  totalPages?: number
+  totalItems?: number
   className?: string
 }
 
@@ -16,6 +18,8 @@ export function CursorPaginationControls({
   backHref,
   nextHref,
   pageNumber,
+  totalPages,
+  totalItems,
   className,
 }: CursorPaginationControlsProps) {
   const btnBase =
@@ -24,6 +28,9 @@ export function CursorPaginationControls({
     'border-border bg-surface text-foreground shadow-xs hover:bg-muted hover:shadow-sm'
   const btnDisabled =
     'border-border/60 bg-muted text-muted-foreground cursor-not-allowed'
+
+  const hasTotalPages = typeof totalPages === 'number' && totalPages > 0
+  const hasTotalItems = typeof totalItems === 'number' && totalItems >= 0
 
   return (
     <nav
@@ -45,9 +52,22 @@ export function CursorPaginationControls({
         </span>
       )}
 
-      <p className="text-sm font-medium text-muted-foreground">
-        Page <span className="text-foreground">{pageNumber}</span>
-      </p>
+      <div className="text-center">
+        <p className="text-sm font-medium text-muted-foreground">
+          Page <span className="text-foreground">{pageNumber}</span>
+          {hasTotalPages ? (
+            <>
+              {' '}
+              of <span className="text-foreground">{totalPages}</span>
+            </>
+          ) : null}
+        </p>
+        {hasTotalItems ? (
+          <p className="text-xs text-muted-foreground">
+            {totalItems} total record{totalItems === 1 ? '' : 's'}
+          </p>
+        ) : null}
+      </div>
 
       {nextHref ? (
         <Link href={nextHref} className={`${btnBase} ${btnActive}`}>

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense, use } from 'react'
 import {
   ArrowRight,
   Banknote,
@@ -41,8 +42,8 @@ type EmployeeDashboardInfo = {
 type DashboardContentProps = {
   access: DashboardAccess
   employee: EmployeeDashboardInfo
-  stats: DashboardClaimStats
-  recentClaims: DashboardRecentClaim[]
+  statsPromise: Promise<DashboardClaimStats>
+  recentClaimsPromise: Promise<DashboardRecentClaim[]>
 }
 
 type QuickAccessCardProps = {
@@ -86,14 +87,139 @@ function getGreeting(hour: number): string {
   return 'Good evening'
 }
 
+function DashboardClaimsSkeleton() {
+  return (
+    <div className="space-y-4 animate-slide-up stagger-4">
+      <div className="h-28 rounded-2xl border border-border bg-muted/40" />
+      <div className="h-44 rounded-lg border border-border bg-muted/40" />
+    </div>
+  )
+}
+
+function DashboardClaimSummarySections({
+  access,
+  statsPromise,
+  recentClaimsPromise,
+}: {
+  access: DashboardAccess
+  statsPromise: Promise<DashboardClaimStats>
+  recentClaimsPromise: Promise<DashboardRecentClaim[]>
+}) {
+  const stats = use(statsPromise)
+  const recentClaims = use(recentClaimsPromise)
+
+  if (!access.canViewClaims) {
+    return null
+  }
+
+  return (
+    <>
+      {stats.total.count > 0 ? (
+        <ClaimAnalyticsCards
+          columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5"
+          className="animate-slide-up stagger-4"
+          cards={[
+            {
+              label: 'Total Claims',
+              count: stats.total.count,
+              amount: stats.total.amount,
+              tone: 'neutral',
+            },
+            {
+              label: 'Pending',
+              count: stats.pending.count,
+              amount: stats.pending.amount,
+              tone: 'pending',
+            },
+            {
+              label: 'Payment Issued',
+              count: stats.approved.count,
+              amount: stats.approved.amount,
+              tone: 'approved',
+            },
+            {
+              label: 'Rejected',
+              count: stats.rejected.count,
+              amount: stats.rejected.amount,
+              tone: 'rejected',
+            },
+            {
+              label: 'Rejected - Allow Reclaim',
+              count: stats.rejectedAllowReclaim.count,
+              amount: stats.rejectedAllowReclaim.amount,
+              tone: 'finance',
+            },
+          ]}
+        />
+      ) : null}
+
+      {recentClaims.length > 0 ? (
+        <section className="rounded-lg border border-border bg-surface animate-slide-up stagger-5">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold">Recent Claims</h2>
+          </div>
+          <div className={DATA_TABLE_SCROLL_WRAPPER_CLASS}>
+            <table className={DATA_TABLE_CLASS}>
+              <thead>
+                <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
+                  <th className={getDataTableHeadCellClass({ nowrap: true })}>
+                    Claim #
+                  </th>
+                  <th className={getDataTableHeadCellClass()}>Date</th>
+                  <th className={getDataTableHeadCellClass({ align: 'right' })}>
+                    Amount
+                  </th>
+                  <th className={getDataTableHeadCellClass()}>Status</th>
+                </tr>
+              </thead>
+              <tbody className={DATA_TABLE_BODY_CLASS}>
+                {recentClaims.map((claim) => (
+                  <tr key={claim.id} className={DATA_TABLE_ROW_CLASS}>
+                    <td
+                      className={getDataTableCellClass({
+                        nowrap: true,
+                        weight: 'medium',
+                      })}
+                    >
+                      {claim.claim_number ?? '—'}
+                    </td>
+                    <td className={getDataTableCellClass({ muted: true })}>
+                      {formatDate(claim.claim_date)}
+                    </td>
+                    <td
+                      className={getDataTableCellClass({
+                        align: 'right',
+                        mono: true,
+                        weight: 'medium',
+                      })}
+                    >
+                      ₹{claim.total_amount.toLocaleString('en-IN')}
+                    </td>
+                    <td className={getDataTableCellClass()}>
+                      <ClaimStatusBadge
+                        statusName={claim.statusName}
+                        statusDisplayColor={claim.displayColor}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+    </>
+  )
+}
+
 export function DashboardContent({
   access,
   employee,
-  stats,
-  recentClaims,
+  statsPromise,
+  recentClaimsPromise,
 }: DashboardContentProps) {
   const greeting = getGreeting(new Date().getHours())
-  const firstName = employee.employeeName.split(' ')[0]
+  const fullName = employee.employeeName.trim()
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
@@ -101,7 +227,7 @@ export function DashboardContent({
         <div className="flex flex-wrap items-end justify-between gap-4 animate-slide-up stagger-1">
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
-              {greeting}, {firstName}
+              {greeting}, {fullName}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Submit your daily field expenses and track their approval status
@@ -202,95 +328,13 @@ export function DashboardContent({
           ) : null}
         </section>
 
-        {access.canViewClaims && stats.total.count > 0 ? (
-          <ClaimAnalyticsCards
-            className="animate-slide-up stagger-4"
-            cards={[
-              {
-                label: 'Total Claims',
-                count: stats.total.count,
-                amount: stats.total.amount,
-                tone: 'neutral',
-              },
-              {
-                label: 'Pending',
-                count: stats.pending.count,
-                amount: stats.pending.amount,
-                tone: 'pending',
-              },
-              {
-                label: 'Payment Issued',
-                count: stats.approved.count,
-                amount: stats.approved.amount,
-                tone: 'approved',
-              },
-              {
-                label: 'Rejected',
-                count: stats.rejected.count,
-                amount: stats.rejected.amount,
-                tone: 'rejected',
-              },
-            ]}
+        <Suspense fallback={<DashboardClaimsSkeleton />}>
+          <DashboardClaimSummarySections
+            access={access}
+            statsPromise={statsPromise}
+            recentClaimsPromise={recentClaimsPromise}
           />
-        ) : null}
-
-        {access.canViewClaims && recentClaims.length > 0 ? (
-          <section className="rounded-lg border border-border bg-surface animate-slide-up stagger-5">
-            <div className="border-b border-border px-6 py-4">
-              <h2 className="text-lg font-semibold">Recent Claims</h2>
-            </div>
-            <div className={DATA_TABLE_SCROLL_WRAPPER_CLASS}>
-              <table className={DATA_TABLE_CLASS}>
-                <thead>
-                  <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
-                    <th className={getDataTableHeadCellClass({ nowrap: true })}>
-                      Claim #
-                    </th>
-                    <th className={getDataTableHeadCellClass()}>Date</th>
-                    <th
-                      className={getDataTableHeadCellClass({ align: 'right' })}
-                    >
-                      Amount
-                    </th>
-                    <th className={getDataTableHeadCellClass()}>Status</th>
-                  </tr>
-                </thead>
-                <tbody className={DATA_TABLE_BODY_CLASS}>
-                  {recentClaims.map((claim) => (
-                    <tr key={claim.id} className={DATA_TABLE_ROW_CLASS}>
-                      <td
-                        className={getDataTableCellClass({
-                          nowrap: true,
-                          weight: 'medium',
-                        })}
-                      >
-                        {claim.claim_number ?? '—'}
-                      </td>
-                      <td className={getDataTableCellClass({ muted: true })}>
-                        {formatDate(claim.claim_date)}
-                      </td>
-                      <td
-                        className={getDataTableCellClass({
-                          align: 'right',
-                          mono: true,
-                          weight: 'medium',
-                        })}
-                      >
-                        ₹{claim.total_amount.toLocaleString('en-IN')}
-                      </td>
-                      <td className={getDataTableCellClass()}>
-                        <ClaimStatusBadge
-                          statusName={claim.statusName}
-                          statusDisplayColor={claim.displayColor}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
+        </Suspense>
       </div>
     </main>
   )

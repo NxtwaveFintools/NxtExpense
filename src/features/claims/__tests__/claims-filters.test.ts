@@ -12,18 +12,18 @@ const VALID_STATUS_ID = 'a02dc74a-bacc-43e2-ae71-82495147aeb6'
 describe('normalizeMyClaimsFilters', () => {
   // ─── Happy Path ────────────────────────────────────────────────────────────
 
-  it('normalizes ISO claimDate input from native date picker', () => {
+  it('normalizes ISO claimDateFrom input from native date picker', () => {
     const result = normalizeMyClaimsFilters({
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
     })
-    expect(result.claimDate).toBe('2026-03-01')
+    expect(result.claimDateFrom).toBe('2026-03-01')
   })
 
-  it('normalizes DD/MM/YYYY claimDate input to ISO', () => {
+  it('normalizes DD/MM/YYYY claimDateTo input to ISO', () => {
     const result = normalizeMyClaimsFilters({
-      claimDate: '01/03/2026',
+      claimDateTo: '01/03/2026',
     })
-    expect(result.claimDate).toBe('2026-03-01')
+    expect(result.claimDateTo).toBe('2026-03-01')
   })
 
   it('normalizes claimStatus to trimmed string', () => {
@@ -44,11 +44,13 @@ describe('normalizeMyClaimsFilters', () => {
     const result = normalizeMyClaimsFilters({
       claimStatus: VALID_STATUS_ID,
       workLocation: 'Field - Outstation',
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-05',
     })
     expect(result.claimStatus).toBe(VALID_STATUS_ID)
     expect(result.workLocation).toBe('Field - Outstation')
-    expect(result.claimDate).toBe('2026-03-01')
+    expect(result.claimDateFrom).toBe('2026-03-01')
+    expect(result.claimDateTo).toBe('2026-03-05')
   })
 
   // ─── Empty / Null States ───────────────────────────────────────────────────
@@ -58,9 +60,13 @@ describe('normalizeMyClaimsFilters', () => {
     expect(result.claimStatus).toBeNull()
   })
 
-  it('returns null for empty claimDate string', () => {
-    const result = normalizeMyClaimsFilters({ claimDate: '' })
-    expect(result.claimDate).toBeNull()
+  it('returns null for empty claimDateFrom/claimDateTo strings', () => {
+    const result = normalizeMyClaimsFilters({
+      claimDateFrom: '',
+      claimDateTo: '',
+    })
+    expect(result.claimDateFrom).toBeNull()
+    expect(result.claimDateTo).toBeNull()
   })
 
   it('returns null for null workLocation (absent filter)', () => {
@@ -84,15 +90,17 @@ describe('normalizeMyClaimsFilters', () => {
 
   it('preserves claimStatus when workLocation is empty string (CLAIMS-001 regression)', () => {
     // This is the exact scenario from the CLAIMS-001 bug report:
-    // form submits claimStatus=REJECTED&workLocation=&claimDate=
+    // form submits claimStatus=REJECTED&workLocation=&claimDateFrom=&claimDateTo=
     const result = normalizeMyClaimsFilters({
       claimStatus: VALID_STATUS_ID,
       workLocation: '',
-      claimDate: '',
+      claimDateFrom: '',
+      claimDateTo: '',
     })
     expect(result.claimStatus).toBe(VALID_STATUS_ID)
     expect(result.workLocation).toBeNull()
-    expect(result.claimDate).toBeNull()
+    expect(result.claimDateFrom).toBeNull()
+    expect(result.claimDateTo).toBeNull()
   })
 
   it('treats empty workLocation as no filter (null) when all fields are empty strings', () => {
@@ -100,11 +108,13 @@ describe('normalizeMyClaimsFilters', () => {
     const result = normalizeMyClaimsFilters({
       claimStatus: '',
       workLocation: '',
-      claimDate: '',
+      claimDateFrom: '',
+      claimDateTo: '',
     })
     expect(result.claimStatus).toBeNull()
     expect(result.workLocation).toBeNull()
-    expect(result.claimDate).toBeNull()
+    expect(result.claimDateFrom).toBeNull()
+    expect(result.claimDateTo).toBeNull()
   })
 
   it('does NOT throw for all empty form fields (full form submit, nothing selected)', () => {
@@ -112,17 +122,27 @@ describe('normalizeMyClaimsFilters', () => {
       normalizeMyClaimsFilters({
         claimStatus: '',
         workLocation: '',
-        claimDate: '',
+        claimDateFrom: '',
+        claimDateTo: '',
       })
     ).not.toThrow()
   })
 
   // ─── Validation Errors (expected throws) ──────────────────────────────────
 
-  it('throws on invalid date format (not ISO or DD/MM/YYYY)', () => {
+  it('throws on invalid claimDateFrom format (not ISO or DD/MM/YYYY)', () => {
     expect(() =>
-      normalizeMyClaimsFilters({ claimDate: '03-07-2026' })
-    ).toThrowError('Claim date must be in DD/MM/YYYY format.')
+      normalizeMyClaimsFilters({ claimDateFrom: '03-07-2026' })
+    ).toThrowError('Claim date from must be in DD/MM/YYYY format.')
+  })
+
+  it('throws when claimDateFrom is later than claimDateTo', () => {
+    expect(() =>
+      normalizeMyClaimsFilters({
+        claimDateFrom: '2026-03-08',
+        claimDateTo: '2026-03-07',
+      })
+    ).toThrowError('From Date cannot be later than To Date')
   })
 
   it('accepts any non-empty workLocation string (values come from DB)', () => {
@@ -135,7 +155,8 @@ describe('addMyClaimsFiltersToParams', () => {
   const emptyFilters = {
     claimStatus: null,
     workLocation: null,
-    claimDate: null,
+    claimDateFrom: null,
+    claimDateTo: null,
   }
 
   it('produces empty params when all filters are null/false', () => {
@@ -162,23 +183,33 @@ describe('addMyClaimsFiltersToParams', () => {
     expect(params.get('workLocation')).toBe('Field - Base Location')
   })
 
-  it('adds claimDate param when set', () => {
+  it('adds claimDateFrom param when set', () => {
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
       ...emptyFilters,
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
     })
-    expect(params.get('claimDate')).toBe('2026-03-01')
+    expect(params.get('claimDateFrom')).toBe('2026-03-01')
+  })
+
+  it('adds claimDateTo param when set', () => {
+    const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
+      ...emptyFilters,
+      claimDateTo: '2026-03-31',
+    })
+    expect(params.get('claimDateTo')).toBe('2026-03-31')
   })
 
   it('adds multiple active filters simultaneously', () => {
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
       claimStatus: VALID_STATUS_ID,
       workLocation: 'Office / WFH',
-      claimDate: '2026-03-01',
+      claimDateFrom: '2026-03-01',
+      claimDateTo: '2026-03-05',
     })
     expect(params.get('claimStatus')).toBe(VALID_STATUS_ID)
     expect(params.get('workLocation')).toBe('Office / WFH')
-    expect(params.get('claimDate')).toBe('2026-03-01')
+    expect(params.get('claimDateFrom')).toBe('2026-03-01')
+    expect(params.get('claimDateTo')).toBe('2026-03-05')
   })
 
   it('round-trip: normalize then add to params preserves filters', () => {
@@ -186,7 +217,8 @@ describe('addMyClaimsFiltersToParams', () => {
     const normalized = normalizeMyClaimsFilters({
       claimStatus: VALID_STATUS_ID,
       workLocation: '', // empty from form
-      claimDate: '',
+      claimDateFrom: '',
+      claimDateTo: '',
     })
     const params = addMyClaimsFiltersToParams(new URLSearchParams(), normalized)
     // claimStatus UUID should be in params, workLocation should NOT

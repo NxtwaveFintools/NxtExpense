@@ -1,4 +1,4 @@
-import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
+import { getClaimStatusDisplay } from '@/lib/utils/claim-status'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export type ClaimMetricSummary = {
@@ -11,6 +11,7 @@ export type DashboardClaimStats = {
   pending: ClaimMetricSummary
   approved: ClaimMetricSummary
   rejected: ClaimMetricSummary
+  rejectedAllowReclaim: ClaimMetricSummary
 }
 
 export type DashboardRecentClaim = {
@@ -37,6 +38,7 @@ type EmployeeClaimSummaryRow = {
   created_at: string
   status_id: string
   total_amount: number | string
+  allow_resubmit: boolean
 }
 
 function createMetricSummary(): ClaimMetricSummary {
@@ -78,6 +80,7 @@ export async function getEmployeeClaimStats(
     pending: createMetricSummary(),
     approved: createMetricSummary(),
     rejected: createMetricSummary(),
+    rejectedAllowReclaim: createMetricSummary(),
   }
 
   const pageSize = 500
@@ -86,7 +89,7 @@ export async function getEmployeeClaimStats(
   for (;;) {
     let query = supabase
       .from('expense_claims')
-      .select('id, created_at, status_id, total_amount')
+      .select('id, created_at, status_id, total_amount, allow_resubmit')
       .eq('employee_id', employeeId)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -114,7 +117,11 @@ export async function getEmployeeClaimStats(
       addToMetric(stats.total, amount)
 
       if (rejectedStatusIds.has(row.status_id)) {
-        addToMetric(stats.rejected, amount)
+        if (row.allow_resubmit) {
+          addToMetric(stats.rejectedAllowReclaim, amount)
+        } else {
+          addToMetric(stats.rejected, amount)
+        }
         continue
       }
 
@@ -147,7 +154,7 @@ export async function getRecentClaims(
   const { data } = await supabase
     .from('expense_claims')
     .select(
-      'id, claim_number, claim_date, total_amount, claim_statuses!status_id(status_code, status_name, display_color)'
+      'id, claim_number, claim_date, total_amount, allow_resubmit, claim_statuses!status_id(status_code, status_name, display_color, allow_resubmit_status_name, allow_resubmit_display_color)'
     )
     .eq('employee_id', employeeId)
     .order('created_at', { ascending: false })
@@ -158,17 +165,22 @@ export async function getRecentClaims(
     const statusInfo = Array.isArray(row.claim_statuses)
       ? row.claim_statuses[0]
       : row.claim_statuses
+    const display = getClaimStatusDisplay({
+      statusCode: statusInfo?.status_code,
+      statusName: statusInfo?.status_name,
+      statusDisplayColor: statusInfo?.display_color,
+      allowResubmit: Boolean(row.allow_resubmit),
+      allowResubmitStatusName: statusInfo?.allow_resubmit_status_name,
+      allowResubmitDisplayColor: statusInfo?.allow_resubmit_display_color,
+    })
 
     return {
       id: row.id,
       claim_number: row.claim_number,
       claim_date: row.claim_date,
       total_amount: Number(row.total_amount ?? 0),
-      statusName: getClaimStatusDisplayLabel(
-        statusInfo?.status_code,
-        statusInfo?.status_name
-      ),
-      displayColor: statusInfo?.display_color ?? 'gray',
+      statusName: display.label,
+      displayColor: display.colorToken,
     }
   })
 }
