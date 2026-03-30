@@ -74,6 +74,7 @@ AS $function$
       ah.approver_employee_id,
       ah.action,
       ah.approval_level,
+      ah.allow_resubmit,
       ah.notes,
       ah.acted_at
     from public.approval_history ah
@@ -163,7 +164,7 @@ AS $function$
     )
     and (
       p_claim_allow_resubmit is null
-      or c.allow_resubmit = p_claim_allow_resubmit
+      or la.allow_resubmit = p_claim_allow_resubmit
     )
     and (
       p_claim_status is null
