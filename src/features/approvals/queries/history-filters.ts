@@ -7,6 +7,7 @@ import type {
 } from '@/features/approvals/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 import { getClaimStatusDisplay } from '@/lib/utils/claim-status'
+import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 type FilteredApprovalHistoryRpcRow = {
   action_id: string
@@ -143,6 +144,7 @@ export async function getFilteredApprovalHistoryPaginated(
 ): Promise<PaginatedApprovalHistoryRecords> {
   const normalizedLimit = Math.max(1, Math.min(limit, 100))
   const decodedCursor = cursor ? decodeCursor(cursor) : null
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
 
   const baseArgs = {
     p_limit: normalizedLimit,
@@ -150,7 +152,8 @@ export async function getFilteredApprovalHistoryPaginated(
     p_cursor_action_id: decodedCursor?.id ?? null,
     p_name_search: filters.employeeName,
     p_actor_filters: null,
-    p_claim_status_id: filters.claimStatus?.trim() ?? null,
+    p_claim_status_id: parsedStatusFilter?.statusId ?? null,
+    p_claim_allow_resubmit: parsedStatusFilter?.allowResubmitOnly ? true : null,
     p_amount_operator: filters.amountOperator,
     p_amount_value: filters.amountValue,
     p_location_type: filters.locationType,
@@ -255,13 +258,18 @@ export async function getFilteredApprovalHistoryCount(
   supabase: SupabaseClient,
   filters: ApprovalHistoryFilters
 ): Promise<number> {
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+
   const { data, error } = await supabase.rpc(
     'get_filtered_approval_history_count',
     {
       p_name_search: filters.employeeName,
       p_actor_filters: null,
       p_claim_status: null,
-      p_claim_status_id: filters.claimStatus?.trim() ?? null,
+      p_claim_status_id: parsedStatusFilter?.statusId ?? null,
+      p_claim_allow_resubmit: parsedStatusFilter?.allowResubmitOnly
+        ? true
+        : null,
       p_amount_operator: filters.amountOperator,
       p_amount_value: filters.amountValue,
       p_location_type: filters.locationType,

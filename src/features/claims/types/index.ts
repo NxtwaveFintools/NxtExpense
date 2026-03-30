@@ -113,6 +113,8 @@ export type ClaimFormInitialValues = {
 
 export type ClaimStatusCatalogItem = {
   status_id: ClaimStatusId
+  status_filter_value: string
+  allow_resubmit_only: boolean
   display_label: string
   is_terminal: boolean
   sort_order: number

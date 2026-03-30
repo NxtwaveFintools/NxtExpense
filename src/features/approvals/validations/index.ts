@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { parseDateDDMMYYYY, toISODate } from '@/lib/utils/date'
+import { isValidClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
@@ -42,7 +43,11 @@ export const approvalHistoryFiltersSchema = z
     employeeName: z.string().trim().max(100).optional(),
     claimStatus: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().trim().uuid().optional()
+      z
+        .string()
+        .trim()
+        .refine(isValidClaimStatusFilterValue, 'Invalid claim status filter.')
+        .optional()
     ),
     claimDateFrom: optionalDateField('Claim date from'),
     claimDateTo: optionalDateField('Claim date to'),

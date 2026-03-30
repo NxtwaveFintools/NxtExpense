@@ -5,8 +5,13 @@ import {
   buildApprovalHistoryCsv,
   normalizeApprovalHistoryFilters,
 } from '@/features/approvals/utils/history-filters'
+import { buildClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 const VALID_STATUS_ID = '3ae9b558-c006-427d-8ce6-13057d438d17'
+const VALID_ALLOW_RESUBMIT_STATUS_FILTER = buildClaimStatusFilterValue(
+  VALID_STATUS_ID,
+  true
+)
 
 describe('approval history filter utilities', () => {
   it('normalizes DD/MM/YYYY input into ISO dates', () => {
@@ -50,6 +55,14 @@ describe('approval history filter utilities', () => {
     expect(normalized.claimDateTo).toBe('2026-03-08')
   })
 
+  it('normalizes allow-resubmit status filter values', () => {
+    const normalized = normalizeApprovalHistoryFilters({
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+    })
+
+    expect(normalized.claimStatus).toBe(VALID_ALLOW_RESUBMIT_STATUS_FILTER)
+  })
+
   it('throws on invalid date format', () => {
     expect(() =>
       normalizeApprovalHistoryFilters({
@@ -86,6 +99,25 @@ describe('approval history filter utilities', () => {
     expect(params.get('hodApprovedTo')).toBe('2026-03-07')
     expect(params.get('financeApprovedFrom')).toBe('2026-03-02')
     expect(params.get('financeApprovedTo')).toBe('2026-03-08')
+  })
+
+  it('preserves allow-resubmit status filter value in URL params', () => {
+    const params = addApprovalFiltersToParams(new URLSearchParams(), {
+      employeeName: null,
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+      claimDateFrom: null,
+      claimDateTo: null,
+      amountOperator: 'lte',
+      amountValue: null,
+      locationType: null,
+      claimDateSort: 'desc',
+      hodApprovedFrom: null,
+      hodApprovedTo: null,
+      financeApprovedFrom: null,
+      financeApprovedTo: null,
+    })
+
+    expect(params.get('claimStatus')).toBe(VALID_ALLOW_RESUBMIT_STATUS_FILTER)
   })
 
   it('omits query params when filters are at default values', () => {

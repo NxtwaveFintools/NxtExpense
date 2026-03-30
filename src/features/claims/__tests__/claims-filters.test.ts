@@ -6,8 +6,13 @@ import {
   normalizeMyClaimsFilters,
 } from '@/features/claims/utils/filters'
 import type { Claim } from '@/features/claims/types'
+import { buildClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 const VALID_STATUS_ID = 'a02dc74a-bacc-43e2-ae71-82495147aeb6'
+const VALID_ALLOW_RESUBMIT_STATUS_FILTER = buildClaimStatusFilterValue(
+  VALID_STATUS_ID,
+  true
+)
 
 describe('normalizeMyClaimsFilters', () => {
   // ─── Happy Path ────────────────────────────────────────────────────────────
@@ -31,6 +36,14 @@ describe('normalizeMyClaimsFilters', () => {
       claimStatus: `  ${VALID_STATUS_ID}  `,
     })
     expect(result.claimStatus).toBe(VALID_STATUS_ID)
+  })
+
+  it('accepts allow-resubmit status filter values', () => {
+    const result = normalizeMyClaimsFilters({
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+    })
+
+    expect(result.claimStatus).toBe(VALID_ALLOW_RESUBMIT_STATUS_FILTER)
   })
 
   it('applies valid workLocation filter', () => {
@@ -173,6 +186,15 @@ describe('addMyClaimsFiltersToParams', () => {
       claimStatus: VALID_STATUS_ID,
     })
     expect(params.get('claimStatus')).toBe(VALID_STATUS_ID)
+  })
+
+  it('adds allow-resubmit claimStatus param when set', () => {
+    const params = addMyClaimsFiltersToParams(new URLSearchParams(), {
+      ...emptyFilters,
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+    })
+
+    expect(params.get('claimStatus')).toBe(VALID_ALLOW_RESUBMIT_STATUS_FILTER)
   })
 
   it('adds workLocation param when set', () => {

@@ -4,8 +4,13 @@ import {
   normalizeApprovalHistoryFilters,
   buildApprovalHistoryCsv,
 } from '@/features/approvals/utils/history-filters'
+import { buildClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 const VALID_STATUS_ID = '7a0068ba-39c3-4229-b6f5-88559ace4e77'
+const VALID_ALLOW_RESUBMIT_STATUS_FILTER = buildClaimStatusFilterValue(
+  VALID_STATUS_ID,
+  true
+)
 
 describe('normalizeApprovalHistoryFilters', () => {
   it('normalizes empty input to defaults', () => {
@@ -135,6 +140,14 @@ describe('normalizeApprovalHistoryFilters', () => {
     expect(result.hodApprovedTo).toBe('2026-03-06')
     expect(result.financeApprovedFrom).toBe('2026-03-03')
     expect(result.financeApprovedTo).toBe('2026-03-05')
+  })
+
+  it('accepts allow-resubmit status filter values', () => {
+    const result = normalizeApprovalHistoryFilters({
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+    })
+
+    expect(result.claimStatus).toBe(VALID_ALLOW_RESUBMIT_STATUS_FILTER)
   })
 })
 
