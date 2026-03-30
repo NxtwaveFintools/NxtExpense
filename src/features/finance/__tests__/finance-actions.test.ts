@@ -9,9 +9,14 @@ import {
   normalizeFinanceFilters,
   hasFinanceClaimFilters,
 } from '@/features/finance/utils/filters'
+import { buildClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 const VALID_UUID = '5db22d75-b209-4f30-b5c8-f4f27ebee9e8'
 const VALID_UUID_2 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+const VALID_ALLOW_RESUBMIT_STATUS_FILTER = buildClaimStatusFilterValue(
+  VALID_UUID,
+  true
+)
 
 // ── Finance Action Schema ───────────────────────────────────────────────────
 
@@ -234,6 +239,14 @@ describe('financeFiltersSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('accepts reclaim-eligible rejected status filter token', () => {
+    const parsed = financeFiltersSchema.safeParse({
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
   it('treats empty workLocation as empty string (normalization happens later)', () => {
     const parsed = financeFiltersSchema.safeParse({ workLocation: '' })
     expect(parsed.success).toBe(true)
@@ -274,6 +287,14 @@ describe('normalizeFinanceFilters', () => {
       dateFrom: '01/03/2026',
     })
     expect(result.dateFrom).toBe('2026-03-01')
+  })
+
+  it('preserves reclaim-eligible rejected status filter token', () => {
+    const result = normalizeFinanceFilters({
+      claimStatus: VALID_ALLOW_RESUBMIT_STATUS_FILTER,
+    })
+
+    expect(result.claimStatus).toBe(VALID_ALLOW_RESUBMIT_STATUS_FILTER)
   })
 
   it('preserves ISO dates', () => {

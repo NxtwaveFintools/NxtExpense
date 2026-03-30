@@ -54,7 +54,6 @@ async function submitOfficeClaimAndGetClaimNumber(
   )
 
   let permanentlyClosedStreak = 0
-  let submittedClaimDateIso: string | null = null
 
   for (const daysBack of candidateDaysBack) {
     const claimDateIso = toIsoDateDaysBack(daysBack)
@@ -86,7 +85,6 @@ async function submitOfficeClaimAndGetClaimNumber(
         : null)
 
     if (submittedClaimNumber) {
-      submittedClaimDateIso = claimDateIso
       expect(submittedClaimNumber).toMatch(/^CLAIM-/i)
       return submittedClaimNumber
     }

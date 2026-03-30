@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { parseDateDDMMYYYY, toISODate } from '@/lib/utils/date'
+import { isValidClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 const FINANCE_DATE_FILTER_FIELD_VALUES = [
   'claim_date',
@@ -8,6 +9,11 @@ const FINANCE_DATE_FILTER_FIELD_VALUES = [
 ] as const
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
+const financeClaimStatusFilterSchema = z
+  .string()
+  .trim()
+  .refine(isValidClaimStatusFilterValue, 'Invalid claim status filter.')
 
 function optionalDateField(label: string) {
   return z
@@ -62,7 +68,7 @@ export const financeFiltersSchema = z
     ),
     claimStatus: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().trim().uuid().optional()
+      financeClaimStatusFilterSchema.optional()
     ),
     workLocation: z.string().trim().max(100).optional(),
     actionFilter: z.preprocess(

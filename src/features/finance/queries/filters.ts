@@ -14,7 +14,10 @@ import {
   getAllDesignations,
   getAllWorkLocations,
 } from '@/lib/services/config-service'
-import { getClaimStatusDisplayLabel } from '@/lib/utils/claim-status'
+import {
+  buildClaimStatusFilterOptions,
+  parseClaimStatusFilterValue,
+} from '@/lib/utils/claim-status-filter'
 
 type ClaimFilterScope = {
   /** Pre-fetched UUID of the status that results must be constrained to. */
@@ -24,6 +27,13 @@ type ClaimFilterScope = {
 type FinanceActionTransitionRow = {
   action_code: string
   to_status_id: string
+}
+
+type ClaimStatusFilterRow = {
+  id: string
+  status_code: string
+  status_name: string
+  allow_resubmit_status_name: string | null
 }
 
 function toLikePattern(value: string): string {
@@ -71,15 +81,24 @@ export async function getFilteredClaimIdsForFinance(
     return null
   }
 
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitOnlyStatusFilter =
+    parsedStatusFilter?.allowResubmitOnly ?? false
+
   if (scope.requiredStatusId && filters.claimStatus) {
-    if (filters.claimStatus !== scope.requiredStatusId) {
+    if (
+      !parsedStatusFilter ||
+      allowResubmitOnlyStatusFilter ||
+      parsedStatusFilter.statusId !== scope.requiredStatusId
+    ) {
       return []
     }
   }
 
   // Determine effective status UUID to filter by.
   // scope.requiredStatusId (pre-fetched) takes precedence over user's claimStatus.
-  const statusId = scope.requiredStatusId ?? filters.claimStatus ?? null
+  const statusId =
+    scope.requiredStatusId ?? parsedStatusFilter?.statusId ?? null
 
   let query = supabase
     .from('expense_claims')
@@ -87,6 +106,10 @@ export async function getFilteredClaimIdsForFinance(
 
   if (statusId) {
     query = query.eq('status_id', statusId)
+  }
+
+  if (allowResubmitOnlyStatusFilter) {
+    query = query.eq('allow_resubmit', true)
   }
 
   if (filters.employeeName) {
@@ -259,7 +282,9 @@ export async function getFinanceFilterOptions(
       getAllWorkLocations(supabase),
       supabase
         .from('claim_statuses')
-        .select('id, status_code, status_name, display_order')
+        .select(
+          'id, status_code, status_name, display_order, allow_resubmit_status_name'
+        )
         .eq('is_active', true)
         .order('display_order', { ascending: true }),
       supabase
@@ -310,12 +335,12 @@ export async function getFinanceFilterOptions(
     ]
   }
 
-  const claimStatuses: FinanceFilterOption[] = (statusResult.data ?? []).map(
-    (status) => ({
-      value: status.id,
-      label: getClaimStatusDisplayLabel(status.status_code, status.status_name),
-    })
-  )
+  const claimStatuses: FinanceFilterOption[] = buildClaimStatusFilterOptions(
+    (statusResult.data ?? []) as ClaimStatusFilterRow[]
+  ).map((option) => ({
+    value: option.value,
+    label: option.label,
+  }))
 
   const workLocations: FinanceFilterOption[] = workLocationRows.map((wl) => ({
     value: wl.id,

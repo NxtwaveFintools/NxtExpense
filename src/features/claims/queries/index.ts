@@ -11,10 +11,11 @@ import type {
   PaginatedClaims,
 } from '@/features/claims/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
+import { getClaimStatusDisplay } from '@/lib/utils/claim-status'
 import {
-  getClaimStatusDisplay,
-  getClaimStatusDisplayLabel,
-} from '@/lib/utils/claim-status'
+  buildClaimStatusFilterOptions,
+  parseClaimStatusFilterValue,
+} from '@/lib/utils/claim-status-filter'
 
 const LEGACY_CLAIM_COLUMNS =
   'id, claim_number, employee_id, claim_date, work_location_id, work_locations(location_name), own_vehicle_used, vehicle_type_id, vehicle_types(vehicle_name), outstation_state_id, outstation_city_id, from_city_id, to_city_id, outstation_state:states!outstation_state_id(state_name), outstation_city:cities!outstation_city_id(city_name), from_city_data:cities!from_city_id(city_name), to_city_data:cities!to_city_id(city_name), km_travelled, total_amount, status_id, claim_statuses!status_id(status_code, status_name, display_color, allow_resubmit_status_name, allow_resubmit_display_color, is_terminal, is_rejection), allow_resubmit, is_superseded, current_approval_level, submitted_at, created_at, updated_at, resubmission_count, last_rejection_notes, last_rejected_at, accommodation_nights, food_with_principals_amount'
@@ -110,8 +111,14 @@ function applyMyClaimsFilters(
   query: ClaimsFilterQuery,
   filters: MyClaimsFilters
 ): void {
-  if (filters.claimStatus) {
-    query.eq('status_id', filters.claimStatus)
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+
+  if (parsedStatusFilter) {
+    query.eq('status_id', parsedStatusFilter.statusId)
+
+    if (parsedStatusFilter.allowResubmitOnly) {
+      query.eq('allow_resubmit', true)
+    }
   }
 
   if (filters.workLocation) {
@@ -237,7 +244,7 @@ export async function getClaimStatusCatalog(
   const { data, error } = await supabase
     .from('claim_statuses')
     .select(
-      'id, status_code, status_name, is_terminal, display_order, display_color'
+      'id, status_code, status_name, is_terminal, display_order, display_color, allow_resubmit_status_name, allow_resubmit_display_color'
     )
     .eq('is_active', true)
     .order('display_order', { ascending: true })
@@ -246,14 +253,39 @@ export async function getClaimStatusCatalog(
     throw new Error(error.message)
   }
 
-  return (data ?? []).map((row) => ({
-    status_id: row.id,
-    display_label: getClaimStatusDisplayLabel(row.status_code, row.status_name),
-    is_terminal: row.is_terminal,
-    sort_order: row.display_order,
-    color_token: row.display_color ?? 'neutral',
-    description: null,
-  }))
+  const statusRows = (data ?? []) as Array<{
+    id: string
+    status_code: string
+    status_name: string
+    is_terminal: boolean
+    display_order: number
+    display_color: string | null
+    allow_resubmit_status_name: string | null
+    allow_resubmit_display_color: string | null
+  }>
+
+  const statusRowById = new Map(statusRows.map((row) => [row.id, row]))
+  const statusFilterOptions = buildClaimStatusFilterOptions(statusRows)
+
+  return statusFilterOptions.map((option) => {
+    const sourceStatus = statusRowById.get(option.statusId)
+    const baseColorToken = sourceStatus?.display_color?.trim() || 'neutral'
+    const allowResubmitColorToken =
+      sourceStatus?.allow_resubmit_display_color?.trim() || baseColorToken
+
+    return {
+      status_id: option.statusId,
+      status_filter_value: option.value,
+      allow_resubmit_only: option.allowResubmitOnly,
+      display_label: option.label,
+      is_terminal: sourceStatus?.is_terminal ?? false,
+      sort_order: sourceStatus?.display_order ?? 0,
+      color_token: option.allowResubmitOnly
+        ? allowResubmitColorToken
+        : baseColorToken,
+      description: null,
+    }
+  })
 }
 
 export async function getClaimAvailableActions(

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PendingApprovalsFilters } from '@/features/approvals/types'
 import { getPendingApprovalsSummary } from '@/features/approvals/queries/pending-summary'
 import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
+import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 type ClaimMetricSummary = {
   count: number
@@ -27,6 +28,7 @@ type ClaimAmountRow = {
   id: string
   total_amount: number | string
   status_id: string
+  allow_resubmit: boolean
 }
 
 type ClaimStatusRow = {
@@ -86,12 +88,18 @@ async function getFilteredClaimsByIds(
   let query = supabase
     .from('expense_claims')
     .select(
-      'id, total_amount, status_id, employees!employee_id!inner(employee_name)'
+      'id, total_amount, status_id, allow_resubmit, employees!employee_id!inner(employee_name)'
     )
     .in('id', claimIds)
 
-  if (filters.claimStatus) {
-    query = query.eq('status_id', filters.claimStatus)
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+
+  if (parsedStatusFilter) {
+    query = query.eq('status_id', parsedStatusFilter.statusId)
+
+    if (parsedStatusFilter.allowResubmitOnly) {
+      query = query.eq('allow_resubmit', true)
+    }
   }
 
   if (filters.claimDateFrom) {

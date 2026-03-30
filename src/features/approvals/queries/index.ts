@@ -15,6 +15,7 @@ import type {
 } from '@/features/approvals/types'
 import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
+import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 
 function buildClaimDateCursorFilter(
   claimDate: string,
@@ -75,11 +76,11 @@ export async function getPendingApprovalsPaginated(
   const pendingStatuses = pendingStatusesResult.data ?? []
 
   let pendingStatusIds = pendingStatuses.map((status) => status.id)
-  const normalizedStatusFilter = filters.claimStatus?.trim()
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
 
-  if (normalizedStatusFilter) {
+  if (parsedStatusFilter) {
     pendingStatusIds = pendingStatuses
-      .filter((status) => status.id === normalizedStatusFilter)
+      .filter((status) => status.id === parsedStatusFilter.statusId)
       .map((status) => status.id)
   }
 

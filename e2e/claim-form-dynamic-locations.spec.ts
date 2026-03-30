@@ -70,6 +70,30 @@ async function hasMessageInMainOrToast(
   return mainCount > 0 || notificationCount > 0
 }
 
+type ValidationOutcome = 'date-collision' | 'matched' | 'timeout'
+
+async function waitForValidationOutcome(
+  page: Page,
+  messagePattern: RegExp,
+  timeoutMs = 30_000
+): Promise<ValidationOutcome> {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    if (await hasDateCollisionMessage(page)) {
+      return 'date-collision'
+    }
+
+    if (await hasMessageInMainOrToast(page, messagePattern)) {
+      return 'matched'
+    }
+
+    await page.waitForTimeout(200)
+  }
+
+  return 'timeout'
+}
+
 async function findOutstationOption(
   claims: ClaimsPage
 ): Promise<RuntimeWorkLocationOption> {
@@ -189,34 +213,26 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
 
       await claims.submitButton.click()
 
-      if (await hasDateCollisionMessage(page)) {
+      const firstPromptOutcome = await waitForValidationOutcome(
+        page,
+        /please select whether you travelled between cities using your own vehicle\./i
+      )
+
+      if (firstPromptOutcome === 'date-collision') {
         continue
       }
 
-      await expect
-        .poll(
-          async () =>
-            hasMessageInMainOrToast(
-              page,
-              /please select whether you travelled between cities using your own vehicle\./i
-            ),
-          { timeout: 30_000 }
-        )
-        .toBe(true)
+      expect(firstPromptOutcome).toBe('matched')
 
       await claims.intercityOwnVehicleNoButton.click()
       await claims.submitButton.click()
 
-      await expect
-        .poll(
-          async () =>
-            hasMessageInMainOrToast(
-              page,
-              /please select whether you travelled within the city using your own vehicle(?:\/rental vehicle)?\./i
-            ),
-          { timeout: 30_000 }
-        )
-        .toBe(true)
+      const secondPromptOutcome = await waitForValidationOutcome(
+        page,
+        /please select whether you travelled within the city using your own vehicle(?:\/rental vehicle)?\./i
+      )
+
+      expect(secondPromptOutcome).toBe('matched')
 
       validationSeen = true
       break
@@ -284,20 +300,16 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
       await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
       await claims.submitButton.click()
 
-      if (await hasDateCollisionMessage(page)) {
+      const validationOutcome = await waitForValidationOutcome(
+        page,
+        /inter-city travel requires different from and to cities\./i
+      )
+
+      if (validationOutcome === 'date-collision') {
         continue
       }
 
-      await expect
-        .poll(
-          async () =>
-            hasMessageInMainOrToast(
-              page,
-              /inter-city travel requires different from and to cities\./i
-            ),
-          { timeout: 30_000 }
-        )
-        .toBe(true)
+      expect(validationOutcome).toBe('matched')
 
       validationSeen = true
       break
