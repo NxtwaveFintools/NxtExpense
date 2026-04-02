@@ -26,6 +26,26 @@ const SEGMENT_CLAIM_COLUMNS =
 export const CLAIM_COLUMNS = LEGACY_CLAIM_COLUMNS
 
 const CLAIM_COLUMNS_WITH_SEGMENTS = `${LEGACY_CLAIM_COLUMNS}, ${SEGMENT_CLAIM_COLUMNS}`
+const CLAIM_AVAILABLE_ACTIONS_MAX_RETRIES = 2
+const CLAIM_AVAILABLE_ACTIONS_RETRY_DELAY_MS = 250
+
+function isTransientNetworkErrorMessage(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return (
+    normalized.includes('fetch failed') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network') ||
+    normalized.includes('timeout') ||
+    normalized.includes('connect') ||
+    normalized.includes('terminated')
+  )
+}
+
+async function waitForRetry(attempt: number): Promise<void> {
+  await new Promise((resolve) =>
+    setTimeout(resolve, CLAIM_AVAILABLE_ACTIONS_RETRY_DELAY_MS * attempt)
+  )
+}
 
 function isMissingOutstationSegmentColumnsError(
   error: { message?: string } | null
@@ -292,15 +312,32 @@ export async function getClaimAvailableActions(
   supabase: SupabaseClient,
   claimId: string
 ): Promise<ClaimAvailableAction[]> {
-  const { data, error } = await supabase.rpc('get_claim_available_actions', {
-    p_claim_id: claimId,
-  })
+  for (
+    let attempt = 0;
+    attempt <= CLAIM_AVAILABLE_ACTIONS_MAX_RETRIES;
+    attempt += 1
+  ) {
+    const { data, error } = await supabase.rpc('get_claim_available_actions', {
+      p_claim_id: claimId,
+    })
 
-  if (error) {
+    if (!error) {
+      return (data ?? []) as ClaimAvailableAction[]
+    }
+
+    const shouldRetry =
+      attempt < CLAIM_AVAILABLE_ACTIONS_MAX_RETRIES &&
+      isTransientNetworkErrorMessage(error.message)
+
+    if (shouldRetry) {
+      await waitForRetry(attempt + 1)
+      continue
+    }
+
     throw new Error(error.message)
   }
 
-  return (data ?? []) as ClaimAvailableAction[]
+  throw new Error('Failed to fetch claim actions after retries.')
 }
 
 type BulkClaimAvailableActionRow = ClaimAvailableAction & {

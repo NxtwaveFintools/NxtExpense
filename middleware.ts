@@ -13,6 +13,8 @@ const protectedRoutes = [
   '/claims',
   '/approvals',
   '/finance',
+  '/approved-history',
+  '/no-access',
   '/admin',
 ]
 const publicAuthRoutes = ['/login']
@@ -145,6 +147,8 @@ export const config = {
     '/claims/:path*',
     '/approvals/:path*',
     '/finance/:path*',
+    '/approved-history/:path*',
+    '/no-access',
     '/admin/:path*',
     '/login',
   ],

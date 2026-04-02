@@ -50,7 +50,7 @@ export function ApprovalDetail({ claim, items, owner }: ApprovalDetailProps) {
         </div>
         <div className="space-y-1 rounded-md border border-border bg-background p-4">
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Claim Date
+            Travel Date
           </dt>
           <dd className="font-medium">{formatDate(claim.claim_date)}</dd>
         </div>

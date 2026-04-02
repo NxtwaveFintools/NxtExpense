@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceFilters } from '@/features/finance/types'
-import { getFilteredClaimIdsForFinance } from '@/features/finance/queries/filters'
+import {
+  getFilteredClaimIdsForFinance,
+  isFinanceActionDateFilterField,
+} from '@/features/finance/queries/filters'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
 type ClaimMetricSummary = {
@@ -140,8 +143,8 @@ export async function getFinanceQueueAnalytics(
   const analytics = createEmptyAnalytics()
 
   let scopedClaimIds: string[] | null = null
-  const filterByApprovedDate =
-    filters.dateFilterField === 'finance_approved_date' &&
+  const filterByFinanceActionDate =
+    isFinanceActionDateFilterField(filters.dateFilterField) &&
     (filters.dateFrom || filters.dateTo)
 
   if (hasActiveAnalyticsFilters(filters)) {
@@ -156,7 +159,7 @@ export async function getFinanceQueueAnalytics(
 
     scopedClaimIds = filteredClaimIds
 
-    if (filters.actionFilter && !filterByApprovedDate) {
+    if (filters.actionFilter && !filterByFinanceActionDate) {
       let financeActionQuery = supabase
         .from('finance_actions')
         .select('claim_id')

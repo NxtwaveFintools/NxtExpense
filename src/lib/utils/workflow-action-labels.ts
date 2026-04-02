@@ -5,10 +5,13 @@ type WorkflowActionLabelSource = {
 
 const WORKFLOW_ACTION_CTA_LABELS: Record<string, string> = {
   approved: 'Approve',
+  finance_approved: 'Approve',
   rejected: 'Reject',
   finance_rejected: 'Reject',
   issued: 'Approve',
   finance_issued: 'Approve',
+  payment_released: 'Release Payment',
+  released: 'Release Payment',
   reopened: 'Reopen',
   resubmit: 'Resubmit',
   submitted: 'Submit',

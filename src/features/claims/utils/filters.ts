@@ -63,7 +63,7 @@ export function addMyClaimsFiltersToParams(
 export function buildMyClaimsCsv(rows: Claim[]): string {
   const headers = [
     'Claim ID',
-    'Claim Date',
+    'Travel Date',
     'Work Location',
     'Amount',
     'Status',

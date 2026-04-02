@@ -1,9 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Filter, Download } from 'lucide-react'
+import { Filter } from 'lucide-react'
+
+import { CsvExportActions } from '@/components/ui/csv-export-actions'
 
 import type {
   FinanceDateFilterField,
@@ -12,15 +13,52 @@ import type {
 } from '@/features/finance/types'
 
 type FinanceFiltersBarProps = {
+  pathname: string
+  heading?: string
   filters: FinanceFilters
   options: FinanceFilterOptions
-  exportCurrentPageHref: string
-  exportAllHref: string
+  showHodApproverFilter?: boolean
+  showClaimStatusFilter?: boolean
+  showActionFilter?: boolean
+  showDateFilter?: boolean
+  dateFilterOptions?: FinanceDateFilterField[]
+  exportCurrentPageHref?: string
+  exportAllHref?: string
+}
+
+const DEFAULT_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
+  'claim_date',
+  'submitted_at',
+  'finance_approved_date',
+  'payment_released_date',
+]
+
+function getDateFilterFieldLabel(field: FinanceDateFilterField): string {
+  if (field === 'submitted_at') {
+    return 'Submitted At'
+  }
+
+  if (field === 'finance_approved_date') {
+    return 'Finance Approved Date'
+  }
+
+  if (field === 'payment_released_date') {
+    return 'Payment Released Date'
+  }
+
+  return 'Travel Date'
 }
 
 export function FinanceFiltersBar({
+  pathname,
+  heading = 'Finance Filters',
   filters,
   options,
+  showHodApproverFilter = true,
+  showClaimStatusFilter = true,
+  showActionFilter = true,
+  showDateFilter = true,
+  dateFilterOptions = DEFAULT_DATE_FILTER_OPTIONS,
   exportCurrentPageHref,
   exportAllHref,
 }: FinanceFiltersBarProps) {
@@ -48,20 +86,24 @@ export function FinanceFiltersBar({
     if (employeeName) params.set('employeeName', employeeName)
     if (claimNumber) params.set('claimNumber', claimNumber)
     if (ownerDesignation) params.set('ownerDesignation', ownerDesignation)
-    if (hodApproverEmployeeId)
+    if (showHodApproverFilter && hodApproverEmployeeId)
       params.set('hodApproverEmployeeId', hodApproverEmployeeId)
-    if (claimStatus) params.set('claimStatus', claimStatus)
+    if (showClaimStatusFilter && claimStatus) {
+      params.set('claimStatus', claimStatus)
+    }
     if (workLocation) params.set('workLocation', workLocation)
-    if (actionFilter) {
+    if (showActionFilter && actionFilter) {
       params.set('actionFilter', actionFilter)
     }
-    if (dateFilterField !== 'claim_date') {
-      params.set('dateFilterField', dateFilterField)
+    if (showDateFilter) {
+      if (dateFilterField !== 'claim_date') {
+        params.set('dateFilterField', dateFilterField)
+      }
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
     }
-    if (dateFrom) params.set('dateFrom', dateFrom)
-    if (dateTo) params.set('dateTo', dateTo)
     const qs = params.toString()
-    router.push(`/finance${qs ? `?${qs}` : ''}`)
+    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
   }
 
   function handleClear() {
@@ -75,11 +117,12 @@ export function FinanceFiltersBar({
     setDateFilterField('claim_date')
     setDateFrom('')
     setDateTo('')
-    router.push('/finance')
+    router.push(pathname)
   }
 
   const inputCls =
     'h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none'
+  const activeDateFilterLabel = getDateFilterFieldLabel(dateFilterField)
 
   return (
     <section className="rounded-lg border border-border bg-surface p-6">
@@ -87,7 +130,7 @@ export function FinanceFiltersBar({
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
           <Filter className="size-3.5 text-primary" />
         </div>
-        Finance Filters
+        {heading}
       </h2>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4 md:grid-cols-4">
@@ -132,39 +175,43 @@ export function FinanceFiltersBar({
           </select>
         </label>
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">HOD Approver</span>
-          <select
-            name="hodApproverEmployeeId"
-            value={hodApproverEmployeeId}
-            onChange={(e) => setHodApproverEmployeeId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">All HOD Approvers</option>
-            {options.hodApprovers.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {showHodApproverFilter ? (
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">HOD Approver</span>
+            <select
+              name="hodApproverEmployeeId"
+              value={hodApproverEmployeeId}
+              onChange={(e) => setHodApproverEmployeeId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">All HOD Approvers</option>
+              {options.hodApprovers.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">Claim Status</span>
-          <select
-            name="claimStatus"
-            value={claimStatus}
-            onChange={(e) => setClaimStatus(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">All Statuses</option>
-            {options.claimStatuses.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {showClaimStatusFilter ? (
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Claim Status</span>
+            <select
+              name="claimStatus"
+              value={claimStatus}
+              onChange={(e) => setClaimStatus(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">All Statuses</option>
+              {options.claimStatuses.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Location</span>
@@ -183,59 +230,72 @@ export function FinanceFiltersBar({
           </select>
         </label>
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">Finance Action</span>
-          <select
-            name="actionFilter"
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">All Actions</option>
-            {options.financeActions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {showActionFilter ? (
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Finance Action</span>
+            <select
+              name="actionFilter"
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">All Actions</option>
+              {options.financeActions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">Date Filter</span>
-          <select
-            name="dateFilterField"
-            value={dateFilterField}
-            onChange={(e) =>
-              setDateFilterField(e.target.value as FinanceDateFilterField)
-            }
-            className={inputCls}
-          >
-            <option value="claim_date">Claim Date</option>
-            <option value="finance_approved_date">Payment Issued Date</option>
-          </select>
-        </label>
+        {showDateFilter ? (
+          <>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium text-foreground">Date Filter</span>
+              <select
+                name="dateFilterField"
+                value={dateFilterField}
+                onChange={(e) =>
+                  setDateFilterField(e.target.value as FinanceDateFilterField)
+                }
+                className={inputCls}
+              >
+                {dateFilterOptions.map((field) => (
+                  <option key={field} value={field}>
+                    {getDateFilterFieldLabel(field)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">From</span>
-          <input
-            name="dateFrom"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className={inputCls}
-          />
-        </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium text-foreground">
+                {activeDateFilterLabel} From
+              </span>
+              <input
+                name="dateFrom"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className={inputCls}
+              />
+            </label>
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">To</span>
-          <input
-            name="dateTo"
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className={inputCls}
-          />
-        </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium text-foreground">
+                {activeDateFilterLabel} To
+              </span>
+              <input
+                name="dateTo"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className={inputCls}
+              />
+            </label>
+          </>
+        ) : null}
 
         <div className="md:col-span-4 flex flex-wrap items-center gap-2 pt-2">
           <button
@@ -251,22 +311,13 @@ export function FinanceFiltersBar({
           >
             Clear Filters
           </button>
-          <div className="ml-auto flex items-center gap-2">
-            <Link
-              href={exportCurrentPageHref}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
-            >
-              <Download className="size-3.5" />
-              Page CSV
-            </Link>
-            <Link
-              href={exportAllHref}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
-            >
-              <Download className="size-3.5" />
-              All CSV
-            </Link>
-          </div>
+          {exportCurrentPageHref && exportAllHref ? (
+            <CsvExportActions
+              exportCurrentPageHref={exportCurrentPageHref}
+              exportAllHref={exportAllHref}
+              buttonClassName="rounded-md"
+            />
+          ) : null}
         </div>
       </form>
     </section>

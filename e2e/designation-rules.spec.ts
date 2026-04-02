@@ -91,7 +91,7 @@ test.describe('Designation Rules — UI enforcement', () => {
     await expect(dashboard.financeLink).not.toBeVisible()
   })
 
-  test('Finance user dashboard shows Finance Queue but not My Claims', async ({
+  test('Finance user dashboard shows Finance and Approved History but not My Claims', async ({
     page,
     loginAs,
   }) => {
@@ -101,6 +101,7 @@ test.describe('Designation Rules — UI enforcement', () => {
     await dashboard.goto()
 
     await expect(dashboard.financeLink).toBeVisible()
+    await expect(dashboard.approvedHistoryLink).toBeVisible()
     await expect(dashboard.myClaimsLink).not.toBeVisible()
   })
 

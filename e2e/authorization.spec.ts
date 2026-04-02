@@ -17,7 +17,16 @@ async function navigateAndExpectUrl(
   const maxAttempts = 3
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    await page.goto(pathname)
+    try {
+      await page.goto(pathname, { timeout: 30_000 })
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error
+      }
+
+      await page.waitForTimeout(500)
+      continue
+    }
 
     try {
       await page.waitForURL(expectedUrl, { timeout: timeoutMs })
@@ -55,6 +64,9 @@ test.describe('Authorization Boundaries', () => {
 
     await navigateAndExpectUrl(page, '/finance', /\/login/)
     expect(page.url()).toContain('/login')
+
+    await navigateAndExpectUrl(page, '/approved-history', /\/login/)
+    expect(page.url()).toContain('/login')
   })
 
   test('authenticated user on /login is redirected to /dashboard', async ({
@@ -83,6 +95,13 @@ test.describe('Authorization Boundaries', () => {
   test('SRO cannot access /finance', async ({ page, loginAs }) => {
     await loginAs(SRO_AP.email)
     await navigateAndExpectUrl(page, '/finance', /\/dashboard/)
+
+    expect(page.url()).toContain('/dashboard')
+  })
+
+  test('SRO cannot access /approved-history', async ({ page, loginAs }) => {
+    await loginAs(SRO_AP.email)
+    await navigateAndExpectUrl(page, '/approved-history', /\/dashboard/)
 
     expect(page.url()).toContain('/dashboard')
   })
@@ -118,5 +137,16 @@ test.describe('Authorization Boundaries', () => {
     await page.waitForLoadState('networkidle')
 
     expect(page.url()).toContain('/finance')
+  })
+
+  test('Finance user can access /approved-history', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs(FINANCE_1.email)
+    await page.goto('/approved-history')
+    await page.waitForLoadState('networkidle')
+
+    expect(page.url()).toContain('/approved-history')
   })
 })

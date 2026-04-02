@@ -275,7 +275,7 @@ export default async function ApprovalsPage({
                   tone: 'approved',
                 },
                 {
-                  label: 'Payment Issued',
+                  label: 'Payment Released',
                   count: approvalAnalytics.paymentIssuedClaims.count,
                   amount: approvalAnalytics.paymentIssuedClaims.amount,
                   tone: 'finance',

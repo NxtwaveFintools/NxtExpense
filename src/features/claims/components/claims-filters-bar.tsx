@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { Filter, Download } from 'lucide-react'
+import { Filter } from 'lucide-react'
+
+import { CsvExportActions } from '@/components/ui/csv-export-actions'
 
 import type {
   ClaimStatusCatalogItem,
@@ -76,7 +78,7 @@ export function ClaimsFiltersBar({
         </label>
 
         <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">From Date</span>
+          <span className="font-medium text-foreground">Travel Date From</span>
           <input
             name="claimDateFrom"
             type="date"
@@ -87,7 +89,7 @@ export function ClaimsFiltersBar({
         </label>
 
         <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">To Date</span>
+          <span className="font-medium text-foreground">Travel Date To</span>
           <input
             name="claimDateTo"
             type="date"
@@ -117,22 +119,11 @@ export function ClaimsFiltersBar({
             Clear
           </Link>
           {canExportCsv ? (
-            <div className="ml-auto flex items-center gap-2">
-              <Link
-                href={exportCurrentPageHref}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
-              >
-                <Download className="size-3.5" />
-                Page CSV
-              </Link>
-              <Link
-                href={exportAllHref}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium shadow-xs transition-all hover:bg-muted"
-              >
-                <Download className="size-3.5" />
-                All CSV
-              </Link>
-            </div>
+            <CsvExportActions
+              exportCurrentPageHref={exportCurrentPageHref}
+              exportAllHref={exportAllHref}
+              buttonClassName="rounded-xl"
+            />
           ) : null}
         </div>
       </form>

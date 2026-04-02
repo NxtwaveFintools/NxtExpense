@@ -6,17 +6,19 @@ import {
   CLAIM_COLUMNS,
   mapClaimRow,
 } from '@/features/claims/queries'
-import type { EmployeeRow } from '@/lib/services/employee-service'
 import type {
   FinanceFilters,
   FinanceHistoryItem,
+  FinanceOwner,
   PaginatedFinanceHistory,
   PaginatedFinanceQueue,
 } from '@/features/finance/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 import {
+  getFinanceActionCodesForDateFilter,
   getFilteredClaimIdsForFinance,
   getFinanceFilterOptions,
+  isFinanceActionDateFilterField,
 } from '@/features/finance/queries/filters'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
@@ -33,70 +35,28 @@ const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
   dateTo: null,
 }
 
-type FinanceActionTransitionRow = {
-  action_code: string
-  to_status_id: string
+const FINANCE_OWNER_COLUMNS =
+  'id, employee_id, employee_name, employee_email, designation_id, designations!designation_id(designation_name)'
+
+type FinanceOwnerRelationRow = Omit<FinanceOwner, 'designations'> & {
+  designations:
+    | FinanceOwner['designations']
+    | Array<NonNullable<FinanceOwner['designations']>>
 }
 
-function normalizeFinanceHistoryActionCode(
-  actionCode: string,
-  toStatusId: string,
-  paymentIssuedStatusIds: Set<string>
-): string {
-  if (
-    paymentIssuedStatusIds.has(toStatusId) &&
-    actionCode.startsWith('finance_')
-  ) {
-    return actionCode.slice('finance_'.length)
-  }
-
-  return actionCode
+type ExpenseClaimWithOwnerRow = Record<string, unknown> & {
+  employees: FinanceOwnerRelationRow | FinanceOwnerRelationRow[]
 }
 
-async function getPaymentIssuedHistoryActions(
-  supabase: SupabaseClient
-): Promise<string[]> {
-  const { data: paymentIssuedStatuses, error: paymentIssuedStatusError } =
-    await supabase
-      .from('claim_statuses')
-      .select('id')
-      .eq('is_payment_issued', true)
-      .eq('is_active', true)
+function normalizeFinanceOwner(owner: FinanceOwnerRelationRow): FinanceOwner {
+  const designation = Array.isArray(owner.designations)
+    ? (owner.designations[0] ?? null)
+    : (owner.designations ?? null)
 
-  if (paymentIssuedStatusError) {
-    throw new Error(paymentIssuedStatusError.message)
+  return {
+    ...owner,
+    designations: designation,
   }
-
-  const paymentIssuedStatusIds = new Set(
-    (paymentIssuedStatuses ?? []).map((row) => row.id)
-  )
-
-  if (paymentIssuedStatusIds.size === 0) {
-    return []
-  }
-
-  const { data: transitionRows, error: transitionError } = await supabase
-    .from('claim_status_transitions')
-    .select('action_code, to_status_id')
-    .eq('is_active', true)
-
-  if (transitionError) {
-    throw new Error(transitionError.message)
-  }
-
-  return [
-    ...new Set(
-      ((transitionRows ?? []) as FinanceActionTransitionRow[])
-        .filter((row) => paymentIssuedStatusIds.has(row.to_status_id))
-        .map((row) =>
-          normalizeFinanceHistoryActionCode(
-            row.action_code,
-            row.to_status_id,
-            paymentIssuedStatusIds
-          )
-        )
-    ),
-  ]
 }
 
 export { getFinanceFilterOptions }
@@ -140,7 +100,9 @@ export async function getFinanceQueuePaginated(
 
   let query = supabase
     .from('expense_claims')
-    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
+    .select(
+      `${CLAIM_COLUMNS}, employees!employee_id!inner(${FINANCE_OWNER_COLUMNS})`
+    )
     .eq('status_id', financeStatusRow.id)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
@@ -163,9 +125,7 @@ export async function getFinanceQueuePaginated(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as Array<
-    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
-  >
+  const rows = (data ?? []) as Array<ExpenseClaimWithOwnerRow>
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
   const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
@@ -174,9 +134,11 @@ export async function getFinanceQueuePaginated(
   )
 
   const mappedData = pageData.map((row) => {
-    const owner = Array.isArray(row.employees)
+    const ownerRelation = Array.isArray(row.employees)
       ? row.employees[0]
       : row.employees
+
+    const owner = ownerRelation ? normalizeFinanceOwner(ownerRelation) : null
 
     if (!owner) {
       throw new Error('Claim owner mapping not found.')
@@ -285,14 +247,22 @@ export async function getFinanceHistoryPaginated(
     .order('id', { ascending: false })
     .limit(limit + 1)
 
-  const filterByApprovedDate =
-    filters.dateFilterField === 'finance_approved_date' &&
-    (filters.dateFrom || filters.dateTo)
+  const actionDateFilterField = isFinanceActionDateFilterField(
+    filters.dateFilterField
+  )
+    ? filters.dateFilterField
+    : null
 
-  if (filterByApprovedDate) {
-    const paymentIssuedActions = await getPaymentIssuedHistoryActions(supabase)
+  const filterByFinanceActionDate =
+    actionDateFilterField !== null && (filters.dateFrom || filters.dateTo)
 
-    if (paymentIssuedActions.length === 0) {
+  if (filterByFinanceActionDate) {
+    const dateFilterActions = await getFinanceActionCodesForDateFilter(
+      supabase,
+      actionDateFilterField
+    )
+
+    if (dateFilterActions.length === 0) {
       return {
         data: [],
         hasNextPage: false,
@@ -301,12 +271,12 @@ export async function getFinanceHistoryPaginated(
       }
     }
 
-    query = query.in('action', paymentIssuedActions)
+    query = query.in('action', dateFilterActions)
   } else if (filters.actionFilter) {
     query = query.eq('action', filters.actionFilter)
   }
 
-  if (filterByApprovedDate) {
+  if (filterByFinanceActionDate) {
     const dateFrom = toIstDayStart(filters.dateFrom)
     const dateTo = toIstDayEnd(filters.dateTo)
 
@@ -361,23 +331,30 @@ export async function getFinanceHistoryPaginated(
   }
 
   const claimIds = [...new Set(pageData.map((row) => row.claim_id))]
+  const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
+    supabase,
+    claimIds
+  )
 
   const { data: claimData, error: claimError } = await supabase
     .from('expense_claims')
-    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
+    .select(
+      `${CLAIM_COLUMNS}, employees!employee_id!inner(${FINANCE_OWNER_COLUMNS})`
+    )
     .in('id', claimIds)
 
   if (claimError) {
     throw new Error(claimError.message)
   }
 
-  const claimMap = new Map<string, { claim: Claim; owner: EmployeeRow }>()
-  for (const row of (claimData ?? []) as Array<
-    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
-  >) {
-    const owner = Array.isArray(row.employees)
+  const claimMap = new Map<string, { claim: Claim; owner: FinanceOwner }>()
+  for (const row of (claimData ?? []) as Array<ExpenseClaimWithOwnerRow>) {
+    const ownerRelation = Array.isArray(row.employees)
       ? row.employees[0]
       : row.employees
+
+    const owner = ownerRelation ? normalizeFinanceOwner(ownerRelation) : null
+
     if (!owner) {
       continue
     }
@@ -405,6 +382,7 @@ export async function getFinanceHistoryPaginated(
       return {
         claim: claim.claim,
         owner: claim.owner,
+        availableActions: availableActionsByClaimId.get(action.claim_id) ?? [],
         action: {
           id: action.id,
           claim_id: action.claim_id,
@@ -448,22 +426,30 @@ export async function getFinanceHistoryTotalCount(
     return 0
   }
 
-  const filterByApprovedDate =
-    filters.dateFilterField === 'finance_approved_date' &&
-    (filters.dateFrom || filters.dateTo)
+  const actionDateFilterField = isFinanceActionDateFilterField(
+    filters.dateFilterField
+  )
+    ? filters.dateFilterField
+    : null
+
+  const filterByFinanceActionDate =
+    actionDateFilterField !== null && (filters.dateFrom || filters.dateTo)
 
   let query = supabase
     .from('finance_actions')
     .select('id', { count: 'exact', head: true })
 
-  if (filterByApprovedDate) {
-    const paymentIssuedActions = await getPaymentIssuedHistoryActions(supabase)
+  if (filterByFinanceActionDate) {
+    const dateFilterActions = await getFinanceActionCodesForDateFilter(
+      supabase,
+      actionDateFilterField
+    )
 
-    if (paymentIssuedActions.length === 0) {
+    if (dateFilterActions.length === 0) {
       return 0
     }
 
-    query = query.in('action', paymentIssuedActions)
+    query = query.in('action', dateFilterActions)
 
     const dateFrom = toIstDayStart(filters.dateFrom)
     const dateTo = toIstDayEnd(filters.dateTo)

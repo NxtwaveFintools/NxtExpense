@@ -34,7 +34,7 @@ export default function FinanceLoading() {
                 <table className="w-full min-w-215 border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-border text-left">
-                      {Array.from({ length: 7 }).map((_, index) => (
+                      {Array.from({ length: 8 }).map((_, index) => (
                         <th key={index} className="px-3 py-2">
                           <Skeleton className="h-4 w-20" />
                         </th>
@@ -48,7 +48,7 @@ export default function FinanceLoading() {
                           key={rowIndex}
                           className="border-b border-border/70"
                         >
-                          {Array.from({ length: 7 }).map((__, cellIndex) => (
+                          {Array.from({ length: 8 }).map((__, cellIndex) => (
                             <td key={cellIndex} className="px-3 py-3">
                               <Skeleton className="h-4 w-full max-w-28" />
                             </td>

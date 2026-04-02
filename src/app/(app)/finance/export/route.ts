@@ -32,13 +32,17 @@ async function handleExportRequest(request: Request) {
       ownerDesignation: searchParams.get('ownerDesignation') ?? undefined,
       hodApproverEmployeeId:
         searchParams.get('hodApproverEmployeeId') ?? undefined,
-      claimStatus: searchParams.get('claimStatus') ?? undefined,
       workLocation: searchParams.get('workLocation') ?? undefined,
       actionFilter: searchParams.get('actionFilter') ?? undefined,
       dateFilterField: searchParams.get('dateFilterField') ?? undefined,
       dateFrom: searchParams.get('dateFrom') ?? undefined,
       dateTo: searchParams.get('dateTo') ?? undefined,
     })
+
+    const effectiveFilters = {
+      ...filters,
+      claimStatus: null,
+    }
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -56,19 +60,19 @@ async function handleExportRequest(request: Request) {
 
     const rows =
       mode === 'all'
-        ? await getAllFilteredFinanceHistory(supabase, filters)
+        ? await getAllFilteredFinanceHistory(supabase, effectiveFilters)
         : (
             await getFinanceHistoryPaginated(
               supabase,
               historyCursor,
               PAGE_EXPORT_LIMIT,
-              filters
+              effectiveFilters
             )
           ).data
 
     const csv = buildFinanceHistoryCsv(rows)
     const dateStamp = new Date().toISOString().slice(0, 10)
-    const filename = `finance-history-${mode}-${dateStamp}.csv`
+    const filename = `approved-history-${mode}-${dateStamp}.csv`
 
     return new Response(csv, {
       status: 200,

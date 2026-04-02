@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { sanitizeRedirectPath } from '@/lib/utils/session-utils'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -32,6 +33,21 @@ export async function GET(request: Request) {
     await supabase.auth.signOut()
     return NextResponse.redirect(
       new URL('/login?error=email_domain_not_allowed', requestUrl.origin)
+    )
+  }
+
+  if (!user?.email) {
+    return NextResponse.redirect(new URL('/no-access', requestUrl.origin))
+  }
+
+  try {
+    const employee = await getEmployeeByEmail(supabase, user.email)
+    if (!employee) {
+      return NextResponse.redirect(new URL('/no-access', requestUrl.origin))
+    }
+  } catch {
+    return NextResponse.redirect(
+      new URL('/login?error=auth_verification_failed', requestUrl.origin)
     )
   }
 

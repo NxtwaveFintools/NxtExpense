@@ -1,7 +1,26 @@
 import type { Locator, Page } from '@playwright/test'
 
+const NAVIGATION_MAX_ATTEMPTS = 3
+const NAVIGATION_RETRY_DELAY_MS = 500
+
 export class ApprovalsPage {
   constructor(private page: Page) {}
+
+  private async navigateWithRetry(pathname: string): Promise<void> {
+    for (let attempt = 1; attempt <= NAVIGATION_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        await this.page.goto(pathname, { timeout: 30_000 })
+        await this.page.waitForLoadState('networkidle')
+        return
+      } catch (error) {
+        if (attempt === NAVIGATION_MAX_ATTEMPTS) {
+          throw error
+        }
+
+        await this.page.waitForTimeout(NAVIGATION_RETRY_DELAY_MS * attempt)
+      }
+    }
+  }
 
   private get claimDateFromInput() {
     return this.page.locator('input[name="claimDateFrom"]')
@@ -31,15 +50,31 @@ export class ApprovalsPage {
       return
     }
 
-    await this.claimDateFromInput.fill(claimDateIso)
-    await this.claimDateToInput.fill(claimDateIso)
-    await this.applyFiltersButton.click()
-    await this.page.waitForLoadState('networkidle')
+    const hasDateFilterInputs =
+      (await this.claimDateFromInput.count()) > 0 &&
+      (await this.claimDateToInput.count()) > 0
+
+    if (!hasDateFilterInputs) {
+      return
+    }
+
+    try {
+      await this.claimDateFromInput
+        .first()
+        .fill(claimDateIso, { timeout: 5_000 })
+      await this.claimDateToInput.first().fill(claimDateIso, { timeout: 5_000 })
+
+      if ((await this.applyFiltersButton.count()) > 0) {
+        await this.applyFiltersButton.first().click({ timeout: 5_000 })
+        await this.page.waitForLoadState('networkidle')
+      }
+    } catch {
+      // Allow retry loop in waitForPendingRowByClaimNumber to recover.
+    }
   }
 
   async goto() {
-    await this.page.goto('/approvals')
-    await this.page.waitForLoadState('networkidle')
+    await this.navigateWithRetry('/approvals')
   }
 
   // ── Pending approvals ─────────────────────────────────────────────────
@@ -112,12 +147,16 @@ export class ApprovalsPage {
     const deadline = Date.now() + timeoutMs
 
     while (Date.now() < deadline) {
-      await this.goto()
-      await this.applyClaimDateFilterForClaimNumber(claimNumber)
+      try {
+        await this.goto()
+        await this.applyClaimDateFilterForClaimNumber(claimNumber)
 
-      const hasPendingRow = await this.hasPendingRowByClaimNumber(claimNumber)
-      if (hasPendingRow) {
-        return this.getPendingRowByClaimNumber(claimNumber)
+        const hasPendingRow = await this.hasPendingRowByClaimNumber(claimNumber)
+        if (hasPendingRow) {
+          return this.getPendingRowByClaimNumber(claimNumber)
+        }
+      } catch {
+        // Transient server/page errors are retried until timeout.
       }
 
       await this.page.waitForTimeout(250)

@@ -58,7 +58,11 @@ type ApprovalRpcParams = {
 
 type FinanceRpcParams = {
   p_claim_id: string
-  p_action: 'issued' | 'finance_rejected'
+  p_action:
+    | 'finance_approved'
+    | 'payment_released'
+    | 'released'
+    | 'finance_rejected'
   p_notes: string | null
   p_allow_resubmit: boolean
 }
@@ -80,8 +84,15 @@ function getMockAvailableActions() {
       actor_scope: 'approver',
     },
     {
-      action: 'issued',
-      display_label: 'Issue',
+      action: 'finance_approved',
+      display_label: 'Finance Approved',
+      require_notes: false,
+      supports_allow_resubmit: false,
+      actor_scope: 'finance',
+    },
+    {
+      action: 'payment_released',
+      display_label: 'Payment Released',
       require_notes: false,
       supports_allow_resubmit: false,
       actor_scope: 'finance',
@@ -144,8 +155,17 @@ async function financeApproveClaim(claimId: string, financeEmail: string) {
   setActor(financeEmail)
   return submitFinanceAction({
     claimId,
-    action: 'issued',
-    notes: 'Issued by finance team.',
+    action: 'finance_approved',
+    notes: 'Finance approved by finance team.',
+  })
+}
+
+async function financeReleaseClaim(claimId: string, financeEmail: string) {
+  setActor(financeEmail)
+  return submitFinanceAction({
+    claimId,
+    action: 'payment_released',
+    notes: 'Payment released by finance team.',
   })
 }
 
@@ -182,9 +202,17 @@ async function runDirectFlowScenario(
 
   const financeResult = await financeApproveClaim(claim.id, financeEmail)
   expect(financeResult).toEqual({ ok: true, error: null })
+
   expect(claim.statusCode).toBe('APPROVED')
-  expect(getClaimStatusDisplayLabel(claim.statusCode, 'Payment Issued')).toBe(
-    'Payment Issued'
+  expect(getClaimStatusDisplayLabel(claim.statusCode, 'Finance Approved')).toBe(
+    'Finance Approved'
+  )
+
+  const releaseResult = await financeReleaseClaim(claim.id, financeEmail)
+  expect(releaseResult).toEqual({ ok: true, error: null })
+  expect(claim.statusCode).toBe('PAYMENT_RELEASED')
+  expect(getClaimStatusDisplayLabel(claim.statusCode, 'Payment Released')).toBe(
+    'Payment Released'
   )
 
   return claim
@@ -285,6 +313,7 @@ describe('expense approval workflow integration — direct flow', () => {
     expect(claim.approvalHistory.map((entry) => entry.actorEmail)).toEqual([
       MANSOOR_EMAIL,
       'finance1@nxtwave.co.in',
+      'finance1@nxtwave.co.in',
     ])
     expect(
       claim.approvalHistory.some((entry) => entry.approvalLevel === 1)
@@ -298,6 +327,7 @@ describe('expense approval workflow integration — direct flow', () => {
     )
     expect(claim.approvalHistory.map((entry) => entry.actorEmail)).toEqual([
       MANSOOR_EMAIL,
+      'finance2@nxtwave.co.in',
       'finance2@nxtwave.co.in',
     ])
   })
@@ -324,13 +354,13 @@ describe('expense approval workflow integration — direct flow', () => {
       'mansoor@nxtwave.co.in',
       'finance1@nxtwave.co.in'
     )
-    expect(claim.approvalHistory).toHaveLength(1)
+    expect(claim.approvalHistory).toHaveLength(2)
     expect(claim.approvalHistory[0]?.actorEmail).toBe('finance1@nxtwave.co.in')
     expect(claim.approvalHistory[0]?.approvalLevel).toBeNull()
   })
 
   it.each(['finance1@nxtwave.co.in', 'finance2@nxtwave.co.in'])(
-    'allows %s to approve final finance stage and mark claim approved',
+    'allows %s to finance-approve and release claims',
     async (financeEmail) => {
       const claim = addClaim('nagaraju.madugula@nxtwave.co.in')
       const mansoorResult = await approveClaim(claim.id, MANSOOR_EMAIL)
@@ -340,7 +370,12 @@ describe('expense approval workflow integration — direct flow', () => {
 
       const financeResult = await financeApproveClaim(claim.id, financeEmail)
       expect(financeResult).toEqual({ ok: true, error: null })
-      expect(claim.statusCode).toBe('APPROVED')
+
+      const releaseResult = await financeReleaseClaim(claim.id, financeEmail)
+      expect(releaseResult).toEqual({ ok: true, error: null })
+
+      expect(claim.statusCode).toBe('PAYMENT_RELEASED')
+      expect(claim.approvalHistory.at(-1)?.action).toBe('payment_released')
       expect(claim.approvalHistory.at(-1)?.actorEmail).toBe(financeEmail)
     }
   )

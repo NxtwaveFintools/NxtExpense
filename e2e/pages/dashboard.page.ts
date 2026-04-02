@@ -28,6 +28,10 @@ export class DashboardPage {
     return this.page.locator('a[href="/finance"]').first()
   }
 
+  get approvedHistoryLink() {
+    return this.page.locator('a[href="/approved-history"]').first()
+  }
+
   get designation() {
     return this.page
       .locator('dd')

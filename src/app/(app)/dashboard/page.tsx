@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   }
 
   if (!employee) {
-    redirect('/login')
+    redirect('/no-access')
   }
 
   const approverAccess = await hasApproverAssignments(

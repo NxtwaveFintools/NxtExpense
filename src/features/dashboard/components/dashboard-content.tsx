@@ -132,7 +132,7 @@ function DashboardClaimSummarySections({
               tone: 'pending',
             },
             {
-              label: 'Payment Issued',
+              label: 'Payment Released',
               count: stats.approved.count,
               amount: stats.approved.amount,
               tone: 'approved',
@@ -314,7 +314,7 @@ export function DashboardContent({
             <QuickAccessCard
               href="/finance"
               roleLabel="Finance"
-              title="Claims Processing"
+              title="Pending Claims"
               description="Review approved claims and issue payments or rejections."
               icon={
                 <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10">

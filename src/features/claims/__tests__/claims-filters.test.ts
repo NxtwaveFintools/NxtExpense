@@ -288,6 +288,7 @@ describe('buildMyClaimsCsv', () => {
     const csv = buildMyClaimsCsv([claim])
 
     expect(csv).toContain('Claim ID')
+    expect(csv).toContain('Travel Date')
     expect(csv).toContain('CLAIM-NW0000282-130326-0051')
     expect(csv).toContain('13/03/2026')
     expect(csv).toContain('Rs. 300.00')

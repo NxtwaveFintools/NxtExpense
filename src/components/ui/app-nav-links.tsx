@@ -15,6 +15,7 @@ type AppNavLinksProps = {
 const SOURCE_TO_HREF: Record<string, string> = {
   approvals: '/approvals',
   finance: '/finance',
+  'approved-history': '/approved-history',
 }
 
 export function AppNavLinks({ links }: AppNavLinksProps) {

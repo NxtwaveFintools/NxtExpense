@@ -125,9 +125,11 @@ export function addApprovalFiltersToParams(
 export function buildApprovalHistoryCsv(rows: ApprovalHistoryRecord[]): string {
   const headers = [
     'Claim ID',
+    'Employee ID',
     'Employee',
+    'Employee Email',
     'Employee Designation',
-    'Claim Date',
+    'Travel Date',
     'Work Location',
     'Total Amount',
     'Action',
@@ -135,13 +137,15 @@ export function buildApprovalHistoryCsv(rows: ApprovalHistoryRecord[]): string {
     'Actor Email',
     'Actor Designation',
     'HOD Approved Date',
-    'Payment Issued Date',
+    'Payment Released Date',
     'Current Status',
   ]
 
   const bodyRows = rows.map((row) => [
     row.claimNumber,
+    row.ownerEmployeeId ?? '-',
     row.ownerName,
+    row.ownerEmail ?? '-',
     row.ownerDesignation,
     formatDate(row.claimDate),
     row.workLocation,

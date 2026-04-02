@@ -104,8 +104,8 @@ describe('finance actions workflow integration', () => {
 
     const defaultActions = [
       {
-        action: 'issued',
-        display_label: 'Issue Payment',
+        action: 'finance_approved',
+        display_label: 'Finance Approved',
         require_notes: false,
         supports_allow_resubmit: false,
         actor_scope: 'finance',
@@ -143,11 +143,11 @@ describe('finance actions workflow integration', () => {
     })
   })
 
-  it('should transition Finance Review to Approved when finance issues claim', async () => {
+  it('should transition Finance Review to Finance Approved on finance approval', async () => {
     // Arrange
     const payload = {
       claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
-      action: 'issued' as const,
+      action: 'finance_approved' as const,
       notes: 'NEFT completed',
     }
 
@@ -158,7 +158,7 @@ describe('finance actions workflow integration', () => {
     expect(result).toEqual({ ok: true, error: null })
     expect(rpcMock).toHaveBeenCalledWith('submit_finance_action_atomic', {
       p_claim_id: payload.claimId,
-      p_action: 'issued',
+      p_action: 'finance_approved',
       p_notes: 'NEFT completed',
       p_allow_resubmit: false,
     })
@@ -205,38 +205,39 @@ describe('finance actions workflow integration', () => {
     // Arrange
     rpcMock.mockResolvedValue({
       error: {
-        message: 'Cannot issue claim before approval workflow is complete.',
+        message:
+          'Cannot finance-approve claim before approval workflow is complete.',
       },
     })
 
     // Act
     const result = await submitFinanceAction({
       claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert
     expect(result.ok).toBe(false)
     expect(result.error).toBe(
-      'Cannot issue claim before approval workflow is complete.'
+      'Cannot finance-approve claim before approval workflow is complete.'
     )
   })
 
   it('should block finance action on rejected claims', async () => {
     // Arrange
     rpcMock.mockResolvedValue({
-      error: { message: 'Rejected claims cannot be issued.' },
+      error: { message: 'Rejected claims cannot be finance-approved.' },
     })
 
     // Act
     const result = await submitFinanceAction({
       claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert
     expect(result.ok).toBe(false)
-    expect(result.error).toBe('Rejected claims cannot be issued.')
+    expect(result.error).toBe('Rejected claims cannot be finance-approved.')
   })
 
   it('should handle database connection failure gracefully', async () => {
@@ -248,7 +249,7 @@ describe('finance actions workflow integration', () => {
     // Act
     const result = await submitFinanceAction({
       claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert
@@ -263,7 +264,7 @@ describe('finance actions workflow integration', () => {
     // Act
     const result = await submitFinanceAction({
       claimId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert
@@ -275,7 +276,7 @@ describe('finance actions workflow integration', () => {
     // Act
     const result = await submitFinanceAction({
       claimId: 'invalid-id',
-      action: 'issued',
+      action: 'finance_approved',
     } as never)
 
     // Assert
@@ -308,7 +309,7 @@ describe('finance actions workflow integration', () => {
         '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
         '8d9efea6-f7c2-4b26-b8f4-2f3f65b9f84d',
       ],
-      action: 'issued' as const,
+      action: 'finance_approved' as const,
       notes: 'Bulk payout release',
     }
 
@@ -319,7 +320,7 @@ describe('finance actions workflow integration', () => {
     expect(result).toEqual({ ok: true, error: null })
     expect(rpcMock).toHaveBeenCalledWith('bulk_finance_actions_atomic', {
       p_claim_ids: payload.claimIds,
-      p_action: 'issued',
+      p_action: 'finance_approved',
       p_notes: 'Bulk payout release',
       p_allow_resubmit: false,
     })
@@ -347,7 +348,7 @@ describe('finance actions workflow integration', () => {
     // Act
     const result = await bulkFinanceClaimsAction({
       claimIds: [],
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert
@@ -365,7 +366,7 @@ describe('finance actions workflow integration', () => {
     // Act
     const result = await bulkFinanceClaimsAction({
       claimIds: ['5db22d75-b209-4f30-b5c8-f4f27ebee9e8'],
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert
@@ -380,7 +381,7 @@ describe('finance actions workflow integration', () => {
     // Act
     const result = await bulkFinanceClaimsAction({
       claimIds: ['5db22d75-b209-4f30-b5c8-f4f27ebee9e8'],
-      action: 'issued',
+      action: 'finance_approved',
     })
 
     // Assert

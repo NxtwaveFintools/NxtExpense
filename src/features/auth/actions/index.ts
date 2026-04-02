@@ -12,6 +12,7 @@ import {
   getAllowedCorporateEmailHint,
   isAllowedCorporateEmail,
 } from '@/lib/auth/allowed-email-domains'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import {
@@ -74,14 +75,18 @@ export async function signInWithPasswordAction(
     return { error: errorMessage }
   }
 
+  let validatedEmail = parsedCredentials.data.email
+
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
+    validatedEmail = user?.email ?? parsedCredentials.data.email
+
     const isAllowedEmail = await isAllowedCorporateEmail(
       supabase,
-      user?.email ?? parsedCredentials.data.email
+      validatedEmail
     )
 
     if (!isAllowedEmail) {
@@ -98,6 +103,18 @@ export async function signInWithPasswordAction(
     await signOutMutation(supabase)
     return {
       error: 'Unable to validate corporate email domain. Please try again.',
+    }
+  }
+
+  try {
+    const employee = await getEmployeeByEmail(supabase, validatedEmail)
+    if (!employee) {
+      redirect('/no-access')
+    }
+  } catch {
+    await signOutMutation(supabase)
+    return {
+      error: 'Unable to verify your account access. Please try again.',
     }
   }
 

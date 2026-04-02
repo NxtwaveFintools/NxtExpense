@@ -109,7 +109,7 @@ export function ClaimList({ claims, pagination }: ClaimListProps) {
                   weight: 'semibold',
                 })}
               >
-                Date
+                Travel Date
               </th>
               <th
                 className={getDataTableHeadCellClass({

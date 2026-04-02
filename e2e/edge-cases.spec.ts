@@ -13,10 +13,10 @@ test.describe('Edge Cases', () => {
     loginAs,
   }) => {
     await loginAs(SRO_AP.email)
-    await page.goto('/claims/new')
-    await page.waitForLoadState('networkidle')
 
     const claims = new ClaimsPage(page)
+    await claims.gotoNewClaim()
+    await claims.ensureNewClaimFormReady()
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     const yyyy = tomorrow.getFullYear()
@@ -41,10 +41,10 @@ test.describe('Edge Cases', () => {
     loginAs,
   }) => {
     await loginAs(SRO_AP.email)
-    await page.goto('/claims/new')
-    await page.waitForLoadState('networkidle')
 
     const claims = new ClaimsPage(page)
+    await claims.gotoNewClaim()
+    await claims.ensureNewClaimFormReady()
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
     const yyyy = yesterday.getFullYear()
@@ -86,7 +86,25 @@ test.describe('Edge Cases', () => {
           timeout: 3_000,
         })
       } catch {
-        await expect(claims.submitButton).toBeEnabled({ timeout: 15_000 })
+        let submitButtonEnabled = false
+
+        for (let retry = 0; retry < 30; retry += 1) {
+          submitButtonEnabled = await claims.submitButton
+            .isEnabled()
+            .catch(() => false)
+
+          if (submitButtonEnabled) {
+            break
+          }
+
+          await page.waitForTimeout(500)
+        }
+
+        if (!submitButtonEnabled) {
+          await claims.gotoNewClaim()
+          await claims.ensureNewClaimFormReady()
+          continue
+        }
       }
 
       if (new URL(page.url()).pathname === '/claims') {

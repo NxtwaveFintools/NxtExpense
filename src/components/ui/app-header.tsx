@@ -35,7 +35,10 @@ export async function AppHeader() {
       ? [{ href: '/approvals', label: 'Approvals' }]
       : []),
     ...(access.canViewFinanceQueue
-      ? [{ href: '/finance', label: 'Finance' }]
+      ? [
+          { href: '/finance', label: 'Finance' },
+          { href: '/approved-history', label: 'Approved History' },
+        ]
       : []),
     ...(access.canViewAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ]

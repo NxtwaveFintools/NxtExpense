@@ -8,9 +8,17 @@ import {
   supportsFinanceIntent,
 } from '@/features/finance/utils/action-intents'
 
-const ISSUE_ACTION: ClaimAvailableAction = {
-  action: 'issued',
-  display_label: 'Issue Payment',
+const FINANCE_APPROVE_ACTION: ClaimAvailableAction = {
+  action: 'finance_approved',
+  display_label: 'Finance Approved',
+  require_notes: false,
+  supports_allow_resubmit: false,
+  actor_scope: 'finance',
+}
+
+const RELEASE_ACTION: ClaimAvailableAction = {
+  action: 'payment_released',
+  display_label: 'Payment Released',
   require_notes: false,
   supports_allow_resubmit: false,
   actor_scope: 'finance',
@@ -26,24 +34,26 @@ const REJECT_ACTION: ClaimAvailableAction = {
 
 describe('finance action intents', () => {
   it('builds default intent for actions without allow-resubmit support', () => {
-    const intents = buildFinanceActionIntents(ISSUE_ACTION)
+    const intents = buildFinanceActionIntents(FINANCE_APPROVE_ACTION)
 
     expect(intents).toHaveLength(1)
     expect(intents[0]).toEqual({
-      key: 'issued:default',
-      actionCode: 'issued',
+      key: 'finance_approved:default',
+      actionCode: 'finance_approved',
       label: 'Approve',
       allowResubmit: false,
     })
   })
 
-  it('orders intents as approve, reject, then reject and allow reclaim', () => {
+  it('orders intents as release, approve, reject, then reject and allow reclaim', () => {
     const combined = sortFinanceActionIntents([
       ...buildFinanceActionIntents(REJECT_ACTION),
-      ...buildFinanceActionIntents(ISSUE_ACTION),
+      ...buildFinanceActionIntents(FINANCE_APPROVE_ACTION),
+      ...buildFinanceActionIntents(RELEASE_ACTION),
     ])
 
     expect(combined.map((intent) => intent.label)).toEqual([
+      'Release Payment',
       'Approve',
       'Reject',
       'Reject & Allow Reclaim',
@@ -69,12 +79,12 @@ describe('finance action intents', () => {
   })
 
   it('supports matching default intent on a queue item', () => {
-    const intents = buildFinanceActionIntents(ISSUE_ACTION)
+    const intents = buildFinanceActionIntents(FINANCE_APPROVE_ACTION)
 
     expect(
       supportsFinanceIntent(
         {
-          availableActions: [ISSUE_ACTION],
+          availableActions: [FINANCE_APPROVE_ACTION],
         },
         intents[0]
       )
@@ -83,8 +93,8 @@ describe('finance action intents', () => {
 
   it('rejects allow-resubmit intent when item action does not support it', () => {
     const allowResubmitIntent = {
-      key: 'issued:allow_resubmit',
-      actionCode: 'issued',
+      key: 'finance_approved:allow_resubmit',
+      actionCode: 'finance_approved',
       label: 'Issue (Allow Reclaim)',
       allowResubmit: true,
     }
@@ -92,7 +102,7 @@ describe('finance action intents', () => {
     expect(
       supportsFinanceIntent(
         {
-          availableActions: [ISSUE_ACTION],
+          availableActions: [FINANCE_APPROVE_ACTION],
         },
         allowResubmitIntent
       )
@@ -100,7 +110,7 @@ describe('finance action intents', () => {
   })
 
   it('formats singular and plural success labels', () => {
-    const defaultIntent = buildFinanceActionIntents(ISSUE_ACTION)[0]
+    const defaultIntent = buildFinanceActionIntents(FINANCE_APPROVE_ACTION)[0]
 
     expect(getFinanceSuccessLabel(defaultIntent, 1)).toBe(
       'Approve completed successfully.'

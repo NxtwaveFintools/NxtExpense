@@ -155,11 +155,18 @@ describe('buildApprovalHistoryCsv', () => {
   it('returns headers only for empty data', () => {
     const csv = buildApprovalHistoryCsv([])
     const lines = csv.split('\n')
+    const headers = lines[0].split(',')
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain('Claim ID')
+    expect(lines[0]).toContain('Employee ID')
     expect(lines[0]).toContain('Employee')
+    expect(lines[0]).toContain('Employee Email')
+    expect(lines[0]).toContain('Travel Date')
     expect(lines[0]).toContain('Total Amount')
     expect(lines[0]).toContain('Current Status')
+    expect(headers[1]).toBe('"Employee ID"')
+    expect(headers[2]).toBe('"Employee"')
+    expect(headers[3]).toBe('"Employee Email"')
   })
 
   it('generates correct CSV row with all fields', () => {
@@ -173,7 +180,9 @@ describe('buildApprovalHistoryCsv', () => {
         totalAmount: 300,
         claimStatusName: 'Issued',
         claimStatusDisplayColor: 'green',
+        ownerEmployeeId: 'NW00000737',
         ownerName: 'Yohan Mutluri',
+        ownerEmail: 'yohan.mutluri@nxtwave.co.in',
         ownerDesignation: 'Student Relationship Officer',
         actorEmail: 'nagaraju.madugula@nxtwave.co.in',
         actorDesignation: 'State Business Head',
@@ -189,7 +198,9 @@ describe('buildApprovalHistoryCsv', () => {
     const lines = csv.split('\n')
     expect(lines).toHaveLength(2)
     expect(lines[1]).toContain('CLAIM-001')
+    expect(lines[1]).toContain('NW00000737')
     expect(lines[1]).toContain('Yohan Mutluri')
+    expect(lines[1]).toContain('yohan.mutluri@nxtwave.co.in')
     expect(lines[1]).toContain('Rs. 300.00')
   })
 
@@ -204,7 +215,9 @@ describe('buildApprovalHistoryCsv', () => {
         totalAmount: 300,
         claimStatusName: 'Issued',
         claimStatusDisplayColor: 'green',
+        ownerEmployeeId: 'NW00000123',
         ownerName: 'User, With Comma',
+        ownerEmail: 'user@nxtwave.co.in',
         ownerDesignation: 'SRO',
         actorEmail: 'test@nxtwave.co.in',
         actorDesignation: null,

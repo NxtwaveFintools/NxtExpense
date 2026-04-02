@@ -20,19 +20,19 @@ const VALID_ALLOW_RESUBMIT_STATUS_FILTER = buildClaimStatusFilterValue(
 
 // ── Finance Action Schema ───────────────────────────────────────────────────
 
-describe('financeActionSchema — issue action', () => {
-  it('accepts issued action without notes (APPROVE-005)', () => {
+describe('financeActionSchema — finance approval action', () => {
+  it('accepts finance_approved action without notes (APPROVE-005)', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: VALID_UUID,
-      action: 'issued',
+      action: 'finance_approved',
     })
     expect(parsed.success).toBe(true)
   })
 
-  it('accepts issued action with optional notes', () => {
+  it('accepts finance_approved action with optional notes', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: VALID_UUID,
-      action: 'issued',
+      action: 'finance_approved',
       notes: 'Processed via NEFT',
     })
     expect(parsed.success).toBe(true)
@@ -81,7 +81,7 @@ describe('financeActionSchema — edge cases', () => {
   it('rejects invalid UUID', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: 'not-uuid',
-      action: 'issued',
+      action: 'finance_approved',
     })
     expect(parsed.success).toBe(false)
   })
@@ -115,10 +115,10 @@ describe('financeActionSchema — edge cases', () => {
 // ── Bulk Finance Action Schema ──────────────────────────────────────────────
 
 describe('bulkFinanceActionSchema', () => {
-  it('accepts bulk issued action', () => {
+  it('accepts bulk finance_approved action', () => {
     const parsed = bulkFinanceActionSchema.safeParse({
       claimIds: [VALID_UUID, VALID_UUID_2],
-      action: 'issued',
+      action: 'finance_approved',
     })
     expect(parsed.success).toBe(true)
   })
@@ -126,7 +126,7 @@ describe('bulkFinanceActionSchema', () => {
   it('requires at least one claim ID', () => {
     const parsed = bulkFinanceActionSchema.safeParse({
       claimIds: [],
-      action: 'issued',
+      action: 'finance_approved',
     })
     expect(parsed.success).toBe(false)
   })
@@ -152,7 +152,7 @@ describe('bulkFinanceActionSchema', () => {
   it('rejects invalid UUID in array', () => {
     const parsed = bulkFinanceActionSchema.safeParse({
       claimIds: [VALID_UUID, 'invalid'],
-      action: 'issued',
+      action: 'finance_approved',
     })
     expect(parsed.success).toBe(false)
   })
@@ -178,7 +178,12 @@ describe('financeFiltersSchema', () => {
   })
 
   it('accepts non-empty actionFilter values', () => {
-    for (const filter of ['issued', 'finance_rejected', 'reopened'] as const) {
+    for (const filter of [
+      'finance_approved',
+      'payment_released',
+      'finance_rejected',
+      'reopened',
+    ] as const) {
       const parsed = financeFiltersSchema.safeParse({ actionFilter: filter })
       expect(parsed.success).toBe(true)
     }
@@ -217,6 +222,15 @@ describe('financeFiltersSchema', () => {
   it('accepts DD/MM/YYYY date range input', () => {
     const parsed = financeFiltersSchema.safeParse({
       dateFilterField: 'finance_approved_date',
+      dateFrom: '08/03/2026',
+      dateTo: '10/03/2026',
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts payment_released_date date range input', () => {
+    const parsed = financeFiltersSchema.safeParse({
+      dateFilterField: 'payment_released_date',
       dateFrom: '08/03/2026',
       dateTo: '10/03/2026',
     })
@@ -300,6 +314,16 @@ describe('normalizeFinanceFilters', () => {
   it('preserves ISO dates', () => {
     const result = normalizeFinanceFilters({
       dateFilterField: 'finance_approved_date',
+      dateFrom: '2026-03-01',
+      dateTo: '2026-03-07',
+    })
+    expect(result.dateFrom).toBe('2026-03-01')
+    expect(result.dateTo).toBe('2026-03-07')
+  })
+
+  it('preserves payment released ISO dates', () => {
+    const result = normalizeFinanceFilters({
+      dateFilterField: 'payment_released_date',
       dateFrom: '2026-03-01',
       dateTo: '2026-03-07',
     })

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   appendAllowedDomainHint: vi.fn(),
   getAllowedCorporateEmailHint: vi.fn(),
   isAllowedCorporateEmail: vi.fn(),
+  getEmployeeByEmail: vi.fn(),
   createSupabaseServerClient: vi.fn(),
   signInWithOAuthMutation: vi.fn(),
   signInWithPasswordMutation: vi.fn(),
@@ -30,6 +31,10 @@ vi.mock('@/lib/auth/allowed-email-domains', () => ({
   appendAllowedDomainHint: mocks.appendAllowedDomainHint,
   getAllowedCorporateEmailHint: mocks.getAllowedCorporateEmailHint,
   isAllowedCorporateEmail: mocks.isAllowedCorporateEmail,
+}))
+
+vi.mock('@/lib/services/employee-service', () => ({
+  getEmployeeByEmail: mocks.getEmployeeByEmail,
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -79,6 +84,7 @@ describe('auth actions', () => {
     })
 
     mocks.signInWithPasswordMutation.mockResolvedValue({ errorMessage: null })
+    mocks.getEmployeeByEmail.mockResolvedValue({ id: 'emp-1' })
     mocks.signOutMutation.mockResolvedValue(undefined)
   })
 

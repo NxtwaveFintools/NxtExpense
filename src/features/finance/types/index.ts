@@ -1,10 +1,13 @@
 import type { Claim, ClaimAvailableAction } from '@/features/claims/types'
-import type { EmployeeRow } from '@/lib/services/employee-service'
 import type { PaginatedResult } from '@/lib/utils/pagination'
 
 export type FinanceActionFilter = string | null
 
-export type FinanceDateFilterField = 'claim_date' | 'finance_approved_date'
+export type FinanceDateFilterField =
+  | 'claim_date'
+  | 'submitted_at'
+  | 'finance_approved_date'
+  | 'payment_released_date'
 
 export type FinanceAction = {
   id: string
@@ -16,9 +19,18 @@ export type FinanceAction = {
   acted_at: string
 }
 
+export type FinanceOwner = {
+  id: string
+  employee_id: string
+  employee_name: string
+  employee_email: string
+  designation_id: string | null
+  designations: { designation_name: string } | null
+}
+
 export type FinanceQueueItem = {
   claim: Claim
-  owner: EmployeeRow
+  owner: FinanceOwner
   availableActions: ClaimAvailableAction[]
 }
 
@@ -26,8 +38,9 @@ export type PaginatedFinanceQueue = PaginatedResult<FinanceQueueItem>
 
 export type FinanceHistoryItem = {
   claim: Claim
-  owner: EmployeeRow
+  owner: FinanceOwner
   action: FinanceAction
+  availableActions: ClaimAvailableAction[]
 }
 
 export type PaginatedFinanceHistory = PaginatedResult<FinanceHistoryItem>

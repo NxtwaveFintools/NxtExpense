@@ -1,11 +1,33 @@
 import type { Page } from '@playwright/test'
 
+const NAVIGATION_MAX_ATTEMPTS = 3
+const NAVIGATION_RETRY_DELAY_MS = 500
+
 export class FinancePage {
   constructor(private page: Page) {}
 
+  private async navigateWithRetry(pathname: string): Promise<void> {
+    for (let attempt = 1; attempt <= NAVIGATION_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        await this.page.goto(pathname, { timeout: 30_000 })
+        await this.page.waitForLoadState('networkidle')
+        return
+      } catch (error) {
+        if (attempt === NAVIGATION_MAX_ATTEMPTS) {
+          throw error
+        }
+
+        await this.page.waitForTimeout(NAVIGATION_RETRY_DELAY_MS * attempt)
+      }
+    }
+  }
+
   async goto() {
-    await this.page.goto('/finance')
-    await this.page.waitForLoadState('networkidle')
+    await this.navigateWithRetry('/finance')
+  }
+
+  async gotoApprovedHistory() {
+    await this.navigateWithRetry('/approved-history')
   }
 
   // ── Queue ─────────────────────────────────────────────────────────────
@@ -47,7 +69,7 @@ export class FinancePage {
     }
     return this.page
       .getByRole('button', {
-        name: /approve|issue|issued|payment issued|mark as issued/i,
+        name: /approve|finance approved|issue|issued|mark as issued/i,
       })
       .first()
   }
@@ -96,10 +118,24 @@ export class FinancePage {
     await this.page.waitForLoadState('networkidle')
   }
 
+  async filterHistoryByClaimNumber(claimNumber: string) {
+    await this.filterByClaimNumber(claimNumber)
+  }
+
   // ── History ───────────────────────────────────────────────────────────
 
   get historyRows() {
     return this.page.locator('[data-testid="finance-history-row"]')
+  }
+
+  getHistoryRowByClaimNumber(claimNumber: string) {
+    return this.historyRows.filter({ hasText: claimNumber }).first()
+  }
+
+  getHistoryCheckboxByClaimNumber(claimNumber: string) {
+    return this.getHistoryRowByClaimNumber(claimNumber).locator(
+      'input[type="checkbox"]'
+    )
   }
 
   // ── Bulk actions ──────────────────────────────────────────────────────
@@ -110,7 +146,13 @@ export class FinancePage {
 
   get bulkIssueButton() {
     return this.page.getByRole('button', {
-      name: /approve|issue|issued|payment issued|mark as issued/i,
+      name: /approve|finance approved|issue|issued|mark as issued/i,
+    })
+  }
+
+  get bulkReleaseButton() {
+    return this.page.getByRole('button', {
+      name: /release payment|payment released|release/i,
     })
   }
 }

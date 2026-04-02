@@ -11,16 +11,11 @@ import {
   encodeCursorTrail,
   getCursorTotalPages,
 } from '@/lib/utils/pagination'
-import {
-  getFinanceHistoryAction,
-  getFinanceQueueAction,
-} from '@/features/finance/actions'
+import { getFinanceQueueAction } from '@/features/finance/actions'
 import { getFinanceFilterOptions } from '@/features/finance/queries'
 import { getFinanceQueueAnalytics } from '@/features/finance/queries/analytics'
-import {
-  getFinanceHistoryTotalCount,
-  getFinanceQueueTotalCount,
-} from '@/features/finance/queries'
+import { getFinanceQueueTotalCount } from '@/features/finance/queries'
+import type { FinanceDateFilterField } from '@/features/finance/types'
 import {
   addFinanceFiltersToParams,
   normalizeFinanceFilters,
@@ -28,7 +23,6 @@ import {
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 import { FinanceFiltersBar } from '@/features/finance/components/finance-filters-bar'
 import { FinanceQueue } from '@/features/finance/components/finance-queue'
-import { FinanceHistoryList } from '@/features/finance/components/finance-history-list'
 import {
   buildPathWithSearchParams,
   createNonEmptySearchParams,
@@ -39,20 +33,25 @@ type FinancePageProps = {
   searchParams?: Promise<{
     queueCursor?: string
     queueTrail?: string
-    historyCursor?: string
-    historyTrail?: string
     employeeName?: string
     claimNumber?: string
     ownerDesignation?: string
-    hodApproverEmployeeId?: string
     claimStatus?: string
     workLocation?: string
-    actionFilter?: string
     dateFilterField?: string
     dateFrom?: string
     dateTo?: string
   }>
 }
+
+const PENDING_CLAIMS_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
+  'claim_date',
+  'submitted_at',
+]
+
+const PENDING_CLAIMS_DATE_FILTER_OPTION_SET = new Set(
+  PENDING_CLAIMS_DATE_FILTER_OPTIONS
+)
 
 export default async function FinancePage({ searchParams }: FinancePageProps) {
   const user = await requireCurrentUser('/login')
@@ -69,10 +68,8 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     employeeName: resolvedSearch?.employeeName,
     claimNumber: resolvedSearch?.claimNumber,
     ownerDesignation: resolvedSearch?.ownerDesignation,
-    hodApproverEmployeeId: resolvedSearch?.hodApproverEmployeeId,
     claimStatus: resolvedSearch?.claimStatus,
     workLocation: resolvedSearch?.workLocation,
-    actionFilter: resolvedSearch?.actionFilter,
     dateFilterField: resolvedSearch?.dateFilterField,
     dateFrom: resolvedSearch?.dateFrom,
     dateTo: resolvedSearch?.dateTo,
@@ -86,30 +83,39 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     }
   })()
 
+  // Pending-claims page intentionally does not support HOD filtering.
+  const effectiveFilters = {
+    ...normalizedFilters,
+    hodApproverEmployeeId: null,
+    claimStatus: null,
+    dateFilterField: PENDING_CLAIMS_DATE_FILTER_OPTION_SET.has(
+      normalizedFilters.dateFilterField
+    )
+      ? normalizedFilters.dateFilterField
+      : 'claim_date',
+  }
+
   const normalizedFilterParams = {
-    employeeName: normalizedFilters.employeeName ?? undefined,
-    claimNumber: normalizedFilters.claimNumber ?? undefined,
-    ownerDesignation: normalizedFilters.ownerDesignation ?? undefined,
-    hodApproverEmployeeId: normalizedFilters.hodApproverEmployeeId ?? undefined,
-    claimStatus: normalizedFilters.claimStatus ?? undefined,
-    workLocation: normalizedFilters.workLocation ?? undefined,
-    actionFilter: normalizedFilters.actionFilter ?? undefined,
+    employeeName: effectiveFilters.employeeName ?? undefined,
+    claimNumber: effectiveFilters.claimNumber ?? undefined,
+    ownerDesignation: effectiveFilters.ownerDesignation ?? undefined,
+    hodApproverEmployeeId: effectiveFilters.hodApproverEmployeeId ?? undefined,
+    claimStatus: effectiveFilters.claimStatus ?? undefined,
+    workLocation: effectiveFilters.workLocation ?? undefined,
     dateFilterField:
-      normalizedFilters.dateFilterField !== 'claim_date'
-        ? normalizedFilters.dateFilterField
+      effectiveFilters.dateFilterField !== 'claim_date'
+        ? effectiveFilters.dateFilterField
         : undefined,
-    dateFrom: normalizedFilters.dateFrom ?? undefined,
-    dateTo: normalizedFilters.dateTo ?? undefined,
+    dateFrom: effectiveFilters.dateFrom ?? undefined,
+    dateTo: effectiveFilters.dateTo ?? undefined,
   }
 
   const queueCursor = resolvedSearch?.queueCursor ?? null
   const queueTrail = decodeCursorTrail(resolvedSearch?.queueTrail ?? null)
-  const historyCursor = resolvedSearch?.historyCursor ?? null
-  const historyTrail = decodeCursorTrail(resolvedSearch?.historyTrail ?? null)
 
   const canonicalParams = addFinanceFiltersToParams(
     new URLSearchParams(),
-    normalizedFilters
+    effectiveFilters
   )
 
   if (queueCursor) {
@@ -117,12 +123,6 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   }
   if (queueTrail.length > 0) {
     canonicalParams.set('queueTrail', encodeCursorTrail(queueTrail))
-  }
-  if (historyCursor) {
-    canonicalParams.set('historyCursor', historyCursor)
-  }
-  if (historyTrail.length > 0) {
-    canonicalParams.set('historyTrail', encodeCursorTrail(historyTrail))
   }
 
   const currentParams = createNonEmptySearchParams(resolvedSearch)
@@ -134,20 +134,11 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [
-    queue,
-    history,
-    filterOptions,
-    analytics,
-    queueTotalCount,
-    historyTotalCount,
-  ] = await Promise.all([
+  const [queue, filterOptions, analytics, queueTotalCount] = await Promise.all([
     getFinanceQueueAction(queueCursor, 10, normalizedFilterParams),
-    getFinanceHistoryAction(historyCursor, 10, normalizedFilterParams),
     getFinanceFilterOptions(supabase),
-    getFinanceQueueAnalytics(supabase, normalizedFilters),
-    getFinanceQueueTotalCount(supabase, normalizedFilters),
-    getFinanceHistoryTotalCount(supabase, normalizedFilters),
+    getFinanceQueueAnalytics(supabase, effectiveFilters),
+    getFinanceQueueTotalCount(supabase, effectiveFilters),
   ])
 
   const queuePagination = buildCursorNavigationLinks({
@@ -160,39 +151,25 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     nextCursor: queue.nextCursor,
   })
 
-  const historyPagination = buildCursorNavigationLinks({
-    pathname: '/finance',
-    query: paginationQuery,
-    cursorKey: 'historyCursor',
-    trailKey: 'historyTrail',
-    currentCursor: historyCursor,
-    currentTrail: historyTrail,
-    nextCursor: history.nextCursor,
-  })
-
   const queueTotalPages = getCursorTotalPages(queueTotalCount, queue.limit)
-  const historyTotalPages = getCursorTotalPages(
-    historyTotalCount,
-    history.limit
-  )
 
   const currentPageCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
-    normalizedFilters
+    effectiveFilters
   )
   currentPageCsvParams.set('mode', 'page')
-  if (historyCursor) {
-    currentPageCsvParams.set('historyCursor', historyCursor)
+  if (queueCursor) {
+    currentPageCsvParams.set('queueCursor', queueCursor)
   }
 
   const allRowsCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
-    normalizedFilters
+    effectiveFilters
   )
   allRowsCsvParams.set('mode', 'all')
 
-  const exportCurrentPageHref = `/finance/export?${currentPageCsvParams.toString()}`
-  const exportAllHref = `/finance/export?${allRowsCsvParams.toString()}`
+  const exportCurrentPageHref = `/finance/pending-export?${currentPageCsvParams.toString()}`
+  const exportAllHref = `/finance/pending-export?${allRowsCsvParams.toString()}`
 
   return (
     <>
@@ -200,8 +177,14 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
         <div className="mx-auto w-full max-w-6xl">
           <div className="space-y-6">
             <FinanceFiltersBar
-              filters={normalizedFilters}
+              pathname="/finance"
+              heading="Pending Claims Filters"
+              filters={effectiveFilters}
               options={filterOptions}
+              showHodApproverFilter={false}
+              showClaimStatusFilter={false}
+              showActionFilter={false}
+              dateFilterOptions={PENDING_CLAIMS_DATE_FILTER_OPTIONS}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}
             />
@@ -214,13 +197,13 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
                   tone: 'neutral',
                 },
                 {
-                  label: 'Pending Finance Queue',
+                  label: 'Pending Claims',
                   count: analytics.pendingFinanceQueue.count,
                   amount: analytics.pendingFinanceQueue.amount,
                   tone: 'finance',
                 },
                 {
-                  label: 'Payment Issued',
+                  label: 'Payment Released',
                   count: analytics.approved.count,
                   amount: analytics.approved.amount,
                   tone: 'approved',
@@ -240,15 +223,6 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
                 pageSize: queue.limit,
                 totalPages: queueTotalPages,
                 totalItems: queueTotalCount,
-              }}
-            />
-            <FinanceHistoryList
-              history={history}
-              pagination={{
-                ...historyPagination,
-                pageSize: history.limit,
-                totalPages: historyTotalPages,
-                totalItems: historyTotalCount,
               }}
             />
           </div>

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { AuthMessageToast } from '@/features/auth/components/auth-message-toast'
 import { LoginCard } from '@/features/auth/components/login-card'
 import { getCurrentUser } from '@/features/auth/queries'
+import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import {
   isDevelopmentAuthEnabled,
   getLoginErrorMessage,
@@ -24,8 +25,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     searchParams,
   ])
 
+  if (user?.email) {
+    try {
+      const supabase = await createSupabaseServerClient()
+      const employee = await getEmployeeByEmail(supabase, user.email)
+
+      if (employee) {
+        redirect('/dashboard')
+      }
+
+      redirect('/no-access')
+    } catch {
+      redirect('/no-access')
+    }
+  }
+
   if (user) {
-    redirect('/dashboard')
+    redirect('/no-access')
   }
 
   const errorValue = queryParams.error
