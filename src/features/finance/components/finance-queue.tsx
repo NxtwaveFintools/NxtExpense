@@ -229,12 +229,17 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
         />
 
         <div className={DATA_TABLE_SCROLL_WRAPPER_CLASS}>
-          <table className={`${DATA_TABLE_CLASS} min-w-220 border-collapse`}>
+          <table className={`${DATA_TABLE_CLASS} min-w-230 border-collapse`}>
             <thead>
               <tr className={DATA_TABLE_HEAD_ROW_CLASS}>
-                <th className={getDataTableHeadCellClass()}>Select</th>
-                <th className={getDataTableHeadCellClass({ nowrap: true })}>
+                <th className="w-12 px-2 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Select
+                </th>
+                <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   Claim ID
+                </th>
+                <th className={getDataTableHeadCellClass({ nowrap: true })}>
+                  Emp ID
                 </th>
                 <th className={getDataTableHeadCellClass()}>Employee</th>
                 <th className={getDataTableHeadCellClass()}>Travel Date</th>

@@ -1,3 +1,5 @@
+import { AnimatedNumber } from '@/components/ui/animated-number'
+
 type ClaimAnalyticsTone =
   | 'neutral'
   | 'pending'
@@ -47,15 +49,6 @@ const TONE_STYLES: Record<
   },
 }
 
-function formatInr(value: number): string {
-  const hasDecimals = Math.abs(value % 1) > 0
-
-  return `₹${value.toLocaleString('en-IN', {
-    minimumFractionDigits: hasDecimals ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`
-}
-
 export function ClaimAnalyticsCards({
   cards,
   columnsClassName = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4',
@@ -69,6 +62,7 @@ export function ClaimAnalyticsCards({
     <section className={wrapperClassName}>
       {cards.map((card) => {
         const tone = TONE_STYLES[card.tone]
+        const amountHasDecimals = Math.abs(card.amount % 1) > 0
 
         return (
           <div
@@ -81,10 +75,15 @@ export function ClaimAnalyticsCards({
             <p
               className={`mt-2 text-2xl font-semibold tabular-nums ${tone.countClass}`}
             >
-              {card.count}
+              <AnimatedNumber value={card.count} format="count" />
             </p>
             <p className="mt-1.5 text-sm font-medium text-muted-foreground">
-              Amount {formatInr(card.amount)}
+              Amount{' '}
+              <AnimatedNumber
+                value={card.amount}
+                format="inr"
+                includeDecimals={amountHasDecimals}
+              />
             </p>
           </div>
         )

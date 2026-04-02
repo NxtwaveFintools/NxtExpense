@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceFilters } from '@/features/finance/types'
-import { getFilteredClaimIdsForFinance } from '@/features/finance/queries/filters'
+import {
+  getFilteredClaimIdsForFinance,
+  isFinanceActionDateFilterField,
+} from '@/features/finance/queries/filters'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
 type ClaimMetricSummary = {
@@ -36,7 +39,10 @@ type FinanceActionTransitionRow = {
 
 type ClaimStatusRow = {
   id: string
+  approval_level: number | null
+  is_approval: boolean
   is_rejection: boolean
+  is_terminal: boolean
   is_payment_issued: boolean
 }
 
@@ -88,13 +94,17 @@ function buildActionCursorFilter(actedAt: string, id: string): string {
 }
 
 async function getFinanceActionBuckets(supabase: SupabaseClient): Promise<{
+  financeApprovedActions: Set<string>
+  paymentReleasedActions: Set<string>
   approvedActions: Set<string>
   rejectedActions: Set<string>
 }> {
   const [statusResult, transitionResult] = await Promise.all([
     supabase
       .from('claim_statuses')
-      .select('id, is_rejection, is_payment_issued')
+      .select(
+        'id, approval_level, is_approval, is_rejection, is_terminal, is_payment_issued'
+      )
       .eq('is_active', true),
     supabase
       .from('claim_status_transitions')
@@ -120,7 +130,21 @@ async function getFinanceActionBuckets(supabase: SupabaseClient): Promise<{
   const rejectedStatusIds = new Set(
     statusRows.filter((row) => row.is_rejection).map((row) => row.id)
   )
+  const financeApprovedStatusIds = new Set(
+    statusRows
+      .filter(
+        (row) =>
+          row.is_approval &&
+          !row.is_rejection &&
+          !row.is_terminal &&
+          !row.is_payment_issued &&
+          row.approval_level === null
+      )
+      .map((row) => row.id)
+  )
 
+  const financeApprovedActions = new Set<string>()
+  const paymentReleasedActions = new Set<string>()
   const approvedActions = new Set<string>()
   const rejectedActions = new Set<string>()
 
@@ -131,7 +155,13 @@ async function getFinanceActionBuckets(supabase: SupabaseClient): Promise<{
       paymentIssuedStatusIds
     )
 
+    if (financeApprovedStatusIds.has(row.to_status_id)) {
+      financeApprovedActions.add(row.action_code)
+      approvedActions.add(row.action_code)
+    }
+
     if (paymentIssuedStatusIds.has(row.to_status_id)) {
+      paymentReleasedActions.add(normalized)
       approvedActions.add(normalized)
     }
 
@@ -140,7 +170,12 @@ async function getFinanceActionBuckets(supabase: SupabaseClient): Promise<{
     }
   }
 
-  return { approvedActions, rejectedActions }
+  return {
+    financeApprovedActions,
+    paymentReleasedActions,
+    approvedActions,
+    rejectedActions,
+  }
 }
 
 export async function getFinanceHistoryAnalytics(
@@ -157,14 +192,23 @@ export async function getFinanceHistoryAnalytics(
     return analytics
   }
 
-  const filterByApprovedDate =
-    filters.dateFilterField === 'finance_approved_date' &&
+  const filterByFinanceActionDate =
+    isFinanceActionDateFilterField(filters.dateFilterField) &&
     (filters.dateFrom || filters.dateTo)
 
-  const { approvedActions, rejectedActions } =
-    await getFinanceActionBuckets(supabase)
+  const {
+    approvedActions,
+    rejectedActions,
+    financeApprovedActions,
+    paymentReleasedActions,
+  } = await getFinanceActionBuckets(supabase)
 
-  if (filterByApprovedDate && approvedActions.size === 0) {
+  const dateScopedActions =
+    filters.dateFilterField === 'finance_approved_date'
+      ? financeApprovedActions
+      : paymentReleasedActions
+
+  if (filterByFinanceActionDate && dateScopedActions.size === 0) {
     return analytics
   }
 
@@ -179,8 +223,8 @@ export async function getFinanceHistoryAnalytics(
       .order('id', { ascending: false })
       .limit(pageSize)
 
-    if (filterByApprovedDate) {
-      query = query.in('action', [...approvedActions])
+    if (filterByFinanceActionDate) {
+      query = query.in('action', [...dateScopedActions])
 
       const dateFrom = toIstDayStart(filters.dateFrom)
       const dateTo = toIstDayEnd(filters.dateTo)

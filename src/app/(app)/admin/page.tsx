@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAdminSummary } from '@/features/admin/queries'
 import { getAdminFinanceOverview } from '@/features/admin/queries/finance-overview'
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
+import { AnimatedNumber } from '@/components/ui/animated-number'
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient()
@@ -49,7 +50,7 @@ export default async function AdminPage() {
             tone: 'finance',
           },
           {
-            label: 'Payment Issued',
+            label: 'Payment Released',
             count: financeOverview.paymentIssued.count,
             amount: financeOverview.paymentIssued.amount,
             tone: 'approved',
@@ -72,7 +73,7 @@ export default async function AdminPage() {
           >
             <p className="text-sm text-foreground/60">{card.label}</p>
             <p className="mt-1 text-2xl font-semibold text-foreground">
-              {card.value}
+              <AnimatedNumber value={card.value} />
             </p>
           </Link>
         ))}

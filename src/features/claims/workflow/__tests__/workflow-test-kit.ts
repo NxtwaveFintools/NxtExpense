@@ -3,9 +3,14 @@ export type WorkflowStatus =
   | 'L3_PENDING_FINANCE_REVIEW'
   | 'REJECTED'
   | 'APPROVED'
+  | 'PAYMENT_RELEASED'
 
 type ApprovalAction = 'approved' | 'rejected'
-type FinanceAction = 'issued' | 'finance_rejected'
+type FinanceAction =
+  | 'finance_approved'
+  | 'payment_released'
+  | 'released'
+  | 'finance_rejected'
 
 export type WorkflowHistoryEntry = {
   actorEmail: string
@@ -169,7 +174,11 @@ export function applyApprovalTransition(
 ): string | null {
   const normalizedActor = normalizeEmail(actorEmail)
 
-  if (claim.statusCode === 'APPROVED' || claim.statusCode === 'REJECTED') {
+  if (
+    claim.statusCode === 'APPROVED' ||
+    claim.statusCode === 'PAYMENT_RELEASED' ||
+    claim.statusCode === 'REJECTED'
+  ) {
     return 'Claim is already finalized.'
   }
 
@@ -223,15 +232,35 @@ export function applyFinanceTransition(
     return 'Finance access is required.'
   }
 
-  if (claim.statusCode === 'APPROVED' || claim.statusCode === 'REJECTED') {
+  if (
+    claim.statusCode === 'PAYMENT_RELEASED' ||
+    claim.statusCode === 'REJECTED'
+  ) {
     return 'Claim is already finalized.'
   }
 
-  if (
-    claim.statusCode !== 'L3_PENDING_FINANCE_REVIEW' ||
-    claim.currentApprovalLevel !== null
-  ) {
-    return 'Claim is not in finance review stage.'
+  const isFinanceApprovalAction = params.p_action === 'finance_approved'
+  const isPaymentReleaseAction =
+    params.p_action === 'payment_released' || params.p_action === 'released'
+
+  if (params.p_action === 'finance_rejected') {
+    if (
+      claim.statusCode !== 'L3_PENDING_FINANCE_REVIEW' ||
+      claim.currentApprovalLevel !== null
+    ) {
+      return 'Claim is not in finance review stage.'
+    }
+  } else if (isFinanceApprovalAction) {
+    if (
+      claim.statusCode !== 'L3_PENDING_FINANCE_REVIEW' ||
+      claim.currentApprovalLevel !== null
+    ) {
+      return 'Claim is not in finance review stage.'
+    }
+  } else if (isPaymentReleaseAction) {
+    if (claim.statusCode !== 'APPROVED') {
+      return 'Claim is not finance approved yet.'
+    }
   }
 
   claim.approvalHistory.push({
@@ -249,9 +278,20 @@ export function applyFinanceTransition(
     return null
   }
 
-  claim.statusCode = 'APPROVED'
-  claim.allowResubmit = false
-  claim.rejectionReason = null
+  if (isFinanceApprovalAction) {
+    claim.statusCode = 'APPROVED'
+    claim.allowResubmit = false
+    claim.rejectionReason = null
+    return null
+  }
+
+  if (isPaymentReleaseAction) {
+    claim.statusCode = 'PAYMENT_RELEASED'
+    claim.allowResubmit = false
+    claim.rejectionReason = null
+    return null
+  }
+
   return null
 }
 

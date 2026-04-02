@@ -132,7 +132,7 @@ function DashboardClaimSummarySections({
               tone: 'pending',
             },
             {
-              label: 'Payment Issued',
+              label: 'Payment Released',
               count: stats.approved.count,
               amount: stats.approved.amount,
               tone: 'approved',

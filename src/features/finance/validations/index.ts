@@ -7,6 +7,7 @@ const FINANCE_DATE_FILTER_FIELD_VALUES = [
   'claim_date',
   'submitted_at',
   'finance_approved_date',
+  'payment_released_date',
 ] as const
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/

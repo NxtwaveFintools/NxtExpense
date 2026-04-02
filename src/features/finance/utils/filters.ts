@@ -2,6 +2,7 @@ import { formatDate, formatDatetime } from '@/lib/utils/date'
 import type {
   FinanceFilters,
   FinanceHistoryItem,
+  FinanceQueueItem,
 } from '@/features/finance/types'
 import { financeFiltersSchema } from '@/features/finance/validations'
 
@@ -124,9 +125,11 @@ function toFriendlyAction(value: string): string {
 export function buildFinanceHistoryCsv(rows: FinanceHistoryItem[]): string {
   const headers = [
     'Claim ID',
+    'Employee ID',
     'Employee',
+    'Employee Email',
     'Employee Designation',
-    'Claim Date',
+    'Travel Date',
     'Work Location',
     'Total Amount',
     'Action',
@@ -137,14 +140,50 @@ export function buildFinanceHistoryCsv(rows: FinanceHistoryItem[]): string {
 
   const bodyRows = rows.map((row) => [
     row.claim.claim_number,
+    row.owner.employee_id,
     row.owner.employee_name,
-    row.owner.designations?.designation_name ?? '',
+    row.owner.employee_email,
+    row.owner.designations?.designation_name ?? '-',
     formatDate(row.claim.claim_date),
     row.claim.work_location,
     `Rs. ${row.claim.total_amount.toFixed(2)}`,
     toFriendlyAction(row.action.action),
     row.action.actor_email,
     formatDatetime(row.action.acted_at),
+    row.claim.statusName,
+  ])
+
+  return [headers, ...bodyRows]
+    .map((cells) =>
+      cells.map((cell) => normalizeCsvCell(String(cell))).join(',')
+    )
+    .join('\n')
+}
+
+export function buildFinancePendingClaimsCsv(rows: FinanceQueueItem[]): string {
+  const headers = [
+    'Claim ID',
+    'Employee ID',
+    'Employee',
+    'Employee Email',
+    'Employee Designation',
+    'Travel Date',
+    'Submitted At',
+    'Work Location',
+    'Total Amount',
+    'Current Status',
+  ]
+
+  const bodyRows = rows.map((row) => [
+    row.claim.claim_number,
+    row.owner.employee_id,
+    row.owner.employee_name,
+    row.owner.employee_email,
+    row.owner.designations?.designation_name ?? '-',
+    formatDate(row.claim.claim_date),
+    row.claim.submitted_at ? formatDatetime(row.claim.submitted_at) : '-',
+    row.claim.work_location,
+    `Rs. ${Number(row.claim.total_amount).toFixed(2)}`,
     row.claim.statusName,
   ])
 

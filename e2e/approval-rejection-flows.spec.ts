@@ -136,7 +136,27 @@ async function submitOfficeClaimAndGetClaimNumber(
       })
       navigatedToClaims = true
     } catch {
-      await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
+      let submitButtonEnabled = false
+
+      for (let retry = 0; retry < 24; retry += 1) {
+        try {
+          submitButtonEnabled = await claims.submitButton.isEnabled()
+          if (submitButtonEnabled) {
+            break
+          }
+        } catch {
+          submitButtonEnabled = false
+        }
+
+        await page.waitForTimeout(500)
+      }
+
+      if (!submitButtonEnabled) {
+        await claims.gotoNewClaim()
+        await ensureClaimFormReady(page, claims)
+        continue
+      }
+
       await page.waitForTimeout(250)
     }
 

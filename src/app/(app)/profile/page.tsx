@@ -10,15 +10,16 @@ import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import { getAllClaimStatuses } from '@/lib/services/config-service'
 import { redirect } from 'next/navigation'
 import { formatDate } from '@/lib/utils/date'
+import { AnimatedNumber } from '@/components/ui/animated-number'
 
 export const dynamic = 'force-dynamic'
 
 type ClaimStats = {
   total: number
   pending: number
-  approved: number
+  financeApproved: number
   rejected: number
-  issued: number
+  paymentReleased: number
 }
 
 async function getClaimStats(
@@ -38,40 +39,50 @@ async function getClaimStats(
   ])
 
   if (claimsResult.error)
-    return { total: 0, pending: 0, approved: 0, rejected: 0, issued: 0 }
+    return {
+      total: 0,
+      pending: 0,
+      financeApproved: 0,
+      rejected: 0,
+      paymentReleased: 0,
+    }
 
   const rows = claimsResult.data ?? []
 
   const rejectionIds = new Set(
     statusCatalog.filter((s) => s.is_rejection).map((s) => s.id)
   )
-  const issuedIds = new Set(
-    statusCatalog.filter((s) => s.is_payment_issued).map((s) => s.id)
+  const financeApprovedIds = new Set(
+    statusCatalog.filter((s) => s.status_code === 'APPROVED').map((s) => s.id)
   )
-  const terminalNonRejectNonIssuedIds = new Set(
-    statusCatalog
-      .filter((s) => s.is_terminal && !s.is_rejection && !s.is_payment_issued)
-      .map((s) => s.id)
+  const paymentReleasedIds = new Set(
+    statusCatalog.filter((s) => s.is_payment_issued).map((s) => s.id)
   )
 
   let pending = 0
   let rejected = 0
-  let issued = 0
-  let approved = 0
+  let paymentReleased = 0
+  let financeApproved = 0
   for (const row of rows) {
     const sid = row.status_id as string
-    if (issuedIds.has(sid)) {
-      issued++
+    if (paymentReleasedIds.has(sid)) {
+      paymentReleased++
     } else if (rejectionIds.has(sid)) {
       rejected++
-    } else if (terminalNonRejectNonIssuedIds.has(sid)) {
-      approved++
+    } else if (financeApprovedIds.has(sid)) {
+      financeApproved++
     } else {
       pending++
     }
   }
 
-  return { total: rows.length, pending, approved, rejected, issued }
+  return {
+    total: rows.length,
+    pending,
+    financeApproved,
+    rejected,
+    paymentReleased,
+  }
 }
 
 export default async function ProfilePage() {
@@ -128,8 +139,8 @@ export default async function ProfilePage() {
           iconColor: 'text-amber-600',
         },
         {
-          label: 'Payment Issued',
-          value: stats.approved,
+          label: 'Finance Approved',
+          value: stats.financeApproved,
           color: 'text-emerald-600 dark:text-emerald-400',
           bgIcon: 'bg-emerald-500/10',
           iconColor: 'text-emerald-600',
@@ -142,8 +153,8 @@ export default async function ProfilePage() {
           iconColor: 'text-rose-600',
         },
         {
-          label: 'Issued',
-          value: stats.issued,
+          label: 'Payment Released',
+          value: stats.paymentReleased,
           color: 'text-blue-600 dark:text-blue-400',
           bgIcon: 'bg-blue-500/10',
           iconColor: 'text-blue-600',
@@ -250,7 +261,7 @@ export default async function ProfilePage() {
                     </div>
                   </div>
                   <p className={`text-2xl font-semibold ${s.color}`}>
-                    {s.value}
+                    <AnimatedNumber value={s.value} />
                   </p>
                   <p className="mt-1 text-xs font-medium text-muted-foreground">
                     {s.label}

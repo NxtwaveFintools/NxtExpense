@@ -87,6 +87,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   const effectiveFilters = {
     ...normalizedFilters,
     hodApproverEmployeeId: null,
+    claimStatus: null,
     dateFilterField: PENDING_CLAIMS_DATE_FILTER_OPTION_SET.has(
       normalizedFilters.dateFilterField
     )
@@ -152,6 +153,24 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const queueTotalPages = getCursorTotalPages(queueTotalCount, queue.limit)
 
+  const currentPageCsvParams = addFinanceFiltersToParams(
+    new URLSearchParams(),
+    effectiveFilters
+  )
+  currentPageCsvParams.set('mode', 'page')
+  if (queueCursor) {
+    currentPageCsvParams.set('queueCursor', queueCursor)
+  }
+
+  const allRowsCsvParams = addFinanceFiltersToParams(
+    new URLSearchParams(),
+    effectiveFilters
+  )
+  allRowsCsvParams.set('mode', 'all')
+
+  const exportCurrentPageHref = `/finance/pending-export?${currentPageCsvParams.toString()}`
+  const exportAllHref = `/finance/pending-export?${allRowsCsvParams.toString()}`
+
   return (
     <>
       <main className="min-h-screen bg-background px-4 py-8">
@@ -163,8 +182,11 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
               filters={effectiveFilters}
               options={filterOptions}
               showHodApproverFilter={false}
+              showClaimStatusFilter={false}
               showActionFilter={false}
               dateFilterOptions={PENDING_CLAIMS_DATE_FILTER_OPTIONS}
+              exportCurrentPageHref={exportCurrentPageHref}
+              exportAllHref={exportAllHref}
             />
             <ClaimAnalyticsCards
               cards={[
@@ -181,7 +203,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
                   tone: 'finance',
                 },
                 {
-                  label: 'Payment Issued',
+                  label: 'Payment Released',
                   count: analytics.approved.count,
                   amount: analytics.approved.amount,
                   tone: 'approved',

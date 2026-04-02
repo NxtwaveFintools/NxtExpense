@@ -25,7 +25,7 @@ export function FinanceClaimRow({
 }: FinanceClaimRowProps) {
   return (
     <tr className={DATA_TABLE_ROW_CLASS}>
-      <td className={getDataTableCellClass()}>
+      <td className="px-2 py-3.5">
         <input
           type="checkbox"
           checked={checked}
@@ -34,13 +34,16 @@ export function FinanceClaimRow({
           className="size-4 rounded border-border accent-primary"
         />
       </td>
-      <td className={getDataTableCellClass({ weight: 'medium', nowrap: true })}>
+      <td className="px-2 py-3.5 font-medium whitespace-nowrap">
         <Link
           href={`/claims/${item.claim.id}?from=finance`}
           className="text-primary font-semibold hover:text-primary-hover transition-colors"
         >
           {item.claim.claim_number}
         </Link>
+      </td>
+      <td className={getDataTableCellClass({ muted: true, nowrap: true })}>
+        {item.owner.employee_id}
       </td>
       <td className={getDataTableCellClass({ muted: true, nowrap: true })}>
         {item.owner.employee_name}

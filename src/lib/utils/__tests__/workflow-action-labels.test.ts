@@ -28,6 +28,18 @@ describe('workflow action CTA labels', () => {
     expect(
       getWorkflowActionCtaLabel({ action: 'issued', display_label: 'Issued' })
     ).toBe('Approve')
+    expect(
+      getWorkflowActionCtaLabel({
+        action: 'finance_approved',
+        display_label: 'Finance Approved',
+      })
+    ).toBe('Approve')
+    expect(
+      getWorkflowActionCtaLabel({
+        action: 'payment_released',
+        display_label: 'Payment Released',
+      })
+    ).toBe('Release Payment')
   })
 
   it('falls back to normalized display label for unknown actions', () => {

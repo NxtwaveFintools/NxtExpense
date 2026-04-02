@@ -59,7 +59,11 @@ type ApprovalRpcParams = {
 
 type FinanceRpcParams = {
   p_claim_id: string
-  p_action: 'issued' | 'finance_rejected'
+  p_action:
+    | 'finance_approved'
+    | 'payment_released'
+    | 'released'
+    | 'finance_rejected'
   p_notes: string | null
   p_allow_resubmit: boolean
 }
@@ -81,8 +85,15 @@ function getMockAvailableActions() {
       actor_scope: 'approver',
     },
     {
-      action: 'issued',
-      display_label: 'Issue',
+      action: 'finance_approved',
+      display_label: 'Finance Approved',
+      require_notes: false,
+      supports_allow_resubmit: false,
+      actor_scope: 'finance',
+    },
+    {
+      action: 'payment_released',
+      display_label: 'Payment Released',
       require_notes: false,
       supports_allow_resubmit: false,
       actor_scope: 'finance',
@@ -145,8 +156,17 @@ async function financeApproveClaim(claimId: string, financeEmail: string) {
   setActor(financeEmail)
   return submitFinanceAction({
     claimId,
-    action: 'issued',
+    action: 'finance_approved',
     notes: 'Finance approved and queued for payout.',
+  })
+}
+
+async function financeReleaseClaim(claimId: string, financeEmail: string) {
+  setActor(financeEmail)
+  return submitFinanceAction({
+    claimId,
+    action: 'payment_released',
+    notes: 'Payment released to employee.',
   })
 }
 
@@ -173,19 +193,43 @@ async function runStandardFlowScenario(
   expect(financeResult).toEqual({ ok: true, error: null })
 
   expect(claim.statusCode).toBe('APPROVED')
-  expect(getClaimStatusDisplayLabel(claim.statusCode, 'Payment Issued')).toBe(
-    'Payment Issued'
+  expect(getClaimStatusDisplayLabel(claim.statusCode, 'Finance Approved')).toBe(
+    'Finance Approved'
   )
+
+  const releaseResult = await financeReleaseClaim(claim.id, financeEmail)
+  expect(releaseResult).toEqual({ ok: true, error: null })
+
+  expect(claim.statusCode).toBe('PAYMENT_RELEASED')
+  expect(getClaimStatusDisplayLabel(claim.statusCode, 'Payment Released')).toBe(
+    'Payment Released'
+  )
+
   expect(claim.approvalHistory.map((entry) => entry.actorEmail)).toEqual([
     sbhEmail.toLowerCase(),
     MANSOOR_EMAIL,
+    financeEmail.toLowerCase(),
     financeEmail.toLowerCase(),
   ])
   expect(claim.approvalHistory.map((entry) => entry.approvalLevel)).toEqual([
     1,
     3,
     null,
+    null,
   ])
+
+  expect(claim.approvalHistory.map((entry) => entry.action)).toEqual([
+    'approved',
+    'approved',
+    'finance_approved',
+    'payment_released',
+  ])
+
+  expect(claim.approvalHistory.length).toBe(4)
+
+  expect(claim.approvalHistory.at(-1)?.notes).toBe(
+    'Payment released to employee.'
+  )
 
   return claim
 }

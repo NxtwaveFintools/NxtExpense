@@ -34,6 +34,16 @@ type FilteredApprovalHistoryRpcRow = {
 type ClaimStatusDisplayRow = {
   id: string
   allow_resubmit: boolean
+  employees:
+    | {
+        employee_id: string
+        employee_email: string
+      }
+    | Array<{
+        employee_id: string
+        employee_email: string
+      }>
+    | null
   claim_statuses:
     | {
         status_code: string
@@ -57,6 +67,12 @@ type StatusDisplayOverride = {
   colorToken: string
 }
 
+type ApprovalHistoryClaimEnrichment = {
+  statusDisplay: StatusDisplayOverride
+  ownerEmployeeId: string | null
+  ownerEmail: string | null
+}
+
 const IST_START_TIME = 'T00:00:00+05:30'
 const IST_END_TIME = 'T23:59:59.999+05:30'
 
@@ -70,7 +86,7 @@ function toIstDayEnd(date: string | null): string | null {
 
 function mapHistoryRecord(
   row: FilteredApprovalHistoryRpcRow,
-  statusOverride?: StatusDisplayOverride
+  enrichment?: ApprovalHistoryClaimEnrichment
 ): ApprovalHistoryRecord {
   return {
     actionId: row.action_id,
@@ -79,10 +95,12 @@ function mapHistoryRecord(
     claimDate: row.claim_date,
     workLocation: row.work_location,
     totalAmount: Number(row.total_amount),
-    claimStatusName: statusOverride?.label ?? row.claim_status_name,
+    claimStatusName: enrichment?.statusDisplay.label ?? row.claim_status_name,
     claimStatusDisplayColor:
-      statusOverride?.colorToken ?? row.claim_status_display_color,
+      enrichment?.statusDisplay.colorToken ?? row.claim_status_display_color,
+    ownerEmployeeId: enrichment?.ownerEmployeeId ?? null,
     ownerName: row.owner_name,
+    ownerEmail: enrichment?.ownerEmail ?? null,
     ownerDesignation: row.owner_designation,
     actorEmail: row.actor_email,
     actorDesignation: row.actor_designation,
@@ -95,10 +113,10 @@ function mapHistoryRecord(
   }
 }
 
-async function getStatusDisplayOverridesByClaimId(
+async function getApprovalHistoryClaimEnrichmentByClaimId(
   supabase: SupabaseClient,
   claimIds: string[]
-): Promise<Map<string, StatusDisplayOverride>> {
+): Promise<Map<string, ApprovalHistoryClaimEnrichment>> {
   if (claimIds.length === 0) {
     return new Map()
   }
@@ -106,7 +124,7 @@ async function getStatusDisplayOverridesByClaimId(
   const { data, error } = await supabase
     .from('expense_claims')
     .select(
-      'id, allow_resubmit, claim_statuses!status_id(status_code, status_name, display_color, allow_resubmit_status_name, allow_resubmit_display_color)'
+      'id, allow_resubmit, employees!employee_id(employee_id, employee_email), claim_statuses!status_id(status_code, status_name, display_color, allow_resubmit_status_name, allow_resubmit_display_color)'
     )
     .in('id', claimIds)
 
@@ -114,12 +132,15 @@ async function getStatusDisplayOverridesByClaimId(
     throw new Error(error.message)
   }
 
-  const overrides = new Map<string, StatusDisplayOverride>()
+  const enrichmentByClaimId = new Map<string, ApprovalHistoryClaimEnrichment>()
 
   for (const row of (data ?? []) as ClaimStatusDisplayRow[]) {
     const statusInfo = Array.isArray(row.claim_statuses)
       ? row.claim_statuses[0]
       : row.claim_statuses
+    const owner = Array.isArray(row.employees)
+      ? row.employees[0]
+      : row.employees
 
     const display = getClaimStatusDisplay({
       statusCode: statusInfo?.status_code,
@@ -130,10 +151,14 @@ async function getStatusDisplayOverridesByClaimId(
       allowResubmitDisplayColor: statusInfo?.allow_resubmit_display_color,
     })
 
-    overrides.set(row.id, display)
+    enrichmentByClaimId.set(row.id, {
+      statusDisplay: display,
+      ownerEmployeeId: owner?.employee_id ?? null,
+      ownerEmail: owner?.employee_email ?? null,
+    })
   }
 
-  return overrides
+  return enrichmentByClaimId
 }
 
 export async function getFilteredApprovalHistoryPaginated(
@@ -177,12 +202,12 @@ export async function getFilteredApprovalHistoryPaginated(
   const hasNextPage = rows.length > normalizedLimit
   const pageRows = hasNextPage ? rows.slice(0, normalizedLimit) : rows
   const claimIds = [...new Set(pageRows.map((row) => row.claim_id))]
-  const statusDisplayByClaimId = await getStatusDisplayOverridesByClaimId(
+  const claimEnrichmentById = await getApprovalHistoryClaimEnrichmentByClaimId(
     supabase,
     claimIds
   )
   const mappedRows = pageRows.map((row) =>
-    mapHistoryRecord(row, statusDisplayByClaimId.get(row.claim_id))
+    mapHistoryRecord(row, claimEnrichmentById.get(row.claim_id))
   )
 
   const lastRecord = pageRows.at(-1)

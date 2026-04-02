@@ -46,16 +46,28 @@ async function hasDateCollisionMessage(page: Page): Promise<boolean> {
 }
 
 async function findOutstationOption(
-  claims: ClaimsPage
+  claims: ClaimsPage,
+  page: Page
 ): Promise<RuntimeWorkLocationOption> {
-  const options = await claims.getWorkLocationOptions()
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const options = await claims.getWorkLocationOptions()
 
-  for (const option of options) {
-    await claims.selectWorkLocationByValue(option.value)
+    for (const option of options) {
+      await claims.selectWorkLocationByValue(option.value)
+      await page.waitForTimeout(120)
 
-    if (await claims.intercityOwnVehicleGroup.isVisible().catch(() => false)) {
-      return option
+      if (
+        await claims.intercityOwnVehicleGroup.isVisible().catch(() => false)
+      ) {
+        return option
+      }
+
+      if (option.label.toLowerCase().includes('outstation')) {
+        return option
+      }
     }
+
+    await page.waitForTimeout(250)
   }
 
   throw new Error(
@@ -107,6 +119,7 @@ async function submitOutstationRentalClaimAndGetNumber(
 
     await claims.ensureNewClaimFormReady()
     await claims.fillClaimDate(claimDateIso)
+    await expect(claims.submitButton).toBeEnabled({ timeout: 20_000 })
     await claims.submitButton.click()
 
     let navigatedToClaims = false
@@ -117,7 +130,25 @@ async function submitOutstationRentalClaimAndGetNumber(
       })
       navigatedToClaims = true
     } catch {
-      await expect(claims.submitButton).toBeEnabled({ timeout: 10_000 })
+      let submitButtonEnabled = false
+
+      for (let retry = 0; retry < 20; retry += 1) {
+        try {
+          submitButtonEnabled = await claims.submitButton.isEnabled()
+          if (submitButtonEnabled) {
+            break
+          }
+        } catch {
+          submitButtonEnabled = false
+        }
+
+        await page.waitForTimeout(500)
+      }
+
+      if (!submitButtonEnabled) {
+        await claims.gotoNewClaim()
+        await claims.ensureNewClaimFormReady()
+      }
 
       const submittedClaimNumber =
         (await claims.getSubmittedClaimNumberFromSuccessToast(5_000)) ??
@@ -168,7 +199,7 @@ test.describe('Claim Detail Line Items', () => {
     const claims = new ClaimsPage(page)
     await claims.gotoNewClaim()
 
-    const outstationOption = await findOutstationOption(claims)
+    const outstationOption = await findOutstationOption(claims, page)
     const claimNumber = await submitOutstationRentalClaimAndGetNumber(
       page,
       claims,

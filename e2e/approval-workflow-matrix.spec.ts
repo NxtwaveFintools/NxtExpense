@@ -87,7 +87,27 @@ async function submitOfficeClaimAndGetClaimNumber(
       })
       navigatedToClaims = true
     } catch {
-      await expect(claims.submitButton).toBeEnabled({ timeout: 60_000 })
+      let submitButtonEnabled = false
+
+      for (let retry = 0; retry < 24; retry += 1) {
+        try {
+          submitButtonEnabled = await claims.submitButton.isEnabled()
+          if (submitButtonEnabled) {
+            break
+          }
+        } catch {
+          submitButtonEnabled = false
+        }
+
+        await page.waitForTimeout(500)
+      }
+
+      if (!submitButtonEnabled) {
+        await claims.gotoNewClaim()
+        await claims.ensureNewClaimFormReady()
+        continue
+      }
+
       await page.waitForTimeout(250)
     }
 
@@ -215,6 +235,46 @@ async function issueClaimInFinanceQueue(
     .toBe(0)
 }
 
+async function releaseClaimFromApprovedHistory(
+  page: Page,
+  loginAs: LoginAs,
+  financeEmail: string,
+  claimNumber: string
+): Promise<void> {
+  await loginAsFresh(page, loginAs, financeEmail)
+
+  const finance = new FinancePage(page)
+  await finance.gotoApprovedHistory()
+  await finance.filterHistoryByClaimNumber(claimNumber)
+
+  const historyRow = finance.getHistoryRowByClaimNumber(claimNumber)
+  await expect(historyRow).toBeVisible({ timeout: 20_000 })
+
+  const historyCheckbox = finance.getHistoryCheckboxByClaimNumber(claimNumber)
+  await historyCheckbox.check()
+  await expect(historyCheckbox).toBeChecked()
+
+  await expect(finance.bulkReleaseButton).toBeEnabled()
+  await finance.bulkReleaseButton.click()
+
+  await expect
+    .poll(
+      async () => {
+        await finance.gotoApprovedHistory()
+        await finance.filterHistoryByClaimNumber(claimNumber)
+        return (
+          (await finance
+            .getHistoryRowByClaimNumber(claimNumber)
+            .textContent()) ?? ''
+        )
+      },
+      {
+        timeout: 30_000,
+      }
+    )
+    .toContain('Payment Released')
+}
+
 async function runWorkflowPath(
   page: Page,
   loginAs: LoginAs,
@@ -243,6 +303,12 @@ async function runWorkflowPath(
     )
   }
   await issueClaimInFinanceQueue(page, loginAs, path.financeEmail, claimNumber)
+  await releaseClaimFromApprovedHistory(
+    page,
+    loginAs,
+    path.financeEmail,
+    claimNumber
+  )
 }
 
 test.describe

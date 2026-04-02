@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
+  FinanceDateFilterField,
   FinanceFilterOption,
   FinanceFilterOptions,
   FinanceFilters,
@@ -36,6 +37,15 @@ type ClaimStatusFilterRow = {
   allow_resubmit_status_name: string | null
 }
 
+type ClaimStatusIdRow = {
+  id: string
+}
+
+export type FinanceActionDateFilterField = Extract<
+  FinanceDateFilterField,
+  'finance_approved_date' | 'payment_released_date'
+>
+
 function toLikePattern(value: string): string {
   const escaped = value.replaceAll('%', '\\%').replaceAll('_', '\\_')
   return `%${escaped}%`
@@ -70,6 +80,95 @@ function normalizeFinanceHistoryActionCode(
 
 function formatFinanceActionLabel(actionCode: string): string {
   return toTitleCaseWords(actionCode)
+}
+
+export function isFinanceActionDateFilterField(
+  field: FinanceDateFilterField
+): field is FinanceActionDateFilterField {
+  return field === 'finance_approved_date' || field === 'payment_released_date'
+}
+
+async function getFinanceApprovedStatusIds(
+  supabase: SupabaseClient
+): Promise<Set<string>> {
+  const { data: statuses, error } = await supabase
+    .from('claim_statuses')
+    .select('id')
+    .eq('is_active', true)
+    .eq('is_approval', true)
+    .eq('is_rejection', false)
+    .eq('is_terminal', false)
+    .eq('is_payment_issued', false)
+    .is('approval_level', null)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return new Set((statuses ?? []).map((row) => (row as ClaimStatusIdRow).id))
+}
+
+async function getPaymentReleasedStatusIds(
+  supabase: SupabaseClient
+): Promise<Set<string>> {
+  const { data: statuses, error } = await supabase
+    .from('claim_statuses')
+    .select('id')
+    .eq('is_payment_issued', true)
+    .eq('is_active', true)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return new Set((statuses ?? []).map((row) => (row as ClaimStatusIdRow).id))
+}
+
+async function getDateFilterTargetStatusIds(
+  supabase: SupabaseClient,
+  dateFilterField: FinanceActionDateFilterField
+): Promise<Set<string>> {
+  return dateFilterField === 'finance_approved_date'
+    ? getFinanceApprovedStatusIds(supabase)
+    : getPaymentReleasedStatusIds(supabase)
+}
+
+export async function getFinanceActionCodesForDateFilter(
+  supabase: SupabaseClient,
+  dateFilterField: FinanceActionDateFilterField,
+  targetStatusIds?: Set<string>
+): Promise<string[]> {
+  const resolvedStatusIds =
+    targetStatusIds ??
+    (await getDateFilterTargetStatusIds(supabase, dateFilterField))
+
+  if (resolvedStatusIds.size === 0) {
+    return []
+  }
+
+  const { data: transitionRows, error: transitionError } = await supabase
+    .from('claim_status_transitions')
+    .select('action_code, to_status_id')
+    .eq('is_active', true)
+    .in('to_status_id', [...resolvedStatusIds])
+
+  if (transitionError) {
+    throw new Error(transitionError.message)
+  }
+
+  return [
+    ...new Set(
+      ((transitionRows ?? []) as FinanceActionTransitionRow[]).map((row) =>
+        dateFilterField === 'payment_released_date'
+          ? normalizeFinanceHistoryActionCode(
+              row.action_code,
+              row.to_status_id,
+              resolvedStatusIds
+            )
+          : row.action_code
+      )
+    ),
+  ]
 }
 
 export async function getFilteredClaimIdsForFinance(
@@ -150,85 +249,66 @@ export async function getFilteredClaimIdsForFinance(
     }
   }
 
-  if (
-    filters.dateFilterField === 'finance_approved_date' &&
+  const filterByFinanceActionDate =
+    isFinanceActionDateFilterField(filters.dateFilterField) &&
     (filters.dateFrom || filters.dateTo)
-  ) {
-    const { data: paymentIssuedStatuses, error: paymentIssuedStatusError } =
-      await supabase
-        .from('claim_statuses')
-        .select('id')
-        .eq('is_payment_issued', true)
-        .eq('is_active', true)
 
-    if (paymentIssuedStatusError) {
-      throw new Error(paymentIssuedStatusError.message)
-    }
-
-    const paymentIssuedStatusIds = new Set(
-      (paymentIssuedStatuses ?? []).map((row) => row.id)
+  if (filterByFinanceActionDate) {
+    const dateFilterStatusIds = await getDateFilterTargetStatusIds(
+      supabase,
+      filters.dateFilterField
     )
 
-    if (paymentIssuedStatusIds.size === 0) {
+    if (dateFilterStatusIds.size === 0) {
       return []
     }
 
-    const { data: transitionRows, error: transitionError } = await supabase
-      .from('claim_status_transitions')
-      .select('action_code, to_status_id')
-      .eq('is_active', true)
+    // Date filter fields are milestone-specific and must only return claims
+    // that are currently in the corresponding status bucket.
+    query = query.in('status_id', [...dateFilterStatusIds])
 
-    if (transitionError) {
-      throw new Error(transitionError.message)
-    }
-
-    const paymentIssuedActions = new Set(
-      ((transitionRows ?? []) as FinanceActionTransitionRow[])
-        .filter((row) => paymentIssuedStatusIds.has(row.to_status_id))
-        .map((row) =>
-          normalizeFinanceHistoryActionCode(
-            row.action_code,
-            row.to_status_id,
-            paymentIssuedStatusIds
-          )
-        )
+    const dateFilterActions = await getFinanceActionCodesForDateFilter(
+      supabase,
+      filters.dateFilterField,
+      dateFilterStatusIds
     )
 
-    if (paymentIssuedActions.size === 0) {
+    if (dateFilterActions.length === 0) {
       return []
     }
 
     let financeDateQuery = supabase
       .from('finance_actions')
       .select('claim_id')
-      .in('action', [...paymentIssuedActions])
+      .in('action', dateFilterActions)
 
-    const approvedDateFrom = toIstDayStart(filters.dateFrom)
-    const approvedDateTo = toIstDayEnd(filters.dateTo)
+    const dateFrom = toIstDayStart(filters.dateFrom)
+    const dateTo = toIstDayEnd(filters.dateTo)
 
-    if (approvedDateFrom) {
-      financeDateQuery = financeDateQuery.gte('acted_at', approvedDateFrom)
+    if (dateFrom) {
+      financeDateQuery = financeDateQuery.gte('acted_at', dateFrom)
     }
 
-    if (approvedDateTo) {
-      financeDateQuery = financeDateQuery.lte('acted_at', approvedDateTo)
+    if (dateTo) {
+      financeDateQuery = financeDateQuery.lte('acted_at', dateTo)
     }
 
-    const { data: approvedRows, error: approvedError } = await financeDateQuery
+    const { data: financeDateRows, error: financeDateError } =
+      await financeDateQuery
 
-    if (approvedError) {
-      throw new Error(approvedError.message)
+    if (financeDateError) {
+      throw new Error(financeDateError.message)
     }
 
-    const approvedClaimIds = [
-      ...new Set((approvedRows ?? []).map((row) => row.claim_id)),
+    const financeDateClaimIds = [
+      ...new Set((financeDateRows ?? []).map((row) => row.claim_id)),
     ]
 
-    if (approvedClaimIds.length === 0) {
+    if (financeDateClaimIds.length === 0) {
       return []
     }
 
-    query = query.in('id', approvedClaimIds)
+    query = query.in('id', financeDateClaimIds)
   }
 
   if (filters.workLocation) {

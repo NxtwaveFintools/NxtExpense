@@ -7,8 +7,8 @@ import {
 
 describe('claim status helpers', () => {
   it('returns provided status name for approved status code', () => {
-    expect(getClaimStatusDisplayLabel('APPROVED', 'Payment Issued')).toBe(
-      'Payment Issued'
+    expect(getClaimStatusDisplayLabel('APPROVED', 'Finance Approved')).toBe(
+      'Finance Approved'
     )
   })
 

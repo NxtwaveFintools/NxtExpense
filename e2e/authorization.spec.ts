@@ -17,7 +17,16 @@ async function navigateAndExpectUrl(
   const maxAttempts = 3
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    await page.goto(pathname)
+    try {
+      await page.goto(pathname, { timeout: 30_000 })
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error
+      }
+
+      await page.waitForTimeout(500)
+      continue
+    }
 
     try {
       await page.waitForURL(expectedUrl, { timeout: timeoutMs })

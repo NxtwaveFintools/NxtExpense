@@ -9,10 +9,19 @@ import {
 const VALID_UUID = '5db22d75-b209-4f30-b5c8-f4f27ebee9e8'
 
 describe('finance validation schemas', () => {
-  it('accepts issued action without notes', () => {
+  it('accepts finance_approved action without notes', () => {
     const parsed = financeActionSchema.safeParse({
       claimId: VALID_UUID,
-      action: 'issued',
+      action: 'finance_approved',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts payment_released action without notes', () => {
+    const parsed = financeActionSchema.safeParse({
+      claimId: VALID_UUID,
+      action: 'payment_released',
     })
 
     expect(parsed.success).toBe(true)
@@ -61,6 +70,16 @@ describe('finance validation schemas', () => {
   it('accepts submitted_at date filter values', () => {
     const parsed = financeFiltersSchema.safeParse({
       dateFilterField: 'submitted_at',
+      dateFrom: '07/03/2026',
+      dateTo: '08/03/2026',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts payment_released_date filter values', () => {
+    const parsed = financeFiltersSchema.safeParse({
+      dateFilterField: 'payment_released_date',
       dateFrom: '07/03/2026',
       dateTo: '08/03/2026',
     })

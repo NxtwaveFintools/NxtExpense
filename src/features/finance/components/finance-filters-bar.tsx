@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Filter } from 'lucide-react'
@@ -19,6 +18,7 @@ type FinanceFiltersBarProps = {
   filters: FinanceFilters
   options: FinanceFilterOptions
   showHodApproverFilter?: boolean
+  showClaimStatusFilter?: boolean
   showActionFilter?: boolean
   showDateFilter?: boolean
   dateFilterOptions?: FinanceDateFilterField[]
@@ -30,6 +30,7 @@ const DEFAULT_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
   'claim_date',
   'submitted_at',
   'finance_approved_date',
+  'payment_released_date',
 ]
 
 function getDateFilterFieldLabel(field: FinanceDateFilterField): string {
@@ -38,7 +39,11 @@ function getDateFilterFieldLabel(field: FinanceDateFilterField): string {
   }
 
   if (field === 'finance_approved_date') {
-    return 'Payment Issued Date'
+    return 'Finance Approved Date'
+  }
+
+  if (field === 'payment_released_date') {
+    return 'Payment Released Date'
   }
 
   return 'Travel Date'
@@ -50,6 +55,7 @@ export function FinanceFiltersBar({
   filters,
   options,
   showHodApproverFilter = true,
+  showClaimStatusFilter = true,
   showActionFilter = true,
   showDateFilter = true,
   dateFilterOptions = DEFAULT_DATE_FILTER_OPTIONS,
@@ -82,7 +88,9 @@ export function FinanceFiltersBar({
     if (ownerDesignation) params.set('ownerDesignation', ownerDesignation)
     if (showHodApproverFilter && hodApproverEmployeeId)
       params.set('hodApproverEmployeeId', hodApproverEmployeeId)
-    if (claimStatus) params.set('claimStatus', claimStatus)
+    if (showClaimStatusFilter && claimStatus) {
+      params.set('claimStatus', claimStatus)
+    }
     if (workLocation) params.set('workLocation', workLocation)
     if (showActionFilter && actionFilter) {
       params.set('actionFilter', actionFilter)
@@ -186,22 +194,24 @@ export function FinanceFiltersBar({
           </label>
         ) : null}
 
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-foreground">Claim Status</span>
-          <select
-            name="claimStatus"
-            value={claimStatus}
-            onChange={(e) => setClaimStatus(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">All Statuses</option>
-            {options.claimStatuses.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {showClaimStatusFilter ? (
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Claim Status</span>
+            <select
+              name="claimStatus"
+              value={claimStatus}
+              onChange={(e) => setClaimStatus(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">All Statuses</option>
+              {options.claimStatuses.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Location</span>

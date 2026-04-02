@@ -1,5 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 
+const NAVIGATION_MAX_ATTEMPTS = 3
+const NAVIGATION_RETRY_DELAY_MS = 500
+
 type WorkLocationOption = {
   value: string
   label: string
@@ -17,30 +20,58 @@ export class ClaimsPage {
       .toLowerCase()
   }
 
+  private async navigateWithRetry(pathname: string): Promise<void> {
+    for (let attempt = 1; attempt <= NAVIGATION_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        await this.page.goto(pathname, { timeout: 30_000 })
+        await this.page.waitForLoadState('networkidle')
+        return
+      } catch (error) {
+        if (attempt === NAVIGATION_MAX_ATTEMPTS) {
+          throw error
+        }
+
+        await this.page.waitForTimeout(NAVIGATION_RETRY_DELAY_MS * attempt)
+      }
+    }
+  }
+
   async goto() {
-    await this.page.goto('/claims')
-    await this.page.waitForLoadState('networkidle')
+    await this.navigateWithRetry('/claims')
   }
 
   async gotoNewClaim() {
-    await this.page.goto('/claims/new')
-    await this.page.waitForLoadState('networkidle')
+    await this.navigateWithRetry('/claims/new')
   }
 
   async ensureNewClaimFormReady(timeoutMs = 20_000) {
-    const currentPath = new URL(this.page.url()).pathname
-    if (currentPath !== '/claims/new') {
-      await this.gotoNewClaim()
-    }
+    const maxAttempts = 3
 
-    await expect(this.page).toHaveURL(/\/claims\/new(?:\?.*)?$/, {
-      timeout: timeoutMs,
-    })
-    await this.dateInput.waitFor({ state: 'visible', timeout: timeoutMs })
-    await this.workLocationSelect.waitFor({
-      state: 'visible',
-      timeout: timeoutMs,
-    })
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const currentPath = new URL(this.page.url()).pathname
+      if (currentPath !== '/claims/new') {
+        await this.gotoNewClaim()
+      }
+
+      try {
+        await expect(this.page).toHaveURL(/\/claims\/new(?:\?.*)?$/, {
+          timeout: timeoutMs,
+        })
+        await this.dateInput.waitFor({ state: 'visible', timeout: timeoutMs })
+        await this.workLocationSelect.waitFor({
+          state: 'visible',
+          timeout: timeoutMs,
+        })
+        return
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          throw error
+        }
+
+        await this.gotoNewClaim()
+        await this.page.waitForTimeout(400)
+      }
+    }
   }
 
   async fillClaimDate(dateIso: string, maxAttempts = 4) {

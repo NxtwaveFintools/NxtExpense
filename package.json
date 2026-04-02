@@ -17,7 +17,7 @@
     "test:e2e": "playwright test --project=chromium --workers=1",
     "test:e2e:ci": "playwright test --project=chromium --workers=1",
     "test:e2e:smoke": "playwright test e2e/smoke-login.spec.ts --project=chromium --workers=1",
-    "test:e2e:parallel": "playwright test --project=chromium --workers=50%",
+    "test:e2e:parallel": "playwright test --project=chromium --workers=4",
     "test:e2e:live:fast": "playwright test --project=chromium --headed --workers=50% --grep-invert \"Approval Workflow Matrix|Approval Workflow — SRO claim through full chain|Approval Rejection Flows|Finance Rejection Flows\"",
     "test:e2e:live:workflow": "playwright test e2e/approval-workflow-matrix.spec.ts e2e/approval-rejection-flows.spec.ts e2e/finance-rejection-flows.spec.ts --project=chromium --headed --workers=1",
     "test:e2e:live": "npm run test:e2e:live:fast && npm run test:e2e:live:workflow",
@@ -48,6 +48,7 @@
     "next-themes": "^0.4.6",
     "pg": "^8.20.0",
     "react": "19.2.3",
+    "react-countup": "^6.5.3",
     "react-dom": "19.2.3",
     "sonner": "^2.0.7",
     "zod": "^4.3.6"

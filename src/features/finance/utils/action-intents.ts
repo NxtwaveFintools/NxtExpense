@@ -44,7 +44,16 @@ export function buildFinanceActionIntents(
 }
 
 function isFinanceApproveAction(actionCode: string): boolean {
-  return actionCode === 'issued' || actionCode === 'finance_issued'
+  return (
+    actionCode === 'issued' ||
+    actionCode === 'finance_issued' ||
+    actionCode === 'approved' ||
+    actionCode === 'finance_approved'
+  )
+}
+
+function isFinanceReleaseAction(actionCode: string): boolean {
+  return actionCode === 'payment_released' || actionCode === 'released'
 }
 
 function isFinanceRejectAction(actionCode: string): boolean {
@@ -52,16 +61,20 @@ function isFinanceRejectAction(actionCode: string): boolean {
 }
 
 function getFinanceIntentSortRank(intent: FinanceActionIntent): number {
-  if (isFinanceApproveAction(intent.actionCode) && !intent.allowResubmit) {
+  if (isFinanceReleaseAction(intent.actionCode) && !intent.allowResubmit) {
     return 1
   }
 
-  if (isFinanceRejectAction(intent.actionCode) && !intent.allowResubmit) {
+  if (isFinanceApproveAction(intent.actionCode) && !intent.allowResubmit) {
     return 2
   }
 
-  if (isFinanceRejectAction(intent.actionCode) && intent.allowResubmit) {
+  if (isFinanceRejectAction(intent.actionCode) && !intent.allowResubmit) {
     return 3
+  }
+
+  if (isFinanceRejectAction(intent.actionCode) && intent.allowResubmit) {
+    return 4
   }
 
   return 99
@@ -82,6 +95,10 @@ export function sortFinanceActionIntents(
 }
 
 export function getFinanceActionToneClass(intent: FinanceActionIntent): string {
+  if (isFinanceReleaseAction(intent.actionCode) && !intent.allowResubmit) {
+    return 'bg-emerald-600 hover:bg-emerald-700'
+  }
+
   if (isFinanceApproveAction(intent.actionCode) && !intent.allowResubmit) {
     return 'bg-emerald-600 hover:bg-emerald-700'
   }

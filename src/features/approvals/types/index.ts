@@ -71,7 +71,9 @@ export type ApprovalHistoryRecord = {
   totalAmount: number
   claimStatusName: string
   claimStatusDisplayColor: string
+  ownerEmployeeId: string | null
   ownerName: string
+  ownerEmail: string | null
   ownerDesignation: string
   actorEmail: string
   actorDesignation: string | null

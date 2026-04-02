@@ -84,6 +84,7 @@ export default async function ApprovedHistoryPage({
   const effectiveFilters = {
     ...normalizedFilters,
     hodApproverEmployeeId: null,
+    claimStatus: null,
   }
 
   const normalizedFilterParams = {
@@ -177,6 +178,7 @@ export default async function ApprovedHistoryPage({
             filters={effectiveFilters}
             options={filterOptions}
             showHodApproverFilter={false}
+            showClaimStatusFilter={false}
             exportCurrentPageHref={exportCurrentPageHref}
             exportAllHref={exportAllHref}
           />

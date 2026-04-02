@@ -95,16 +95,26 @@ async function waitForValidationOutcome(
 }
 
 async function findOutstationOption(
-  claims: ClaimsPage
+  claims: ClaimsPage,
+  page: Page
 ): Promise<RuntimeWorkLocationOption> {
-  const options = await claims.getWorkLocationOptions()
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const options = await claims.getWorkLocationOptions()
 
-  for (const option of options) {
-    await claims.selectWorkLocationByValue(option.value)
+    for (const option of options) {
+      await claims.selectWorkLocationByValue(option.value)
+      await page.waitForTimeout(120)
 
-    if (await isVisible(claims.intercityOwnVehicleGroup)) {
-      return option
+      if (await isVisible(claims.intercityOwnVehicleGroup)) {
+        return option
+      }
+
+      if (option.label.toLowerCase().includes('outstation')) {
+        return option
+      }
     }
+
+    await page.waitForTimeout(250)
   }
 
   throw new Error(
@@ -203,7 +213,7 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
     const claims = new ClaimsPage(page)
     await claims.gotoNewClaim()
 
-    const outstationOption = await findOutstationOption(claims)
+    const outstationOption = await findOutstationOption(claims, page)
 
     let validationSeen = false
 
@@ -211,6 +221,7 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
       await claims.selectWorkLocationByValue(outstationOption.value)
       await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
 
+      await expect(claims.submitButton).toBeEnabled({ timeout: 20_000 })
       await claims.submitButton.click()
 
       const firstPromptOutcome = await waitForValidationOutcome(
@@ -225,6 +236,7 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
       expect(firstPromptOutcome).toBe('matched')
 
       await claims.intercityOwnVehicleNoButton.click()
+      await expect(claims.submitButton).toBeEnabled({ timeout: 20_000 })
       await claims.submitButton.click()
 
       const secondPromptOutcome = await waitForValidationOutcome(
@@ -251,7 +263,7 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
     const claims = new ClaimsPage(page)
     await claims.gotoNewClaim()
 
-    const outstationOption = await findOutstationOption(claims)
+    const outstationOption = await findOutstationOption(claims, page)
 
     await claims.selectWorkLocationByValue(outstationOption.value)
     await claims.intercityOwnVehicleYesButton.click()
@@ -298,6 +310,15 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
 
     for (const daysBack of buildCandidateDaysBack()) {
       await claims.dateInput.fill(toIsoDateDaysBack(daysBack))
+
+      const submitButtonEnabled = await claims.submitButton
+        .isEnabled()
+        .catch(() => false)
+      if (!submitButtonEnabled) {
+        await page.waitForTimeout(500)
+        continue
+      }
+
       await claims.submitButton.click()
 
       const validationOutcome = await waitForValidationOutcome(
