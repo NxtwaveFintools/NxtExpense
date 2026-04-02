@@ -7,6 +7,7 @@ DECLARE
   v_payment_released_id uuid;
   v_finance_role_id uuid;
   v_finance_review_id uuid;
+  v_now timestamptz := now();
 BEGIN
   SELECT id, display_order
   INTO v_approved_id, v_approved_order
@@ -89,10 +90,32 @@ BEGIN
     RAISE EXCEPTION 'PAYMENT_RELEASED status could not be created.';
   END IF;
 
+  INSERT INTO public.roles (
+    role_code,
+    role_name,
+    is_finance_role,
+    is_active,
+    updated_at
+  )
+  VALUES (
+    'FINANCE_TEAM',
+    'Finance Team',
+    true,
+    true,
+    v_now
+  )
+  ON CONFLICT (role_code) DO UPDATE
+  SET
+    role_name = EXCLUDED.role_name,
+    is_finance_role = true,
+    is_active = true,
+    updated_at = v_now;
+
   SELECT id
   INTO v_finance_role_id
   FROM public.roles
   WHERE role_code = 'FINANCE_TEAM'
+    AND is_active = true
   LIMIT 1;
 
   IF v_finance_role_id IS NULL THEN
@@ -102,28 +125,26 @@ BEGIN
   SELECT id
   INTO v_finance_review_id
   FROM public.claim_statuses
-  WHERE is_active = true
-    AND approval_level = 3
-    AND is_approval = false
-    AND is_rejection = false
-    AND is_terminal = false
-  ORDER BY display_order NULLS LAST, created_at ASC
+  WHERE status_code = 'L3_PENDING_FINANCE_REVIEW'
+    AND is_active = true
   LIMIT 1;
+
+  IF v_finance_review_id IS NULL THEN
+    SELECT id
+    INTO v_finance_review_id
+    FROM public.claim_statuses
+    WHERE is_active = true
+      AND approval_level = 3
+      AND is_approval = false
+      AND is_rejection = false
+      AND is_terminal = false
+    ORDER BY display_order NULLS LAST, created_at ASC
+    LIMIT 1;
+  END IF;
 
   IF v_finance_review_id IS NULL THEN
     RAISE EXCEPTION 'Finance review status is missing; cannot create finance approval transition.';
   END IF;
-
-  UPDATE public.claim_status_transitions
-  SET action_code = 'finance_approved',
-      requires_comment = false,
-      is_auto_transition = false,
-      allow_resubmit = NULL,
-      is_active = true
-  WHERE from_status_id = v_finance_review_id
-    AND to_status_id = v_approved_id
-    AND requires_role_id = v_finance_role_id
-    AND is_auto_transition = false;
 
   INSERT INTO public.claim_status_transitions (
     from_status_id,
@@ -136,7 +157,7 @@ BEGIN
     action_code,
     allow_resubmit
   )
-  SELECT
+  VALUES (
     v_finance_review_id,
     v_approved_id,
     v_finance_role_id,
@@ -146,13 +167,14 @@ BEGIN
     true,
     'finance_approved',
     NULL
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.claim_status_transitions cst
-    WHERE cst.from_status_id = v_finance_review_id
-      AND cst.to_status_id = v_approved_id
-      AND cst.requires_role_id = v_finance_role_id
-  );
+  )
+  ON CONFLICT (from_status_id, to_status_id, requires_role_id)
+  DO UPDATE
+  SET action_code = 'finance_approved',
+      requires_comment = false,
+      is_auto_transition = false,
+      allow_resubmit = NULL,
+      is_active = true;
 
   INSERT INTO public.claim_status_transitions (
     from_status_id,

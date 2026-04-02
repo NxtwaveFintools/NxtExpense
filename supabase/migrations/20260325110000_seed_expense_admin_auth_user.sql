@@ -11,6 +11,8 @@ DECLARE
   v_admin_designation_id uuid;
   v_active_status_id uuid;
   v_admin_role_id uuid;
+  v_has_designation_code boolean := false;
+  v_password_hash text;
 BEGIN
   SELECT id
   INTO v_user_id
@@ -21,6 +23,25 @@ BEGIN
 
   IF v_user_id IS NULL THEN
     v_user_id := gen_random_uuid();
+
+    IF to_regprocedure('extensions.crypt(text,text)') IS NOT NULL
+       AND to_regprocedure('extensions.gen_salt(text)') IS NOT NULL THEN
+      EXECUTE 'select extensions.crypt($1, extensions.gen_salt(''bf''))'
+      INTO v_password_hash
+      USING v_password;
+    ELSIF to_regprocedure('public.crypt(text,text)') IS NOT NULL
+       AND to_regprocedure('public.gen_salt(text)') IS NOT NULL THEN
+      EXECUTE 'select public.crypt($1, public.gen_salt(''bf''))'
+      INTO v_password_hash
+      USING v_password;
+    ELSIF to_regprocedure('crypt(text,text)') IS NOT NULL
+       AND to_regprocedure('gen_salt(text)') IS NOT NULL THEN
+      EXECUTE 'select crypt($1, gen_salt(''bf''))'
+      INTO v_password_hash
+      USING v_password;
+    ELSE
+      RAISE EXCEPTION 'Password hash functions crypt/gen_salt are not available. Enable pgcrypto in this environment.';
+    END IF;
 
     INSERT INTO auth.users (
       instance_id,
@@ -43,7 +64,7 @@ BEGIN
       'authenticated',
       'authenticated',
       v_email,
-      crypt(v_password, gen_salt('bf')),
+      v_password_hash,
       v_now,
       '{"provider":"email","providers":["email"]}'::jsonb,
       '{}'::jsonb,
@@ -112,39 +133,76 @@ BEGIN
   INTO v_admin_role_id
   FROM public.roles
   WHERE role_code = 'ADMIN'
+    AND is_active = true
   LIMIT 1;
 
   IF v_admin_role_id IS NULL THEN
     RAISE EXCEPTION 'ADMIN role is not configured.';
   END IF;
 
-  INSERT INTO public.employees (
-    employee_id,
-    employee_name,
-    employee_email,
-    designation_id,
-    employee_status_id,
-    designation_code,
-    created_at,
-    updated_at
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+      AND c.table_name = 'employees'
+      AND c.column_name = 'designation_code'
   )
-  VALUES (
-    'ADMIN001',
-    'Expense Admin',
-    v_email,
-    v_admin_designation_id,
-    v_active_status_id,
-    'ADM',
-    v_now,
-    v_now
-  )
-  ON CONFLICT (employee_email) DO UPDATE
-  SET
-    employee_name = EXCLUDED.employee_name,
-    designation_id = EXCLUDED.designation_id,
-    employee_status_id = EXCLUDED.employee_status_id,
-    designation_code = EXCLUDED.designation_code,
-    updated_at = v_now;
+  INTO v_has_designation_code;
+
+  IF v_has_designation_code THEN
+    INSERT INTO public.employees (
+      employee_id,
+      employee_name,
+      employee_email,
+      designation_id,
+      employee_status_id,
+      designation_code,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      'ADMIN001',
+      'Expense Admin',
+      v_email,
+      v_admin_designation_id,
+      v_active_status_id,
+      'ADM',
+      v_now,
+      v_now
+    )
+    ON CONFLICT (employee_email) DO UPDATE
+    SET
+      employee_name = EXCLUDED.employee_name,
+      designation_id = EXCLUDED.designation_id,
+      employee_status_id = EXCLUDED.employee_status_id,
+      designation_code = EXCLUDED.designation_code,
+      updated_at = v_now;
+  ELSE
+    INSERT INTO public.employees (
+      employee_id,
+      employee_name,
+      employee_email,
+      designation_id,
+      employee_status_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      'ADMIN001',
+      'Expense Admin',
+      v_email,
+      v_admin_designation_id,
+      v_active_status_id,
+      v_now,
+      v_now
+    )
+    ON CONFLICT (employee_email) DO UPDATE
+    SET
+      employee_name = EXCLUDED.employee_name,
+      designation_id = EXCLUDED.designation_id,
+      employee_status_id = EXCLUDED.employee_status_id,
+      updated_at = v_now;
+  END IF;
 
   INSERT INTO public.employee_roles (
     employee_id,

@@ -7,6 +7,7 @@ DECLARE
   v_fin_designation_id uuid;
   v_active_status_id uuid;
   v_finance_role_id uuid;
+  v_employee_role_id uuid;
   v_employee_uuid uuid;
   v_employee_uuid_by_email uuid;
   v_employee_uuid_by_employee_id uuid;
@@ -14,6 +15,7 @@ DECLARE
   v_employee_name text;
   v_employee_email text;
   v_email_domain text;
+  v_has_designation_code boolean := false;
   v_now timestamptz := now();
   r record;
 BEGIN
@@ -70,6 +72,26 @@ BEGIN
     RAISE EXCEPTION 'FINANCE_TEAM role is not configured as active.';
   END IF;
 
+  SELECT id
+  INTO v_employee_role_id
+  FROM public.roles
+  WHERE role_code = 'EMPLOYEE'
+    AND is_active = true
+  LIMIT 1;
+
+  IF v_employee_role_id IS NULL THEN
+    RAISE EXCEPTION 'EMPLOYEE role is not configured as active.';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+      AND c.table_name = 'employees'
+      AND c.column_name = 'designation_code'
+  )
+  INTO v_has_designation_code;
+
   FOR r IN
     SELECT *
     FROM (
@@ -124,47 +146,90 @@ BEGIN
     v_employee_uuid := coalesce(v_employee_uuid_by_email, v_employee_uuid_by_employee_id);
 
     IF v_employee_uuid IS NULL THEN
-      INSERT INTO public.employees (
-        employee_id,
-        employee_name,
-        employee_email,
-        designation_id,
-        employee_status_id,
-        approval_employee_id_level_1,
-        approval_employee_id_level_2,
-        approval_employee_id_level_3,
-        designation_code,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        v_employee_code,
-        v_employee_name,
-        v_employee_email,
-        v_fin_designation_id,
-        v_active_status_id,
-        NULL,
-        NULL,
-        NULL,
-        'FIN',
-        v_now,
-        v_now
-      )
-      RETURNING id INTO v_employee_uuid;
+      IF v_has_designation_code THEN
+        INSERT INTO public.employees (
+          employee_id,
+          employee_name,
+          employee_email,
+          designation_id,
+          employee_status_id,
+          approval_employee_id_level_1,
+          approval_employee_id_level_2,
+          approval_employee_id_level_3,
+          designation_code,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          v_employee_code,
+          v_employee_name,
+          v_employee_email,
+          v_fin_designation_id,
+          v_active_status_id,
+          NULL,
+          NULL,
+          NULL,
+          'FIN',
+          v_now,
+          v_now
+        )
+        RETURNING id INTO v_employee_uuid;
+      ELSE
+        INSERT INTO public.employees (
+          employee_id,
+          employee_name,
+          employee_email,
+          designation_id,
+          employee_status_id,
+          approval_employee_id_level_1,
+          approval_employee_id_level_2,
+          approval_employee_id_level_3,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          v_employee_code,
+          v_employee_name,
+          v_employee_email,
+          v_fin_designation_id,
+          v_active_status_id,
+          NULL,
+          NULL,
+          NULL,
+          v_now,
+          v_now
+        )
+        RETURNING id INTO v_employee_uuid;
+      END IF;
     ELSE
-      UPDATE public.employees
-      SET
-        employee_id = v_employee_code,
-        employee_name = v_employee_name,
-        employee_email = v_employee_email,
-        designation_id = v_fin_designation_id,
-        employee_status_id = v_active_status_id,
-        approval_employee_id_level_1 = NULL,
-        approval_employee_id_level_2 = NULL,
-        approval_employee_id_level_3 = NULL,
-        designation_code = 'FIN',
-        updated_at = v_now
-      WHERE id = v_employee_uuid;
+      IF v_has_designation_code THEN
+        UPDATE public.employees
+        SET
+          employee_id = v_employee_code,
+          employee_name = v_employee_name,
+          employee_email = v_employee_email,
+          designation_id = v_fin_designation_id,
+          employee_status_id = v_active_status_id,
+          approval_employee_id_level_1 = NULL,
+          approval_employee_id_level_2 = NULL,
+          approval_employee_id_level_3 = NULL,
+          designation_code = 'FIN',
+          updated_at = v_now
+        WHERE id = v_employee_uuid;
+      ELSE
+        UPDATE public.employees
+        SET
+          employee_id = v_employee_code,
+          employee_name = v_employee_name,
+          employee_email = v_employee_email,
+          designation_id = v_fin_designation_id,
+          employee_status_id = v_active_status_id,
+          approval_employee_id_level_1 = NULL,
+          approval_employee_id_level_2 = NULL,
+          approval_employee_id_level_3 = NULL,
+          updated_at = v_now
+        WHERE id = v_employee_uuid;
+      END IF;
     END IF;
 
     INSERT INTO public.employee_roles (
@@ -175,6 +240,20 @@ BEGIN
     VALUES (
       v_employee_uuid,
       v_finance_role_id,
+      true
+    )
+    ON CONFLICT (employee_id, role_id) DO UPDATE
+    SET
+      is_active = true;
+
+    INSERT INTO public.employee_roles (
+      employee_id,
+      role_id,
+      is_active
+    )
+    VALUES (
+      v_employee_uuid,
+      v_employee_role_id,
       true
     )
     ON CONFLICT (employee_id, role_id) DO UPDATE
