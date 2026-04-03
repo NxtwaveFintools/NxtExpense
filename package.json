@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --max-http-header-size=32768 ./node_modules/next/dist/bin/next dev",
     "dev:provision-test-accounts": "node --env-file=.env.local scripts/dev/provision-test-accounts.mjs",
+    "dev:provision-test-flow-auth-users": "node --env-file=.env.local scripts/dev/provision-test-flow-auth-users.mjs",
     "build": "next build",
     "build:analyze": "cross-env ANALYZE=true next build",
     "start": "next start",
