@@ -10,6 +10,13 @@ export type ExpenseItemType = string
 /** A simple { id, name } option for select dropdowns */
 export type SelectOption = { id: string; name: string }
 
+export type BaseLocationDayTypeOption = {
+  code: string
+  label: string
+  includeFoodAllowance: boolean
+  isDefault: boolean
+}
+
 /** City dropdown option with parent state linkage for dynamic filtering */
 export type CityOption = SelectOption & { stateId: string }
 
@@ -22,6 +29,7 @@ export type Claim = {
   employee_id: string
   claim_date: string
   work_location: WorkLocation
+  base_location_day_type_code?: string | null
   own_vehicle_used: boolean | null
   vehicle_type: VehicleType | null
   outstation_state_id?: string | null
@@ -74,6 +82,7 @@ export type ClaimWithItems = {
 export type ClaimFormValues = {
   claimDate: string
   workLocation: WorkLocation
+  baseLocationDayTypeCode?: string
   ownVehicleUsed?: boolean
   hasIntercityTravel?: boolean
   hasIntracityTravel?: boolean
@@ -94,6 +103,7 @@ export type ClaimFormValues = {
 export type ClaimFormInitialValues = {
   claimDateIso: string
   workLocation: WorkLocation
+  baseLocationDayTypeCode?: string | null
   vehicleType?: VehicleType | null
   ownVehicleUsed?: boolean | null
   hasIntercityTravel?: boolean | null

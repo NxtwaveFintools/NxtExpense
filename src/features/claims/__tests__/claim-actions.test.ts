@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getEmployeeRoles: vi.fn(),
   canAccessEmployeeClaimsFromRoles: vi.fn(),
   getAllWorkLocations: vi.fn(),
+  getBaseLocationDayTypeByCode: vi.fn(),
+  getDefaultBaseLocationDayType: vi.fn(),
   getDesignationApprovalFlow: vi.fn(),
   calculateBaseLocationItems: vi.fn(),
   getVehicleTypeById: vi.fn(),
@@ -52,6 +54,8 @@ vi.mock('@/lib/services/config-service', async () => {
   return {
     ...actual,
     getAllWorkLocations: mocks.getAllWorkLocations,
+    getBaseLocationDayTypeByCode: mocks.getBaseLocationDayTypeByCode,
+    getDefaultBaseLocationDayType: mocks.getDefaultBaseLocationDayType,
     getDesignationApprovalFlow: mocks.getDesignationApprovalFlow,
   }
 })
@@ -162,6 +166,16 @@ describe('submitClaimAction', () => {
         requires_outstation_details: false,
       },
     ])
+
+    mocks.getBaseLocationDayTypeByCode.mockResolvedValue(null)
+    mocks.getDefaultBaseLocationDayType.mockResolvedValue({
+      day_type_code: 'FULL_DAY',
+      day_type_label: 'Full Day',
+      include_food_allowance: true,
+      is_default: true,
+      display_order: 1,
+      is_active: true,
+    })
 
     mocks.getDesignationApprovalFlow.mockResolvedValue({
       required_approval_levels: [1],

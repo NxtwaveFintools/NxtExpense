@@ -10,6 +10,7 @@ type ClaimInput = {
   workLocation: string
   requiresVehicleSelection?: boolean
   requiresOutstationDetails?: boolean
+  includeFoodAllowance?: boolean
   vehicleType?: string
   ownVehicleUsed?: boolean
   kmTravelled?: number
@@ -29,11 +30,14 @@ export function buildClaimItemsAndTotal(
   const items: ClaimItemDraft[] = []
 
   if (input.requiresVehicleSelection) {
-    items.push({
-      itemType: 'food',
-      amount: rates.foodBase ?? 0,
-      description: 'Base location food allowance',
-    })
+    if (input.includeFoodAllowance !== false) {
+      items.push({
+        itemType: 'food',
+        amount: rates.foodBase ?? 0,
+        description: 'Base location food allowance',
+      })
+    }
+
     items.push({
       itemType: 'fuel',
       amount: rates.fuelBase ?? 0,

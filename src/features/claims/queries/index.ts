@@ -16,16 +16,16 @@ import {
   buildClaimStatusFilterOptions,
   parseClaimStatusFilterValue,
 } from '@/lib/utils/claim-status-filter'
+import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
 const LEGACY_CLAIM_COLUMNS =
   'id, claim_number, employee_id, claim_date, work_location_id, work_locations(location_name), own_vehicle_used, vehicle_type_id, vehicle_types(vehicle_name), outstation_state_id, outstation_city_id, from_city_id, to_city_id, outstation_state:states!outstation_state_id(state_name), outstation_city:cities!outstation_city_id(city_name), from_city_data:cities!from_city_id(city_name), to_city_data:cities!to_city_id(city_name), km_travelled, total_amount, status_id, claim_statuses!status_id(status_code, status_name, display_color, allow_resubmit_status_name, allow_resubmit_display_color, is_terminal, is_rejection), allow_resubmit, is_superseded, current_approval_level, submitted_at, created_at, updated_at, resubmission_count, last_rejection_notes, last_rejected_at, accommodation_nights, food_with_principals_amount'
 
 const SEGMENT_CLAIM_COLUMNS =
   'has_intercity_travel, has_intracity_travel, intercity_own_vehicle_used, intracity_own_vehicle_used, intracity_vehicle_mode'
+const BASE_DAY_TYPE_CLAIM_COLUMNS = 'base_location_day_type_code'
 
-export const CLAIM_COLUMNS = LEGACY_CLAIM_COLUMNS
-
-const CLAIM_COLUMNS_WITH_SEGMENTS = `${LEGACY_CLAIM_COLUMNS}, ${SEGMENT_CLAIM_COLUMNS}`
+export const CLAIM_COLUMNS = `${LEGACY_CLAIM_COLUMNS}, ${SEGMENT_CLAIM_COLUMNS}, ${BASE_DAY_TYPE_CLAIM_COLUMNS}`
 const CLAIM_AVAILABLE_ACTIONS_MAX_RETRIES = 2
 const CLAIM_AVAILABLE_ACTIONS_RETRY_DELAY_MS = 250
 
@@ -44,24 +44,6 @@ function isTransientNetworkErrorMessage(message: string): boolean {
 async function waitForRetry(attempt: number): Promise<void> {
   await new Promise((resolve) =>
     setTimeout(resolve, CLAIM_AVAILABLE_ACTIONS_RETRY_DELAY_MS * attempt)
-  )
-}
-
-function isMissingOutstationSegmentColumnsError(
-  error: { message?: string } | null
-): boolean {
-  const message = error?.message?.toLowerCase() ?? ''
-
-  if (!message.includes('does not exist')) {
-    return false
-  }
-
-  return (
-    message.includes('expense_claims.has_intercity_travel') ||
-    message.includes('expense_claims.has_intracity_travel') ||
-    message.includes('expense_claims.intercity_own_vehicle_used') ||
-    message.includes('expense_claims.intracity_own_vehicle_used') ||
-    message.includes('expense_claims.intracity_vehicle_mode')
   )
 }
 
@@ -99,6 +81,7 @@ export function mapClaimRow(raw: Record<string, unknown>): Claim {
     intercity_own_vehicle_used: r.intercity_own_vehicle_used ?? null,
     intracity_own_vehicle_used: r.intracity_own_vehicle_used ?? null,
     intracity_vehicle_mode: r.intracity_vehicle_mode ?? null,
+    base_location_day_type_code: r.base_location_day_type_code ?? null,
     allow_resubmit: r.allow_resubmit ?? false,
     is_superseded: r.is_superseded ?? false,
     statusName: statusDisplay.label,
@@ -127,17 +110,42 @@ type ClaimsFilterQuery = {
   lte: (column: string, value: unknown) => unknown
 }
 
-function applyMyClaimsFilters(
-  query: ClaimsFilterQuery,
+type ResolvedMyClaimsStatusFilter = {
+  statusId: string
+  allowResubmitFilter: boolean | null
+}
+
+async function resolveMyClaimsStatusFilter(
+  supabase: SupabaseClient,
   filters: MyClaimsFilters
-): void {
+): Promise<ResolvedMyClaimsStatusFilter | null> {
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
 
-  if (parsedStatusFilter) {
-    query.eq('status_id', parsedStatusFilter.statusId)
+  if (!parsedStatusFilter) {
+    return null
+  }
 
-    if (parsedStatusFilter.allowResubmitOnly) {
-      query.eq('allow_resubmit', true)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
+
+  return {
+    statusId: parsedStatusFilter.statusId,
+    allowResubmitFilter,
+  }
+}
+
+function applyMyClaimsFilters(
+  query: ClaimsFilterQuery,
+  filters: MyClaimsFilters,
+  statusFilter: ResolvedMyClaimsStatusFilter | null
+): void {
+  if (statusFilter) {
+    query.eq('status_id', statusFilter.statusId)
+
+    if (statusFilter.allowResubmitFilter !== null) {
+      query.eq('allow_resubmit', statusFilter.allowResubmitFilter)
     }
   }
 
@@ -161,6 +169,8 @@ export async function getMyClaimsPaginated(
   limit = 10,
   filters: MyClaimsFilters = DEFAULT_MY_CLAIMS_FILTERS
 ): Promise<PaginatedClaims> {
+  const statusFilter = await resolveMyClaimsStatusFilter(supabase, filters)
+
   const runClaimsQuery = async (columns: string) => {
     let query = supabase
       .from('expense_claims')
@@ -177,15 +187,11 @@ export async function getMyClaimsPaginated(
       )
     }
 
-    applyMyClaimsFilters(query, filters)
+    applyMyClaimsFilters(query, filters, statusFilter)
     return query
   }
 
-  let { data, error } = await runClaimsQuery(CLAIM_COLUMNS_WITH_SEGMENTS)
-
-  if (error && isMissingOutstationSegmentColumnsError(error)) {
-    ;({ data, error } = await runClaimsQuery(CLAIM_COLUMNS))
-  }
+  const { data, error } = await runClaimsQuery(CLAIM_COLUMNS)
 
   if (error) {
     throw new Error(error.message)
@@ -226,14 +232,8 @@ export async function getClaimById(
       .maybeSingle()
   }
 
-  let { data: claimData, error: claimError } = await runClaimByIdQuery(
-    CLAIM_COLUMNS_WITH_SEGMENTS
-  )
-
-  if (claimError && isMissingOutstationSegmentColumnsError(claimError)) {
-    ;({ data: claimData, error: claimError } =
-      await runClaimByIdQuery(CLAIM_COLUMNS))
-  }
+  const { data: claimData, error: claimError } =
+    await runClaimByIdQuery(CLAIM_COLUMNS)
 
   if (claimError) {
     throw new Error(claimError.message)
@@ -476,12 +476,14 @@ export async function getMyClaimsTotalCount(
   employeeId: string,
   filters: MyClaimsFilters
 ): Promise<number> {
+  const statusFilter = await resolveMyClaimsStatusFilter(supabase, filters)
+
   const query = supabase
     .from('expense_claims')
     .select('id', { count: 'exact', head: true })
     .eq('employee_id', employeeId)
 
-  applyMyClaimsFilters(query, filters)
+  applyMyClaimsFilters(query, filters, statusFilter)
 
   const { count, error } = await query
 
@@ -532,6 +534,8 @@ export async function getMyClaimsStats(
   employeeId: string,
   filters: MyClaimsFilters
 ): Promise<MyClaimsStats> {
+  const statusFilter = await resolveMyClaimsStatusFilter(supabase, filters)
+
   const { data: statusRows, error: statusError } = await supabase
     .from('claim_statuses')
     .select('id, is_rejection, is_payment_issued')
@@ -578,7 +582,7 @@ export async function getMyClaimsStats(
       )
     }
 
-    applyMyClaimsFilters(query, filters)
+    applyMyClaimsFilters(query, filters, statusFilter)
 
     const { data, error } = await query
 

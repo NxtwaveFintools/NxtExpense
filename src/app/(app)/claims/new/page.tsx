@@ -9,12 +9,14 @@ import { ClaimSubmissionForm } from '@/features/claims/components/claim-submissi
 import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import {
+  getActiveBaseLocationDayTypes,
   getAllWorkLocations,
   getAllStates,
   getAllCities,
   getVehicleTypesByDesignation,
   getExpenseRateByType,
 } from '@/lib/services/config-service'
+import type { BaseLocationDayTypeOption } from '@/features/claims/types'
 
 export default async function NewClaimPage() {
   const user = await requireCurrentUser('/login')
@@ -32,14 +34,16 @@ export default async function NewClaimPage() {
   }
 
   // Fetch lookup data from DB
-  const [workLocations, allowedVehicles, states, cities] = await Promise.all([
-    getAllWorkLocations(supabase),
-    employee.designation_id
-      ? getVehicleTypesByDesignation(supabase, employee.designation_id)
-      : Promise.resolve([]),
-    getAllStates(supabase),
-    getAllCities(supabase),
-  ])
+  const [workLocations, allowedVehicles, states, cities, baseDayTypes] =
+    await Promise.all([
+      getAllWorkLocations(supabase),
+      employee.designation_id
+        ? getVehicleTypesByDesignation(supabase, employee.designation_id)
+        : Promise.resolve([]),
+      getAllStates(supabase),
+      getAllCities(supabase),
+      getActiveBaseLocationDayTypes(supabase),
+    ])
 
   const workLocationOptions = workLocations
   const allowedVehicleTypes = allowedVehicles.map((vt) => ({
@@ -52,6 +56,18 @@ export default async function NewClaimPage() {
     name: city.city_name,
     stateId: city.state_id,
   }))
+
+  if (baseDayTypes.length === 0) {
+    throw new Error('No active base location day types are configured.')
+  }
+
+  const baseLocationDayTypeOptions: BaseLocationDayTypeOption[] =
+    baseDayTypes.map((dayType) => ({
+      code: dayType.day_type_code,
+      label: dayType.day_type_label,
+      includeFoodAllowance: dayType.include_food_allowance,
+      isDefault: dayType.is_default,
+    }))
 
   // Build rate snapshot from new lookup tables
   const baseLocationId = workLocations.find(
@@ -87,6 +103,22 @@ export default async function NewClaimPage() {
     allowedVehicles.map((vt) => [vt.id, Number(vt.base_fuel_rate_per_day)])
   ) as Record<string, number>
 
+  const baseDayTypeIncludeFoodByCode = Object.fromEntries(
+    baseLocationDayTypeOptions.map((option) => [
+      option.code,
+      option.includeFoodAllowance,
+    ])
+  ) as Record<string, boolean>
+
+  const baseDayTypeLabelByCode = Object.fromEntries(
+    baseLocationDayTypeOptions.map((option) => [option.code, option.label])
+  ) as Record<string, string>
+
+  const defaultBaseDayTypeCode =
+    baseLocationDayTypeOptions.find((option) => option.isDefault)?.code ??
+    baseLocationDayTypeOptions[0]?.code ??
+    null
+
   const claimRateSnapshot = {
     foodBaseDaily: foodBaseRate ? Number(foodBaseRate.rate_amount) : null,
     foodOutstationDaily: foodOutstationRate
@@ -95,6 +127,9 @@ export default async function NewClaimPage() {
     fuelBaseDailyByVehicle: Object.fromEntries(
       allowedVehicles.map((vt) => [vt.id, Number(vt.base_fuel_rate_per_day)])
     ) as Record<string, number>,
+    baseDayTypeIncludeFoodByCode,
+    baseDayTypeLabelByCode,
+    defaultBaseDayTypeCode,
     intercityPerKmByVehicle: Object.fromEntries(
       allowedVehicles.map((vt) => [vt.id, Number(vt.intercity_rate_per_km)])
     ) as Record<string, number>,
@@ -120,6 +155,7 @@ export default async function NewClaimPage() {
           </div>
           <ClaimSubmissionForm
             allowedVehicleTypes={allowedVehicleTypes}
+            baseLocationDayTypeOptions={baseLocationDayTypeOptions}
             workLocationOptions={workLocationOptions}
             stateOptions={stateOptions}
             initialCityOptions={cityOptions}

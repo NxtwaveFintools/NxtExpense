@@ -9,6 +9,7 @@ import type { ApprovalHistoryFilters } from '@/features/approvals/types'
 type ApprovalFiltersBarProps = {
   filters: ApprovalHistoryFilters
   statusCatalog: ClaimStatusCatalogItem[]
+  employeeNameSuggestions: string[]
   validationError?: string | null
   exportCurrentPageHref: string
   exportAllHref: string
@@ -17,6 +18,7 @@ type ApprovalFiltersBarProps = {
 export function ApprovalFiltersBar({
   filters,
   statusCatalog,
+  employeeNameSuggestions,
   validationError,
   exportCurrentPageHref,
   exportAllHref,
@@ -64,10 +66,18 @@ export function ApprovalFiltersBar({
           <span className="font-medium text-foreground">Employee Name</span>
           <input
             name="employeeName"
+            list="approval-employee-name-options"
             defaultValue={filters.employeeName ?? ''}
             placeholder="Search by employee name"
             className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
           />
+          {employeeNameSuggestions.length > 0 ? (
+            <datalist id="approval-employee-name-options">
+              {employeeNameSuggestions.map((employeeName) => (
+                <option key={employeeName} value={employeeName} />
+              ))}
+            </datalist>
+          ) : null}
         </label>
 
         <label className="space-y-1.5 text-sm">

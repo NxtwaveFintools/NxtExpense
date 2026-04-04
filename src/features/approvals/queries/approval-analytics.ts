@@ -4,6 +4,7 @@ import type { PendingApprovalsFilters } from '@/features/approvals/types'
 import { getPendingApprovalsSummary } from '@/features/approvals/queries/pending-summary'
 import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
+import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
 type ClaimMetricSummary = {
   count: number
@@ -93,13 +94,17 @@ async function getFilteredClaimsByIds(
     .in('id', claimIds)
 
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
 
   if (parsedStatusFilter) {
     query = query.eq('status_id', parsedStatusFilter.statusId)
+  }
 
-    if (parsedStatusFilter.allowResubmitOnly) {
-      query = query.eq('allow_resubmit', true)
-    }
+  if (allowResubmitFilter !== null) {
+    query = query.eq('allow_resubmit', allowResubmitFilter)
   }
 
   if (filters.claimDateFrom) {

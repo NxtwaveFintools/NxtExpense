@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getEmployeeRoles: vi.fn(),
   canAccessEmployeeClaimsFromRoles: vi.fn(),
   getAllWorkLocations: vi.fn(),
+  getBaseLocationDayTypeByCode: vi.fn(),
+  getDefaultBaseLocationDayType: vi.fn(),
   getDesignationApprovalFlow: vi.fn(),
   calculateBaseLocationItems: vi.fn(),
   calculateOutstationTravelItems: vi.fn(),
@@ -53,6 +55,8 @@ vi.mock('@/lib/services/config-service', async () => {
   return {
     ...actual,
     getAllWorkLocations: mocks.getAllWorkLocations,
+    getBaseLocationDayTypeByCode: mocks.getBaseLocationDayTypeByCode,
+    getDefaultBaseLocationDayType: mocks.getDefaultBaseLocationDayType,
     getDesignationApprovalFlow: mocks.getDesignationApprovalFlow,
   }
 })
@@ -95,6 +99,7 @@ const BASE_LOCATION_INPUT = {
   claimDate: '06/03/2026',
   workLocation: 'wl-base',
   vehicleType: 'veh-2w',
+  baseLocationDayTypeCode: 'FULL_DAY',
 }
 
 const OUTSTATION_OWN_INPUT = {
@@ -216,6 +221,42 @@ describe('submitClaimAction branch coverage', () => {
       },
     ])
 
+    mocks.getBaseLocationDayTypeByCode.mockImplementation(
+      (_supabase: unknown, code: string) => {
+        if (code === 'HALF_DAY') {
+          return Promise.resolve({
+            day_type_code: 'HALF_DAY',
+            day_type_label: 'Half Day (Fuel Only)',
+            include_food_allowance: false,
+            is_default: false,
+            display_order: 2,
+            is_active: true,
+          })
+        }
+
+        if (code === 'FULL_DAY') {
+          return Promise.resolve({
+            day_type_code: 'FULL_DAY',
+            day_type_label: 'Full Day',
+            include_food_allowance: true,
+            is_default: true,
+            display_order: 1,
+            is_active: true,
+          })
+        }
+
+        return Promise.resolve(null)
+      }
+    )
+    mocks.getDefaultBaseLocationDayType.mockResolvedValue({
+      day_type_code: 'FULL_DAY',
+      day_type_label: 'Full Day',
+      include_food_allowance: true,
+      is_default: true,
+      display_order: 1,
+      is_active: true,
+    })
+
     mocks.getDesignationApprovalFlow.mockResolvedValue({
       required_approval_levels: [1],
     })
@@ -265,6 +306,38 @@ describe('submitClaimAction branch coverage', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toBe(
       'Vehicle type is required for this work location.'
+    )
+  })
+
+  it('should reject invalid base day type codes', async () => {
+    const result = await submitClaimAction({
+      ...BASE_LOCATION_INPUT,
+      baseLocationDayTypeCode: 'INVALID',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Selected day type is not available.')
+    expect(mocks.calculateBaseLocationItems).not.toHaveBeenCalled()
+  })
+
+  it('should pass fuel-only includeFood flag for half day base claims', async () => {
+    const result = await submitClaimAction({
+      ...BASE_LOCATION_INPUT,
+      baseLocationDayTypeCode: 'HALF_DAY',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(mocks.calculateBaseLocationItems).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        includeFoodAllowance: false,
+      })
+    )
+    expect(mocks.insertClaim).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseLocationDayTypeCode: 'HALF_DAY',
+      })
     )
   })
 

@@ -19,6 +19,7 @@ import {
   buildClaimStatusFilterOptions,
   parseClaimStatusFilterValue,
 } from '@/lib/utils/claim-status-filter'
+import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
 type ClaimFilterScope = {
   /** Pre-fetched UUID of the status that results must be constrained to. */
@@ -181,8 +182,11 @@ export async function getFilteredClaimIdsForFinance(
   }
 
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
-  const allowResubmitOnlyStatusFilter =
-    parsedStatusFilter?.allowResubmitOnly ?? false
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
+  const allowResubmitOnlyStatusFilter = allowResubmitFilter === true
 
   if (scope.requiredStatusId && filters.claimStatus) {
     if (
@@ -207,8 +211,8 @@ export async function getFilteredClaimIdsForFinance(
     query = query.eq('status_id', statusId)
   }
 
-  if (allowResubmitOnlyStatusFilter) {
-    query = query.eq('allow_resubmit', true)
+  if (allowResubmitFilter !== null) {
+    query = query.eq('allow_resubmit', allowResubmitFilter)
   }
 
   if (filters.employeeName) {

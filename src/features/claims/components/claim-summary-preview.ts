@@ -4,6 +4,9 @@ export type ClaimRateSnapshot = {
   foodBaseDaily: number | null
   foodOutstationDaily: number | null
   fuelBaseDailyByVehicle: Record<string, number>
+  baseDayTypeIncludeFoodByCode: Record<string, boolean>
+  baseDayTypeLabelByCode: Record<string, string>
+  defaultBaseDayTypeCode: string | null
   intercityPerKmByVehicle: Record<string, number>
   intracityDailyByVehicle: Record<string, number>
   maxKmRoundTripByVehicle: Record<string, number>
@@ -14,6 +17,7 @@ type ClaimSummaryPreviewInput = {
   workLocation: string
   requiresVehicleSelection: boolean
   requiresOutstationDetails: boolean
+  baseLocationDayTypeCode?: string
   hasIntercityTravel: boolean
   hasIntracityTravel: boolean
   intercityOwnVehicleUsed: boolean
@@ -28,6 +32,7 @@ type ClaimSummaryPreviewInput = {
 export function getClaimSummaryPreview({
   requiresVehicleSelection,
   requiresOutstationDetails,
+  baseLocationDayTypeCode,
   hasIntercityTravel,
   hasIntracityTravel,
   intercityOwnVehicleUsed,
@@ -90,19 +95,39 @@ export function getClaimSummaryPreview({
   }
 
   if (requiresVehicleSelection) {
+    const selectedDayTypeCode =
+      baseLocationDayTypeCode ?? claimRateSnapshot.defaultBaseDayTypeCode
+    const includeFoodAllowance = selectedDayTypeCode
+      ? (claimRateSnapshot.baseDayTypeIncludeFoodByCode[selectedDayTypeCode] ??
+        true)
+      : true
+    const selectedDayTypeLabel = selectedDayTypeCode
+      ? (claimRateSnapshot.baseDayTypeLabelByCode[selectedDayTypeCode] ??
+        'Full Day')
+      : 'Full Day'
+
     const foodAllowance = claimRateSnapshot.foodBaseDaily ?? 0
     const fuelAllowance =
       claimRateSnapshot.fuelBaseDailyByVehicle[vehicleType] ?? 0
 
+    const items: { label: string; amount: number }[] = []
+
+    if (includeFoodAllowance) {
+      items.push({ label: 'Food allowance', amount: foodAllowance })
+    }
+
+    items.push({
+      label: includeFoodAllowance
+        ? `${vehicleTypeName} fuel allowance`
+        : `${vehicleTypeName} fuel allowance (${selectedDayTypeLabel})`,
+      amount: fuelAllowance,
+    })
+
+    const total = items.reduce((sum, item) => sum + item.amount, 0)
+
     return {
-      items: [
-        { label: 'Food allowance', amount: foodAllowance },
-        {
-          label: `${vehicleTypeName} fuel allowance`,
-          amount: fuelAllowance,
-        },
-      ],
-      total: foodAllowance + fuelAllowance,
+      items,
+      total,
     }
   }
 

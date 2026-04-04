@@ -24,6 +24,7 @@ type CalculatedExpenseItem = {
 type BaseLocationInput = {
   workLocationId: string
   vehicleType: VehicleType
+  includeFoodAllowance: boolean
 }
 
 /** Input for outstation with inter-city/intra-city segment selections */
@@ -138,19 +139,22 @@ export async function calculateBaseLocationItems(
 ): Promise<{ items: CalculatedExpenseItem[]; total: number }> {
   const items: CalculatedExpenseItem[] = []
 
-  // Food rate (designation-independent)
-  const foodRate = await getExpenseRateByType(
-    supabase,
-    input.workLocationId,
-    EXPENSE_RATE_TYPES.FOOD_BASE,
-    null
-  )
-  if (foodRate) {
-    items.push({
-      expense_type: CLAIM_ITEM_TYPES.FOOD,
-      amount: Number(foodRate.rate_amount),
-      description: 'Base location food allowance',
-    })
+  if (input.includeFoodAllowance) {
+    // Food rate (designation-independent)
+    const foodRate = await getExpenseRateByType(
+      supabase,
+      input.workLocationId,
+      EXPENSE_RATE_TYPES.FOOD_BASE,
+      null
+    )
+
+    if (foodRate) {
+      items.push({
+        expense_type: CLAIM_ITEM_TYPES.FOOD,
+        amount: Number(foodRate.rate_amount),
+        description: 'Base location food allowance',
+      })
+    }
   }
 
   // Fuel rate (from vehicle_types.base_fuel_rate_per_day)

@@ -129,6 +129,10 @@ export class ClaimsPage {
     return this.page.locator('select[name="vehicleType"]')
   }
 
+  get baseLocationDayTypeSelect() {
+    return this.page.locator('select[name="baseLocationDayTypeCode"]')
+  }
+
   get intercityOwnVehicleGroup() {
     return this.page.getByRole('group', {
       name: /did you travel between cities using your own vehicle\?/i,

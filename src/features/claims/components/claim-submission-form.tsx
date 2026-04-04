@@ -9,6 +9,7 @@ import { useClaimSubmissionForm } from '@/features/claims/components/use-claim-s
 
 import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summary-preview'
 import type {
+  BaseLocationDayTypeOption,
   CityOption,
   ClaimFormInitialValues,
   SelectOption,
@@ -18,6 +19,7 @@ import type {
 
 type ClaimSubmissionFormProps = {
   allowedVehicleTypes: readonly SelectOption[]
+  baseLocationDayTypeOptions: readonly BaseLocationDayTypeOption[]
   workLocationOptions: readonly WorkLocationOption[]
   stateOptions: readonly SelectOption[]
   initialCityOptions: readonly CityOption[]
@@ -27,6 +29,7 @@ type ClaimSubmissionFormProps = {
 
 export function ClaimSubmissionForm({
   allowedVehicleTypes,
+  baseLocationDayTypeOptions,
   workLocationOptions,
   stateOptions,
   initialCityOptions,
@@ -37,6 +40,7 @@ export function ClaimSubmissionForm({
     isEditingReturnedClaim,
     workLocation,
     claimDate,
+    baseLocationDayTypeCode,
     vehicleType,
     intercityOwnVehicleUsed,
     intracityTravelUsed,
@@ -56,6 +60,7 @@ export function ClaimSubmissionForm({
     summary,
     setWorkLocation,
     setClaimDate,
+    setBaseLocationDayTypeCode,
     setVehicleType,
     setOutstationCityId,
     setFromCityId,
@@ -68,6 +73,7 @@ export function ClaimSubmissionForm({
     handleSubmit,
   } = useClaimSubmissionForm({
     allowedVehicleTypes,
+    baseLocationDayTypeOptions,
     workLocationOptions,
     initialCityOptions,
     claimRateSnapshot,
@@ -146,8 +152,11 @@ export function ClaimSubmissionForm({
         {selectedLocation?.requires_vehicle_selection ? (
           <BaseLocationFields
             vehicleType={vehicleType}
+            baseLocationDayTypeCode={baseLocationDayTypeCode}
+            baseLocationDayTypeOptions={baseLocationDayTypeOptions}
             allowedVehicleTypes={allowedVehicleTypes}
             onVehicleTypeChange={setVehicleType}
+            onBaseLocationDayTypeCodeChange={setBaseLocationDayTypeCode}
           />
         ) : null}
 

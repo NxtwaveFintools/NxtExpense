@@ -69,6 +69,22 @@ describe('buildClaimItemsAndTotal — Field - Base Location', () => {
     expect(result.items[0]?.description).toBe('Base location food allowance')
     expect(result.items[1]?.description).toContain('Two Wheeler')
   })
+
+  it('calculates fuel-only total for 2W base location half day', () => {
+    const result = buildClaimItemsAndTotal(
+      {
+        workLocation: 'Field - Base Location',
+        requiresVehicleSelection: true,
+        includeFoodAllowance: false,
+        vehicleType: 'Two Wheeler',
+      },
+      BASE_RATES_2W
+    )
+
+    expect(result.total).toBe(180)
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]).toMatchObject({ itemType: 'fuel', amount: 180 })
+  })
 })
 
 // ── Outstation with Own Vehicle (SUBMIT-002, SUBMIT-005) ────────────────────
