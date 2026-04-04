@@ -9,6 +9,7 @@ import { ApprovalHistoryList } from '@/features/approvals/components/approval-hi
 import { ApprovalList } from '@/features/approvals/components/approval-list'
 import { getApprovalStageAnalytics } from '@/features/approvals/queries/approval-analytics'
 import { getFilteredApprovalHistoryCount } from '@/features/approvals/queries/history-filters'
+import { getApprovalEmployeeNameSuggestions } from '@/features/approvals/queries/employee-name-suggestions'
 import { canViewApprovalHistoryAmount } from '@/features/approvals/utils/amount-visibility'
 import {
   addApprovalFiltersToParams,
@@ -172,12 +173,18 @@ export default async function ApprovalsPage({
     approvals,
     history,
     statusCatalog,
+    employeeNameSuggestions,
     approvalAnalytics,
     historyTotalCount,
   ] = await Promise.all([
     getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
     getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
     getClaimStatusCatalog(supabase),
+    getApprovalEmployeeNameSuggestions(
+      supabase,
+      normalizedFilters.employeeName,
+      120
+    ),
     getApprovalStageAnalytics(supabase, user.email ?? '', {
       employeeName: normalizedFilters.employeeName,
       claimStatus: normalizedFilters.claimStatus,
@@ -249,6 +256,7 @@ export default async function ApprovalsPage({
             <ApprovalFiltersBar
               filters={normalizedFilters}
               statusCatalog={statusCatalog}
+              employeeNameSuggestions={employeeNameSuggestions}
               validationError={filterValidationError}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}

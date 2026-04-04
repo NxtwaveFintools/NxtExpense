@@ -8,6 +8,7 @@ import type {
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 import { getClaimStatusDisplay } from '@/lib/utils/claim-status'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
+import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
 type FilteredApprovalHistoryRpcRow = {
   action_id: string
@@ -170,6 +171,10 @@ export async function getFilteredApprovalHistoryPaginated(
   const normalizedLimit = Math.max(1, Math.min(limit, 100))
   const decodedCursor = cursor ? decodeCursor(cursor) : null
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
 
   const baseArgs = {
     p_limit: normalizedLimit,
@@ -178,7 +183,7 @@ export async function getFilteredApprovalHistoryPaginated(
     p_name_search: filters.employeeName,
     p_actor_filters: null,
     p_claim_status_id: parsedStatusFilter?.statusId ?? null,
-    p_claim_allow_resubmit: parsedStatusFilter?.allowResubmitOnly ? true : null,
+    p_claim_allow_resubmit: allowResubmitFilter,
     p_amount_operator: filters.amountOperator,
     p_amount_value: filters.amountValue,
     p_location_type: filters.locationType,
@@ -284,6 +289,10 @@ export async function getFilteredApprovalHistoryCount(
   filters: ApprovalHistoryFilters
 ): Promise<number> {
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
 
   const { data, error } = await supabase.rpc(
     'get_filtered_approval_history_count',
@@ -292,9 +301,7 @@ export async function getFilteredApprovalHistoryCount(
       p_actor_filters: null,
       p_claim_status: null,
       p_claim_status_id: parsedStatusFilter?.statusId ?? null,
-      p_claim_allow_resubmit: parsedStatusFilter?.allowResubmitOnly
-        ? true
-        : null,
+      p_claim_allow_resubmit: allowResubmitFilter,
       p_amount_operator: filters.amountOperator,
       p_amount_value: filters.amountValue,
       p_location_type: filters.locationType,

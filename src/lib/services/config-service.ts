@@ -50,6 +50,15 @@ export type VehicleType = {
   is_active: boolean
 }
 
+export type BaseLocationDayType = {
+  day_type_code: string
+  day_type_label: string
+  include_food_allowance: boolean
+  is_default: boolean
+  display_order: number
+  is_active: boolean
+}
+
 type ClaimStatus = {
   id: string
   status_code: string
@@ -137,6 +146,66 @@ export async function getAllWorkLocations(
 
   if (error) throw new Error(`Failed to fetch work locations: ${error.message}`)
   return data as WorkLocation[]
+}
+
+const BASE_LOCATION_DAY_TYPE_COLUMNS =
+  'day_type_code, day_type_label, include_food_allowance, is_default, display_order, is_active'
+
+export async function getActiveBaseLocationDayTypes(
+  supabase: SupabaseClient
+): Promise<BaseLocationDayType[]> {
+  const { data, error } = await supabase
+    .from('base_location_day_types')
+    .select(BASE_LOCATION_DAY_TYPE_COLUMNS)
+    .eq('is_active', true)
+    .order('display_order', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch base location day types: ${error.message}`)
+  }
+
+  return (data ?? []) as BaseLocationDayType[]
+}
+
+export async function getBaseLocationDayTypeByCode(
+  supabase: SupabaseClient,
+  dayTypeCode: string
+): Promise<BaseLocationDayType | null> {
+  const { data, error } = await supabase
+    .from('base_location_day_types')
+    .select(BASE_LOCATION_DAY_TYPE_COLUMNS)
+    .eq('day_type_code', dayTypeCode)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to fetch base location day type: ${error.message}`)
+  }
+
+  return data as BaseLocationDayType | null
+}
+
+export async function getDefaultBaseLocationDayType(
+  supabase: SupabaseClient
+): Promise<BaseLocationDayType | null> {
+  const { data, error } = await supabase
+    .from('base_location_day_types')
+    .select(BASE_LOCATION_DAY_TYPE_COLUMNS)
+    .eq('is_active', true)
+    .eq('is_default', true)
+    .order('display_order', { ascending: true })
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to fetch default base day type: ${error.message}`)
+  }
+
+  if (data) {
+    return data as BaseLocationDayType
+  }
+
+  const options = await getActiveBaseLocationDayTypes(supabase)
+  return options[0] ?? null
 }
 
 export async function getAllVehicleTypes(

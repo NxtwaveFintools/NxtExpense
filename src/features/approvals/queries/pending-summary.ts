@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { PendingApprovalsFilters } from '@/features/approvals/types'
 import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
+import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
+import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
 type PendingApprovalsSummary = {
   count: number
@@ -69,11 +71,17 @@ export async function getPendingApprovalsSummary(
   }
 
   const pendingStatuses = pendingStatusesResult.data ?? []
-  const normalizedStatusFilter = filters.claimStatus?.trim()
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
 
   const pendingStatusIds = (
-    normalizedStatusFilter
-      ? pendingStatuses.filter((status) => status.id === normalizedStatusFilter)
+    parsedStatusFilter
+      ? pendingStatuses.filter(
+          (status) => status.id === parsedStatusFilter.statusId
+        )
       : pendingStatuses
   ).map((status) => status.id)
 
@@ -154,6 +162,10 @@ export async function getPendingApprovalsSummary(
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(pageSize)
+
+    if (allowResubmitFilter !== null) {
+      query = query.eq('allow_resubmit', allowResubmitFilter)
+    }
 
     if (nextCursor) {
       query = query.or(buildCursorFilter(nextCursor.created_at, nextCursor.id))

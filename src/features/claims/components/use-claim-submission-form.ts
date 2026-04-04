@@ -11,6 +11,7 @@ import { formatDate } from '@/lib/utils/date'
 
 import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summary-preview'
 import type {
+  BaseLocationDayTypeOption,
   CityOption,
   ClaimFormInitialValues,
   IntracityVehicleMode,
@@ -23,6 +24,7 @@ import type {
 
 type UseClaimSubmissionFormArgs = {
   allowedVehicleTypes: readonly SelectOption[]
+  baseLocationDayTypeOptions: readonly BaseLocationDayTypeOption[]
   workLocationOptions: readonly WorkLocationOption[]
   initialCityOptions: readonly CityOption[]
   claimRateSnapshot: ClaimRateSnapshot
@@ -43,8 +45,19 @@ function getFallbackKmLimit(
   return Math.max(...limits)
 }
 
+function resolveDefaultBaseLocationDayTypeCode(
+  baseLocationDayTypeOptions: readonly BaseLocationDayTypeOption[]
+): string {
+  return (
+    baseLocationDayTypeOptions.find((option) => option.isDefault)?.code ??
+    baseLocationDayTypeOptions[0]?.code ??
+    'FULL_DAY'
+  )
+}
+
 export function useClaimSubmissionForm({
   allowedVehicleTypes,
+  baseLocationDayTypeOptions,
   workLocationOptions,
   initialCityOptions,
   claimRateSnapshot,
@@ -67,6 +80,12 @@ export function useClaimSubmissionForm({
     useState<WorkLocation>(initialWorkLocation)
   const [claimDate, setClaimDate] = useState(
     initialValues?.claimDateIso ?? dayjs().format('YYYY-MM-DD')
+  )
+  const defaultBaseLocationDayTypeCode = resolveDefaultBaseLocationDayTypeCode(
+    baseLocationDayTypeOptions
+  )
+  const [baseLocationDayTypeCode, setBaseLocationDayTypeCode] = useState(
+    initialValues?.baseLocationDayTypeCode ?? defaultBaseLocationDayTypeCode
   )
   const [vehicleType, setVehicleType] =
     useState<VehicleType>(initialVehicleType)
@@ -175,6 +194,7 @@ export function useClaimSubmissionForm({
         selectedLocation?.requires_vehicle_selection ?? false,
       requiresOutstationDetails:
         selectedLocation?.requires_outstation_details ?? false,
+      baseLocationDayTypeCode,
       hasIntercityTravel,
       hasIntracityTravel,
       intercityOwnVehicleUsed: hasIntercityTravel,
@@ -190,6 +210,7 @@ export function useClaimSubmissionForm({
   }, [
     workLocation,
     selectedLocation,
+    baseLocationDayTypeCode,
     hasIntercityTravel,
     hasIntracityTravel,
     effectiveIntracityOwnVehicleUsed,
@@ -349,6 +370,9 @@ export function useClaimSubmissionForm({
     const payload: ClaimFormValues = {
       claimDate: formatDate(claimDate),
       workLocation,
+      baseLocationDayTypeCode: requiresVehicleSelection
+        ? baseLocationDayTypeCode
+        : undefined,
       ownVehicleUsed: requiresOutstationDetails
         ? isOutstationOwnVehicle
         : undefined,
@@ -424,6 +448,7 @@ export function useClaimSubmissionForm({
     isEditingReturnedClaim,
     workLocation,
     claimDate,
+    baseLocationDayTypeCode,
     vehicleType,
     hasIntercityTravel,
     hasIntracityTravel,
@@ -445,6 +470,7 @@ export function useClaimSubmissionForm({
     summary,
     setWorkLocation,
     setClaimDate,
+    setBaseLocationDayTypeCode,
     setVehicleType,
     setOutstationCityId,
     setFromCityId,

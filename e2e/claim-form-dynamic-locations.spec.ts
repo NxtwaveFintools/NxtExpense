@@ -152,8 +152,12 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
       const hasVehicleBranch =
         !hasOutstationBranch &&
         (await isVisible(claims.vehicleTypeSelect.first()))
+      const hasBaseDayTypeBranch =
+        !hasOutstationBranch &&
+        (await isVisible(claims.baseLocationDayTypeSelect.first()))
 
       expect(hasOutstationBranch && hasVehicleBranch).toBe(false)
+      expect(hasVehicleBranch).toBe(hasBaseDayTypeBranch)
 
       if (hasOutstationBranch) {
         outstationBranchCount += 1
@@ -166,6 +170,7 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
         await expect(claims.kmInput).toBeVisible()
         await expect(claims.intracityOwnVehicleGroup).toHaveCount(0)
         await expect(claims.outstationCitySelect).toHaveCount(0)
+        await expect(claims.baseLocationDayTypeSelect).toHaveCount(0)
 
         await claims.intercityOwnVehicleNoButton.click()
 
@@ -186,15 +191,18 @@ test.describe('Claim Form - Dynamic Work Location Matrix', () => {
         await expect(claims.outstationStateSelect).toHaveCount(0)
         await expect(claims.outstationCitySelect).toHaveCount(0)
         await expect(claims.vehicleTypeSelect).toHaveCount(0)
+        await expect(claims.baseLocationDayTypeSelect).toHaveCount(0)
       } else if (hasVehicleBranch) {
         baseBranchCount += 1
 
         await expect(claims.vehicleTypeSelect.first()).toBeVisible()
+        await expect(claims.baseLocationDayTypeSelect.first()).toBeVisible()
         await expect(claims.intercityOwnVehicleGroup).toHaveCount(0)
       } else {
         noExpenseBranchCount += 1
 
         await expect(claims.vehicleTypeSelect).toHaveCount(0)
+        await expect(claims.baseLocationDayTypeSelect).toHaveCount(0)
         await expect(claims.intercityOwnVehicleGroup).toHaveCount(0)
       }
     }

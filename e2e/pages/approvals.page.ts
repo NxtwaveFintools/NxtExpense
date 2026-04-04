@@ -73,6 +73,10 @@ export class ApprovalsPage {
     }
   }
 
+  async applyHistoryClaimDateFilterForClaimNumber(claimNumber: string) {
+    await this.applyClaimDateFilterForClaimNumber(claimNumber)
+  }
+
   async goto() {
     await this.navigateWithRetry('/approvals')
   }
@@ -230,8 +234,61 @@ export class ApprovalsPage {
 
   // ── History ───────────────────────────────────────────────────────────
 
+  get historySection() {
+    return this.page
+      .locator('section:has(h2:has-text("Approval History"))')
+      .first()
+  }
+
   get historyRows() {
-    return this.page.locator('[data-testid="history-row"]')
+    return this.historySection.locator('table tbody tr')
+  }
+
+  get historyNextLink() {
+    return this.historySection.getByRole('link', { name: /^Next$/i }).first()
+  }
+
+  getHistoryRowByClaimNumber(claimNumber: string) {
+    return this.historyRows.filter({ hasText: claimNumber }).first()
+  }
+
+  private async moveToNextHistoryPage(
+    visitedNextHrefs: Set<string>
+  ): Promise<boolean> {
+    if ((await this.historyNextLink.count()) === 0) {
+      return false
+    }
+
+    const nextHref = await this.historyNextLink.getAttribute('href')
+    if (!nextHref || visitedNextHrefs.has(nextHref)) {
+      return false
+    }
+
+    const previousUrl = this.page.url()
+    visitedNextHrefs.add(nextHref)
+
+    await this.historyNextLink.click()
+    await this.page.waitForLoadState('networkidle')
+
+    return this.page.url() !== previousUrl
+  }
+
+  async hasHistoryRowByClaimNumber(claimNumber: string): Promise<boolean> {
+    const visitedNextHrefs = new Set<string>()
+    const maxHistoryPageHops = 250
+
+    for (let hop = 0; hop <= maxHistoryPageHops; hop += 1) {
+      if ((await this.getHistoryRowByClaimNumber(claimNumber).count()) > 0) {
+        return true
+      }
+
+      const movedToNextPage = await this.moveToNextHistoryPage(visitedNextHrefs)
+      if (!movedToNextPage) {
+        return false
+      }
+    }
+
+    return false
   }
 
   // ── Bulk actions ──────────────────────────────────────────────────────

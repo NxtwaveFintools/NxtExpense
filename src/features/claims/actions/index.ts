@@ -9,6 +9,8 @@ import {
 import { canAccessEmployeeClaimsFromRoles } from '@/lib/services/approval-service'
 import {
   getAllWorkLocations,
+  getBaseLocationDayTypeByCode,
+  getDefaultBaseLocationDayType,
   getDesignationApprovalFlow,
 } from '@/lib/services/config-service'
 import {
@@ -38,6 +40,63 @@ type ClaimActionResult = {
 type InitialWorkflowState = {
   statusId: string
   currentApprovalLevel: number | null
+}
+
+type ResolvedBaseLocationDayType = {
+  day_type_code: string
+  day_type_label: string
+  include_food_allowance: boolean
+}
+
+async function resolveBaseLocationDayTypeSelection(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  requestedDayTypeCode: string | undefined
+): Promise<{ value: ResolvedBaseLocationDayType } | { error: string }> {
+  const normalizedRequestedDayType = requestedDayTypeCode?.trim()
+
+  try {
+    if (normalizedRequestedDayType) {
+      const selectedDayType = await getBaseLocationDayTypeByCode(
+        supabase,
+        normalizedRequestedDayType
+      )
+
+      if (!selectedDayType) {
+        return { error: 'Selected day type is not available.' }
+      }
+
+      return {
+        value: {
+          day_type_code: selectedDayType.day_type_code,
+          day_type_label: selectedDayType.day_type_label,
+          include_food_allowance: selectedDayType.include_food_allowance,
+        },
+      }
+    }
+
+    const defaultDayType = await getDefaultBaseLocationDayType(supabase)
+
+    if (!defaultDayType) {
+      return {
+        error: 'No active day type is configured for base location claims.',
+      }
+    }
+
+    return {
+      value: {
+        day_type_code: defaultDayType.day_type_code,
+        day_type_label: defaultDayType.day_type_label,
+        include_food_allowance: defaultDayType.include_food_allowance,
+      },
+    }
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Unable to resolve base day type configuration.',
+    }
+  }
 }
 
 async function resolveInitialWorkflowState(
@@ -387,6 +446,21 @@ export async function submitClaimAction(
     }
   }
 
+  let resolvedBaseLocationDayType: ResolvedBaseLocationDayType | null = null
+
+  if (wlFlags.requires_vehicle_selection) {
+    const resolvedDayType = await resolveBaseLocationDayTypeSelection(
+      supabase,
+      input.baseLocationDayTypeCode
+    )
+
+    if ('error' in resolvedDayType) {
+      return { ok: false, error: resolvedDayType.error }
+    }
+
+    resolvedBaseLocationDayType = resolvedDayType.value
+  }
+
   // ── Calculate expense items from DB rates ──
   let draft: {
     items: { expense_type: string; amount: number; description: string }[]
@@ -398,6 +472,8 @@ export async function submitClaimAction(
     draft = await calculateBaseLocationItems(supabase, {
       workLocationId,
       vehicleType: vt,
+      includeFoodAllowance:
+        resolvedBaseLocationDayType?.include_food_allowance ?? true,
     })
   } else if (wlFlags.requires_outstation_details) {
     const vt = vehicleTypeId
@@ -562,6 +638,9 @@ export async function submitClaimAction(
         employeeId: employee.id,
         claimDateIso: input.claimDate.iso,
         workLocationId,
+        baseLocationDayTypeCode: isBaseLocation
+          ? (resolvedBaseLocationDayType?.day_type_code ?? null)
+          : null,
         ownVehicleUsed: isOutstation ? hasOwnVehicle : null,
         vehicleTypeId: isBaseLocation || hasOwnVehicle ? vehicleTypeId : null,
         outstationStateId: outstation?.outstationStateId ?? null,
@@ -626,6 +705,9 @@ export async function submitClaimAction(
       employeeId: employee.id,
       claimDateIso: input.claimDate.iso,
       workLocationId,
+      baseLocationDayTypeCode: isBaseLocation
+        ? (resolvedBaseLocationDayType?.day_type_code ?? null)
+        : null,
       ownVehicleUsed: isOutstation ? hasOwnVehicle : null,
       vehicleTypeId: isBaseLocation || hasOwnVehicle ? vehicleTypeId : null,
       outstationStateId: outstation?.outstationStateId ?? null,

@@ -16,6 +16,7 @@ import type {
 import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
+import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
 function buildClaimDateCursorFilter(
   claimDate: string,
@@ -77,6 +78,10 @@ export async function getPendingApprovalsPaginated(
 
   let pendingStatusIds = pendingStatuses.map((status) => status.id)
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
 
   if (parsedStatusFilter) {
     pendingStatusIds = pendingStatuses
@@ -139,6 +144,10 @@ export async function getPendingApprovalsPaginated(
     .in('status_id', pendingStatusIds)
     .or(approvalFilters.join(','))
     .limit(limit + 1)
+
+  if (allowResubmitFilter !== null) {
+    query = query.eq('allow_resubmit', allowResubmitFilter)
+  }
 
   if (filters.claimDateFrom) {
     query = query.gte('claim_date', filters.claimDateFrom)

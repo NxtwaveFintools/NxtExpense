@@ -11,6 +11,15 @@ const RATE_SNAPSHOT: ClaimRateSnapshot = {
   fuelBaseDailyByVehicle: {
     'veh-2w': 180,
   },
+  baseDayTypeIncludeFoodByCode: {
+    FULL_DAY: true,
+    HALF_DAY: false,
+  },
+  baseDayTypeLabelByCode: {
+    FULL_DAY: 'Full Day',
+    HALF_DAY: 'Half Day (Fuel Only)',
+  },
+  defaultBaseDayTypeCode: 'FULL_DAY',
   intercityPerKmByVehicle: {
     'veh-2w': 5,
   },
@@ -24,11 +33,62 @@ const RATE_SNAPSHOT: ClaimRateSnapshot = {
 }
 
 describe('getClaimSummaryPreview', () => {
+  it('shows food + fuel for base location full day', () => {
+    const result = getClaimSummaryPreview({
+      workLocation: 'wl-base',
+      requiresVehicleSelection: true,
+      requiresOutstationDetails: false,
+      baseLocationDayTypeCode: 'FULL_DAY',
+      hasIntercityTravel: false,
+      hasIntracityTravel: false,
+      intercityOwnVehicleUsed: false,
+      intracityOwnVehicleUsed: false,
+      vehicleType: 'veh-2w',
+      vehicleTypeName: 'Two Wheeler',
+      kmTravelled: '',
+      foodWithPrincipalsAmount: '',
+      claimRateSnapshot: RATE_SNAPSHOT,
+    })
+
+    expect(result.items).toEqual([
+      { label: 'Food allowance', amount: 120 },
+      { label: 'Two Wheeler fuel allowance', amount: 180 },
+    ])
+    expect(result.total).toBe(300)
+  })
+
+  it('shows fuel-only for base location half day', () => {
+    const result = getClaimSummaryPreview({
+      workLocation: 'wl-base',
+      requiresVehicleSelection: true,
+      requiresOutstationDetails: false,
+      baseLocationDayTypeCode: 'HALF_DAY',
+      hasIntercityTravel: false,
+      hasIntracityTravel: false,
+      intercityOwnVehicleUsed: false,
+      intracityOwnVehicleUsed: false,
+      vehicleType: 'veh-2w',
+      vehicleTypeName: 'Two Wheeler',
+      kmTravelled: '',
+      foodWithPrincipalsAmount: '',
+      claimRateSnapshot: RATE_SNAPSHOT,
+    })
+
+    expect(result.items).toEqual([
+      {
+        label: 'Two Wheeler fuel allowance (Half Day (Fuel Only))',
+        amount: 180,
+      },
+    ])
+    expect(result.total).toBe(180)
+  })
+
   it('shows only food allowance when neither outstation own-vehicle branch is selected', () => {
     const result = getClaimSummaryPreview({
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
+      baseLocationDayTypeCode: undefined,
       hasIntercityTravel: false,
       hasIntracityTravel: false,
       intercityOwnVehicleUsed: false,
@@ -49,6 +109,7 @@ describe('getClaimSummaryPreview', () => {
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
+      baseLocationDayTypeCode: undefined,
       hasIntercityTravel: false,
       hasIntracityTravel: true,
       intercityOwnVehicleUsed: false,
@@ -72,6 +133,7 @@ describe('getClaimSummaryPreview', () => {
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
+      baseLocationDayTypeCode: undefined,
       hasIntercityTravel: false,
       hasIntracityTravel: true,
       intercityOwnVehicleUsed: false,
@@ -99,6 +161,7 @@ describe('getClaimSummaryPreview', () => {
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
+      baseLocationDayTypeCode: undefined,
       hasIntercityTravel: true,
       hasIntracityTravel: false,
       intercityOwnVehicleUsed: true,
@@ -123,6 +186,7 @@ describe('getClaimSummaryPreview', () => {
       workLocation: 'wl-outstation',
       requiresVehicleSelection: false,
       requiresOutstationDetails: true,
+      baseLocationDayTypeCode: undefined,
       hasIntercityTravel: false,
       hasIntracityTravel: false,
       intercityOwnVehicleUsed: false,

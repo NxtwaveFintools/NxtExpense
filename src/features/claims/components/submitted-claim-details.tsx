@@ -5,6 +5,28 @@ type SubmittedField = {
   value: string
 }
 
+function formatBaseLocationDayType(dayTypeCode: string): string {
+  const normalizedCode = dayTypeCode.trim().toUpperCase()
+
+  if (normalizedCode === 'FULL_DAY') {
+    return 'Full Day'
+  }
+
+  if (
+    normalizedCode === 'HALF_DAY' ||
+    normalizedCode === 'HALF_DAY_FUEL_ONLY'
+  ) {
+    return 'Half Day'
+  }
+
+  return normalizedCode
+    .split('_')
+    .map((segment) =>
+      segment.length > 0 ? segment[0] + segment.slice(1).toLowerCase() : segment
+    )
+    .join(' ')
+}
+
 function getSubmittedFields(claim: ClaimWithItems['claim']): SubmittedField[] {
   const fields: Array<SubmittedField | null> = [
     claim.has_intercity_travel
@@ -61,6 +83,12 @@ function getSubmittedFields(claim: ClaimWithItems['claim']): SubmittedField[] {
           label: 'Own vehicle used?',
           value: claim.own_vehicle_used ? 'Yes' : 'No',
         },
+    claim.base_location_day_type_code
+      ? {
+          label: 'Day Type',
+          value: formatBaseLocationDayType(claim.base_location_day_type_code),
+        }
+      : null,
     claim.vehicle_type
       ? {
           label: 'Vehicle Type',
