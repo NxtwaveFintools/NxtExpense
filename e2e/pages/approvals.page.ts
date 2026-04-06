@@ -22,18 +22,6 @@ export class ApprovalsPage {
     }
   }
 
-  private get claimDateFromInput() {
-    return this.page.locator('input[name="claimDateFrom"]')
-  }
-
-  private get claimDateToInput() {
-    return this.page.locator('input[name="claimDateTo"]')
-  }
-
-  private get applyFiltersButton() {
-    return this.page.getByRole('button', { name: /apply filters/i })
-  }
-
   private parseClaimDateIsoFromClaimNumber(claimNumber: string): string | null {
     const dateMatch = claimNumber.match(/-(\d{2})(\d{2})(\d{2})-\d+$/)
     if (!dateMatch) {
@@ -50,27 +38,11 @@ export class ApprovalsPage {
       return
     }
 
-    const hasDateFilterInputs =
-      (await this.claimDateFromInput.count()) > 0 &&
-      (await this.claimDateToInput.count()) > 0
+    const params = new URLSearchParams()
+    params.set('claimDateFrom', claimDateIso)
+    params.set('claimDateTo', claimDateIso)
 
-    if (!hasDateFilterInputs) {
-      return
-    }
-
-    try {
-      await this.claimDateFromInput
-        .first()
-        .fill(claimDateIso, { timeout: 5_000 })
-      await this.claimDateToInput.first().fill(claimDateIso, { timeout: 5_000 })
-
-      if ((await this.applyFiltersButton.count()) > 0) {
-        await this.applyFiltersButton.first().click({ timeout: 5_000 })
-        await this.page.waitForLoadState('networkidle')
-      }
-    } catch {
-      // Allow retry loop in waitForPendingRowByClaimNumber to recover.
-    }
+    await this.navigateWithRetry(`/approvals?${params.toString()}`)
   }
 
   async applyHistoryClaimDateFilterForClaimNumber(claimNumber: string) {
@@ -117,13 +89,14 @@ export class ApprovalsPage {
       return false
     }
 
-    const previousUrl = this.page.url()
     visitedNextHrefs.add(nextHref)
 
     await this.pendingNextLink.click()
     await this.page.waitForLoadState('networkidle')
 
-    return this.page.url() !== previousUrl
+    // Cursor params are intentionally stripped from the visible URL,
+    // so URL equality is not a reliable navigation signal anymore.
+    return true
   }
 
   async hasPendingRowByClaimNumber(claimNumber: string): Promise<boolean> {
@@ -264,13 +237,14 @@ export class ApprovalsPage {
       return false
     }
 
-    const previousUrl = this.page.url()
     visitedNextHrefs.add(nextHref)
 
     await this.historyNextLink.click()
     await this.page.waitForLoadState('networkidle')
 
-    return this.page.url() !== previousUrl
+    // Cursor params are intentionally stripped from the visible URL,
+    // so URL equality is not a reliable navigation signal anymore.
+    return true
   }
 
   async hasHistoryRowByClaimNumber(claimNumber: string): Promise<boolean> {

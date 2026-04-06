@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 
 import {
@@ -155,6 +156,9 @@ export function ClaimOperations() {
                 <th className="px-3 py-2 text-center font-medium text-foreground/70">
                   Action
                 </th>
+                <th className="px-3 py-2 text-center font-medium text-foreground/70">
+                  Open
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -189,6 +193,14 @@ export function ClaimOperations() {
                     >
                       Change Status
                     </button>
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <Link
+                      href={`/claims/${claim.id}?from=admin-claims`}
+                      className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      Open Claim
+                    </Link>
                   </td>
                 </tr>
               ))}

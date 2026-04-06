@@ -113,11 +113,15 @@ async function submitOfficeClaimAndGetClaimNumber(
   await claims.gotoNewClaim()
   await ensureClaimFormReady(page, claims)
 
-  const randomOffset = Math.floor(Math.random() * 120)
-  const candidateDaysBack = Array.from(
-    { length: 120 },
-    (_, i) => 1 + ((i + randomOffset) % 120)
-  )
+  const randomOffset = Math.floor(Math.random() * 997)
+  const candidateDaysBack = [
+    ...Array.from({ length: 31 }, (_, i) => i + randomOffset),
+    ...Array.from({ length: 30 }, (_, i) => 35 + i * 5 + randomOffset),
+    ...Array.from({ length: 18 }, (_, i) => 210 + i * 30 + randomOffset),
+    ...Array.from({ length: 25 }, (_, i) => 760 + i * 120 + randomOffset),
+  ]
+
+  let permanentlyClosedStreak = 0
 
   for (const daysBack of candidateDaysBack) {
     await ensureClaimFormReady(page, claims)
@@ -196,10 +200,20 @@ async function submitOfficeClaimAndGetClaimNumber(
       duplicateConstraintError ||
       permanentlyClosedError
     ) {
+      if (permanentlyClosedError) {
+        permanentlyClosedStreak += 1
+        if (permanentlyClosedStreak >= 30) {
+          break
+        }
+      } else {
+        permanentlyClosedStreak = 0
+      }
+
       continue
     }
 
     if (currentPath === '/claims/new') {
+      permanentlyClosedStreak = 0
       continue
     }
 
