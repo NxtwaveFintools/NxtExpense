@@ -9,7 +9,6 @@ import { ApprovalHistoryList } from '@/features/approvals/components/approval-hi
 import { ApprovalList } from '@/features/approvals/components/approval-list'
 import { getApprovalStageAnalytics } from '@/features/approvals/queries/approval-analytics'
 import { getFilteredApprovalHistoryCount } from '@/features/approvals/queries/history-filters'
-import { getApprovalEmployeeNameSuggestions } from '@/features/approvals/queries/employee-name-suggestions'
 import { canViewApprovalHistoryAmount } from '@/features/approvals/utils/amount-visibility'
 import {
   addApprovalFiltersToParams,
@@ -35,6 +34,7 @@ import {
   toSortedQueryString,
 } from '@/lib/utils/search-params'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { PaginationUrlCleanup } from '@/components/ui/pagination-url-cleanup'
 
 type ApprovalsPageProps = {
   searchParams?: Promise<{
@@ -173,18 +173,12 @@ export default async function ApprovalsPage({
     approvals,
     history,
     statusCatalog,
-    employeeNameSuggestions,
     approvalAnalytics,
     historyTotalCount,
   ] = await Promise.all([
     getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
     getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
     getClaimStatusCatalog(supabase),
-    getApprovalEmployeeNameSuggestions(
-      supabase,
-      normalizedFilters.employeeName,
-      120
-    ),
     getApprovalStageAnalytics(supabase, user.email ?? '', {
       employeeName: normalizedFilters.employeeName,
       claimStatus: normalizedFilters.claimStatus,
@@ -250,13 +244,20 @@ export default async function ApprovalsPage({
 
   return (
     <>
+      <PaginationUrlCleanup
+        keys={[
+          'pendingCursor',
+          'pendingTrail',
+          'historyCursor',
+          'historyTrail',
+        ]}
+      />
       <main className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-6xl">
           <div className="space-y-6">
             <ApprovalFiltersBar
               filters={normalizedFilters}
               statusCatalog={statusCatalog}
-              employeeNameSuggestions={employeeNameSuggestions}
               validationError={filterValidationError}
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}

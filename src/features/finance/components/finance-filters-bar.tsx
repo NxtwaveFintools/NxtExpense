@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useDeferredValue, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Filter } from 'lucide-react'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
+import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
+import { getFinanceEmployeeNameSuggestionsAction } from '@/features/finance/actions/employee-name-suggestions'
 
 import type {
   FinanceDateFilterField,
@@ -35,7 +38,7 @@ const DEFAULT_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
 
 function getDateFilterFieldLabel(field: FinanceDateFilterField): string {
   if (field === 'submitted_at') {
-    return 'Submitted At'
+    return 'Submission Date'
   }
 
   if (field === 'finance_approved_date') {
@@ -79,6 +82,27 @@ export function FinanceFiltersBar({
     useState<FinanceDateFilterField>(filters.dateFilterField)
   const [dateFrom, setDateFrom] = useState(filters.dateFrom ?? '')
   const [dateTo, setDateTo] = useState(filters.dateTo ?? '')
+  const deferredEmployeeName = useDeferredValue(employeeName)
+
+  const employeeNameSuggestionsQuery = useQuery<string[], Error>({
+    queryKey: [
+      'finance-filters-employee-name-suggestions',
+      deferredEmployeeName,
+    ],
+    queryFn: async () => {
+      const result =
+        await getFinanceEmployeeNameSuggestionsAction(deferredEmployeeName)
+
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+
+      return result.data
+    },
+    enabled: deferredEmployeeName.trim().length >= 2,
+    staleTime: 30_000,
+    gcTime: 2 * 60 * 1000,
+  })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -136,12 +160,13 @@ export function FinanceFiltersBar({
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4 md:grid-cols-4">
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Employee Name</span>
-          <input
-            name="employeeName"
+          <EmployeeNameSuggestionInput
             value={employeeName}
-            onChange={(e) => setEmployeeName(e.target.value)}
-            placeholder="Search by employee name"
-            className={`${inputCls} placeholder:text-muted-foreground`}
+            onValueChange={setEmployeeName}
+            suggestions={employeeNameSuggestionsQuery.data ?? []}
+            isLoading={employeeNameSuggestionsQuery.isFetching}
+            placeholder="Search by full employee name"
+            inputClassName={inputCls}
           />
         </label>
 

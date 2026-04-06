@@ -7,9 +7,12 @@ import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
 import {
   buildCursorNavigationLinks,
+  CURSOR_PAGE_SIZE_OPTIONS,
+  DEFAULT_CURSOR_PAGE_SIZE,
   decodeCursorTrail,
   encodeCursorTrail,
   getCursorTotalPages,
+  normalizeCursorPageSize,
 } from '@/lib/utils/pagination'
 import { getFinanceQueueAction } from '@/features/finance/actions'
 import { getFinanceFilterOptions } from '@/features/finance/queries'
@@ -28,11 +31,13 @@ import {
   createNonEmptySearchParams,
   toSortedQueryString,
 } from '@/lib/utils/search-params'
+import { PaginationUrlCleanup } from '@/components/ui/pagination-url-cleanup'
 
 type FinancePageProps = {
   searchParams?: Promise<{
     queueCursor?: string
     queueTrail?: string
+    pageSize?: string
     employeeName?: string
     claimNumber?: string
     ownerDesignation?: string
@@ -112,6 +117,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const queueCursor = resolvedSearch?.queueCursor ?? null
   const queueTrail = decodeCursorTrail(resolvedSearch?.queueTrail ?? null)
+  const pageSize = normalizeCursorPageSize(resolvedSearch?.pageSize)
 
   const canonicalParams = addFinanceFiltersToParams(
     new URLSearchParams(),
@@ -124,6 +130,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   if (queueTrail.length > 0) {
     canonicalParams.set('queueTrail', encodeCursorTrail(queueTrail))
   }
+  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
+    canonicalParams.set('pageSize', String(pageSize))
+  }
 
   const currentParams = createNonEmptySearchParams(resolvedSearch)
   if (
@@ -135,7 +144,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
   const [queue, filterOptions, analytics, queueTotalCount] = await Promise.all([
-    getFinanceQueueAction(queueCursor, 10, normalizedFilterParams),
+    getFinanceQueueAction(queueCursor, pageSize, normalizedFilterParams),
     getFinanceFilterOptions(supabase),
     getFinanceQueueAnalytics(supabase, effectiveFilters),
     getFinanceQueueTotalCount(supabase, effectiveFilters),
@@ -153,6 +162,19 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   const queueTotalPages = getCursorTotalPages(queueTotalCount, queue.limit)
 
+  const pageSizeHrefByValue = Object.fromEntries(
+    CURSOR_PAGE_SIZE_OPTIONS.map((size) => {
+      const params = addFinanceFiltersToParams(
+        new URLSearchParams(),
+        effectiveFilters
+      )
+      if (size !== DEFAULT_CURSOR_PAGE_SIZE) {
+        params.set('pageSize', String(size))
+      }
+      return [size, buildPathWithSearchParams('/finance', params)]
+    })
+  )
+
   const currentPageCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
@@ -160,6 +182,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
   currentPageCsvParams.set('mode', 'page')
   if (queueCursor) {
     currentPageCsvParams.set('queueCursor', queueCursor)
+  }
+  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
+    currentPageCsvParams.set('pageSize', String(pageSize))
   }
 
   const allRowsCsvParams = addFinanceFiltersToParams(
@@ -173,6 +198,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   return (
     <>
+      <PaginationUrlCleanup keys={['queueCursor', 'queueTrail']} />
       <main className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-6xl">
           <div className="space-y-6">
@@ -221,6 +247,8 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
               pagination={{
                 ...queuePagination,
                 pageSize: queue.limit,
+                pageSizeOptions: [...CURSOR_PAGE_SIZE_OPTIONS],
+                pageSizeHrefByValue,
                 totalPages: queueTotalPages,
                 totalItems: queueTotalCount,
               }}

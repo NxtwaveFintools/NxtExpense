@@ -12,6 +12,7 @@ type DashboardAccess = {
   canViewClaims: boolean
   canViewApprovals: boolean
   canViewFinanceQueue: boolean
+  canViewAdmin: boolean
 }
 
 export async function getDashboardAccess(
