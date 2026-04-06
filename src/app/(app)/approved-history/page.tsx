@@ -6,9 +6,12 @@ import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
 import {
   buildCursorNavigationLinks,
+  CURSOR_PAGE_SIZE_OPTIONS,
+  DEFAULT_CURSOR_PAGE_SIZE,
   decodeCursorTrail,
   encodeCursorTrail,
   getCursorTotalPages,
+  normalizeCursorPageSize,
 } from '@/lib/utils/pagination'
 import { getFinanceHistoryAction } from '@/features/finance/actions'
 import {
@@ -28,11 +31,13 @@ import {
   createNonEmptySearchParams,
   toSortedQueryString,
 } from '@/lib/utils/search-params'
+import { PaginationUrlCleanup } from '@/components/ui/pagination-url-cleanup'
 
 type ApprovedHistoryPageProps = {
   searchParams?: Promise<{
     historyCursor?: string
     historyTrail?: string
+    pageSize?: string
     employeeName?: string
     claimNumber?: string
     ownerDesignation?: string
@@ -105,6 +110,7 @@ export default async function ApprovedHistoryPage({
 
   const historyCursor = resolvedSearch?.historyCursor ?? null
   const historyTrail = decodeCursorTrail(resolvedSearch?.historyTrail ?? null)
+  const pageSize = normalizeCursorPageSize(resolvedSearch?.pageSize)
 
   const canonicalParams = addFinanceFiltersToParams(
     new URLSearchParams(),
@@ -116,6 +122,9 @@ export default async function ApprovedHistoryPage({
   }
   if (historyTrail.length > 0) {
     canonicalParams.set('historyTrail', encodeCursorTrail(historyTrail))
+  }
+  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
+    canonicalParams.set('pageSize', String(pageSize))
   }
 
   const currentParams = createNonEmptySearchParams(resolvedSearch)
@@ -129,7 +138,7 @@ export default async function ApprovedHistoryPage({
 
   const [history, filterOptions, historyTotalCount, analytics] =
     await Promise.all([
-      getFinanceHistoryAction(historyCursor, 10, normalizedFilterParams),
+      getFinanceHistoryAction(historyCursor, pageSize, normalizedFilterParams),
       getFinanceFilterOptions(supabase),
       getFinanceHistoryTotalCount(supabase, effectiveFilters),
       getFinanceHistoryAnalytics(supabase, effectiveFilters),
@@ -150,6 +159,19 @@ export default async function ApprovedHistoryPage({
     history.limit
   )
 
+  const pageSizeHrefByValue = Object.fromEntries(
+    CURSOR_PAGE_SIZE_OPTIONS.map((size) => {
+      const params = addFinanceFiltersToParams(
+        new URLSearchParams(),
+        effectiveFilters
+      )
+      if (size !== DEFAULT_CURSOR_PAGE_SIZE) {
+        params.set('pageSize', String(size))
+      }
+      return [size, buildPathWithSearchParams('/approved-history', params)]
+    })
+  )
+
   const currentPageCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
@@ -157,6 +179,9 @@ export default async function ApprovedHistoryPage({
   currentPageCsvParams.set('mode', 'page')
   if (historyCursor) {
     currentPageCsvParams.set('historyCursor', historyCursor)
+  }
+  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
+    currentPageCsvParams.set('pageSize', String(pageSize))
   }
 
   const allRowsCsvParams = addFinanceFiltersToParams(
@@ -169,59 +194,64 @@ export default async function ApprovedHistoryPage({
   const exportAllHref = `/approved-history/export?${allRowsCsvParams.toString()}`
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="space-y-6">
-          <FinanceFiltersBar
-            pathname="/approved-history"
-            heading="Approved History Filters"
-            filters={effectiveFilters}
-            options={filterOptions}
-            showHodApproverFilter={false}
-            showClaimStatusFilter={false}
-            exportCurrentPageHref={exportCurrentPageHref}
-            exportAllHref={exportAllHref}
-          />
-          <ClaimAnalyticsCards
-            cards={[
-              {
-                label: 'Total History Records',
-                count: analytics.total.count,
-                amount: analytics.total.amount,
-                tone: 'neutral',
-              },
-              {
-                label: 'Approved History',
-                count: analytics.approvedHistory.count,
-                amount: analytics.approvedHistory.amount,
-                tone: 'approved',
-              },
-              {
-                label: 'Rejected In Finance',
-                count: analytics.rejected.count,
-                amount: analytics.rejected.amount,
-                tone: 'rejected',
-              },
-              {
-                label: 'Other Actions',
-                count: analytics.other.count,
-                amount: analytics.other.amount,
-                tone: 'finance',
-              },
-            ]}
-          />
-          <FinanceHistoryList
-            source="approved-history"
-            history={history}
-            pagination={{
-              ...historyPagination,
-              pageSize: history.limit,
-              totalPages: historyTotalPages,
-              totalItems: historyTotalCount,
-            }}
-          />
+    <>
+      <PaginationUrlCleanup keys={['historyCursor', 'historyTrail']} />
+      <main className="min-h-screen bg-background px-4 py-8">
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="space-y-6">
+            <FinanceFiltersBar
+              pathname="/approved-history"
+              heading="Approved History Filters"
+              filters={effectiveFilters}
+              options={filterOptions}
+              showHodApproverFilter={false}
+              showClaimStatusFilter={false}
+              exportCurrentPageHref={exportCurrentPageHref}
+              exportAllHref={exportAllHref}
+            />
+            <ClaimAnalyticsCards
+              cards={[
+                {
+                  label: 'Total History Records',
+                  count: analytics.total.count,
+                  amount: analytics.total.amount,
+                  tone: 'neutral',
+                },
+                {
+                  label: 'Approved History',
+                  count: analytics.approvedHistory.count,
+                  amount: analytics.approvedHistory.amount,
+                  tone: 'approved',
+                },
+                {
+                  label: 'Rejected In Finance',
+                  count: analytics.rejected.count,
+                  amount: analytics.rejected.amount,
+                  tone: 'rejected',
+                },
+                {
+                  label: 'Other Actions',
+                  count: analytics.other.count,
+                  amount: analytics.other.amount,
+                  tone: 'finance',
+                },
+              ]}
+            />
+            <FinanceHistoryList
+              source="approved-history"
+              history={history}
+              pagination={{
+                ...historyPagination,
+                pageSize: history.limit,
+                pageSizeOptions: [...CURSOR_PAGE_SIZE_OPTIONS],
+                pageSizeHrefByValue,
+                totalPages: historyTotalPages,
+                totalItems: historyTotalCount,
+              }}
+            />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   )
 }

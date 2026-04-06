@@ -32,6 +32,8 @@ type FinanceQueueProps = {
     nextHref: string | null
     pageNumber: number
     pageSize: number
+    pageSizeOptions?: number[]
+    pageSizeHrefByValue?: Record<number, string>
     totalPages?: number
     totalItems?: number
   }
@@ -178,6 +180,9 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
         backHref={pagination.backHref}
         nextHref={pagination.nextHref}
         pageNumber={pagination.pageNumber}
+        pageSize={pagination.pageSize}
+        pageSizeOptions={pagination.pageSizeOptions}
+        pageSizeHrefByValue={pagination.pageSizeHrefByValue}
         totalPages={pagination.totalPages}
         totalItems={pagination.totalItems}
       />
@@ -243,7 +248,7 @@ export function FinanceQueue({ queue, pagination }: FinanceQueueProps) {
                 </th>
                 <th className={getDataTableHeadCellClass()}>Employee</th>
                 <th className={getDataTableHeadCellClass()}>Travel Date</th>
-                <th className={getDataTableHeadCellClass()}>Submitted At</th>
+                <th className={getDataTableHeadCellClass()}>Submission Date</th>
                 <th className={getDataTableHeadCellClass()}>Location</th>
                 <th className={getDataTableHeadCellClass()}>Amount</th>
               </tr>

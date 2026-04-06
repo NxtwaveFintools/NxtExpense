@@ -29,6 +29,7 @@ import {
   toSortedQueryString,
 } from '@/lib/utils/search-params'
 import { redirect } from 'next/navigation'
+import { PaginationUrlCleanup } from '@/components/ui/pagination-url-cleanup'
 
 import type { MyClaimsFilters } from '@/features/claims/types'
 
@@ -167,6 +168,7 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
 
   return (
     <>
+      <PaginationUrlCleanup keys={['cursor', 'trail']} />
       <main className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-6xl">
           <div className="mb-6">

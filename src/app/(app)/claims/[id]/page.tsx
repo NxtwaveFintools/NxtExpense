@@ -32,6 +32,18 @@ type ClaimDetailPageProps = {
 const SOURCE_BACK_CONFIG: Record<string, { href: string; label: string }> = {
   approvals: { href: '/approvals', label: 'Back to Approvals' },
   finance: { href: '/finance', label: 'Back to Finance' },
+  'admin-claims': {
+    href: '/admin/claims',
+    label: 'Back to Claim Operations',
+  },
+  'admin-dashboard': {
+    href: '/dashboard',
+    label: 'Back to Admin Dashboard',
+  },
+  'admin-analytics': {
+    href: '/dashboard',
+    label: 'Back to Admin Analytics',
+  },
 }
 
 export default async function ClaimDetailPage({

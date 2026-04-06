@@ -7,6 +7,9 @@ type CursorPaginationControlsProps = {
   pageNumber: number
   totalPages?: number
   totalItems?: number
+  pageSize?: number
+  pageSizeOptions?: number[]
+  pageSizeHrefByValue?: Record<number, string>
   className?: string
 }
 
@@ -20,6 +23,9 @@ export function CursorPaginationControls({
   pageNumber,
   totalPages,
   totalItems,
+  pageSize,
+  pageSizeOptions,
+  pageSizeHrefByValue,
   className,
 }: CursorPaginationControlsProps) {
   const btnBase =
@@ -68,6 +74,39 @@ export function CursorPaginationControls({
           </p>
         ) : null}
       </div>
+
+      {pageSize && pageSizeOptions && pageSizeOptions.length > 0 ? (
+        <div className="hidden items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2 py-1 md:flex">
+          <span className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Rows
+          </span>
+          {pageSizeOptions.map((size) => {
+            const isActive = size === pageSize
+            const href = pageSizeHrefByValue?.[size]
+
+            if (isActive || !href) {
+              return (
+                <span
+                  key={size}
+                  className="rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground"
+                >
+                  {size}
+                </span>
+              )
+            }
+
+            return (
+              <Link
+                key={size}
+                href={href}
+                className="rounded-md px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-muted"
+              >
+                {size}
+              </Link>
+            )
+          })}
+        </div>
+      ) : null}
 
       {nextHref ? (
         <Link href={nextHref} className={`${btnBase} ${btnActive}`}>

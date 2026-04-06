@@ -7,8 +7,8 @@ import {
   normalizeFinanceFilters,
 } from '@/features/finance/utils/filters'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { normalizeCursorPageSize } from '@/lib/utils/pagination'
 
-const PAGE_EXPORT_LIMIT = 10
 const ALL_EXPORT_BATCH_SIZE = 200
 
 type ExportMode = 'page' | 'all'
@@ -86,6 +86,7 @@ async function handleExportRequest(request: Request) {
 
     const mode = getExportMode(searchParams.get('mode'))
     const queueCursor = searchParams.get('queueCursor')
+    const pageSize = normalizeCursorPageSize(searchParams.get('pageSize'))
     const filters = getPendingClaimsExportFilters(searchParams)
 
     const supabase = await createSupabaseServerClient()
@@ -109,7 +110,7 @@ async function handleExportRequest(request: Request) {
             await getFinanceQueuePaginated(
               supabase,
               queueCursor,
-              PAGE_EXPORT_LIMIT,
+              pageSize,
               filters
             )
           ).data
