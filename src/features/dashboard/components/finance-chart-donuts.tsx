@@ -164,7 +164,7 @@ export function ExpenseTypeBreakdownLineChart({
   if (data.length === 0) {
     return (
       <ChartCard
-        title="Expense Mix Trend"
+        title="Expenses"
         subtitle="Breakdown across major expense categories"
       >
         <EmptyChart />
@@ -176,7 +176,7 @@ export function ExpenseTypeBreakdownLineChart({
 
   return (
     <ChartCard
-      title="Expense Mix Trend"
+      title="Expenses"
       subtitle="Breakdown across major expense categories"
     >
       <ResponsiveContainer width="100%" height={320}>
