@@ -3,6 +3,9 @@ type CursorPayload = {
   id: string
 }
 
+export const CURSOR_PAGE_SIZE_OPTIONS = [10, 25, 50] as const
+export const DEFAULT_CURSOR_PAGE_SIZE = CURSOR_PAGE_SIZE_OPTIONS[0]
+
 type QueryValue = string | string[] | undefined
 
 type QueryRecord = Record<string, QueryValue>
@@ -23,6 +26,28 @@ function normalizePositiveInteger(value: number, fallback = 1): number {
 
   const normalized = Math.trunc(value)
   return normalized > 0 ? normalized : fallback
+}
+
+export function normalizeCursorPageSize(
+  value: number | string | null | undefined
+): number {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number.parseInt(value, 10)
+        : NaN
+
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_CURSOR_PAGE_SIZE
+  }
+
+  const normalized = Math.trunc(parsed)
+  return CURSOR_PAGE_SIZE_OPTIONS.includes(
+    normalized as (typeof CURSOR_PAGE_SIZE_OPTIONS)[number]
+  )
+    ? normalized
+    : DEFAULT_CURSOR_PAGE_SIZE
 }
 
 export function getCursorTotalPages(

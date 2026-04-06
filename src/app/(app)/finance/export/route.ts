@@ -9,8 +9,7 @@ import {
   normalizeFinanceFilters,
 } from '@/features/finance/utils/filters'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-
-const PAGE_EXPORT_LIMIT = 10
+import { normalizeCursorPageSize } from '@/lib/utils/pagination'
 
 type ExportMode = 'page' | 'all'
 
@@ -25,6 +24,7 @@ async function handleExportRequest(request: Request) {
 
     const mode = getExportMode(searchParams.get('mode'))
     const historyCursor = searchParams.get('historyCursor')
+    const pageSize = normalizeCursorPageSize(searchParams.get('pageSize'))
 
     const filters = normalizeFinanceFilters({
       employeeName: searchParams.get('employeeName') ?? undefined,
@@ -65,7 +65,7 @@ async function handleExportRequest(request: Request) {
             await getFinanceHistoryPaginated(
               supabase,
               historyCursor,
-              PAGE_EXPORT_LIMIT,
+              pageSize,
               effectiveFilters
             )
           ).data

@@ -1,28 +1,143 @@
-import Link from 'next/link'
+'use client'
+
+import { useDeferredValue, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { Filter } from 'lucide-react'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
+import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
+import { getApprovalEmployeeNameSuggestionsAction } from '@/features/approvals/actions/employee-name-suggestions'
+import { addApprovalFiltersToParams } from '@/features/approvals/utils/history-filters'
 
 import type { ClaimStatusCatalogItem } from '@/features/claims/types'
-import type { ApprovalHistoryFilters } from '@/features/approvals/types'
+import type {
+  ApprovalAmountOperator,
+  ApprovalHistoryFilters,
+  ApprovalLocationType,
+} from '@/features/approvals/types'
 
 type ApprovalFiltersBarProps = {
   filters: ApprovalHistoryFilters
   statusCatalog: ClaimStatusCatalogItem[]
-  employeeNameSuggestions: string[]
   validationError?: string | null
   exportCurrentPageHref: string
   exportAllHref: string
 }
 
+const DEFAULT_FILTERS: ApprovalHistoryFilters = {
+  claimStatus: null,
+  employeeName: null,
+  claimDateFrom: null,
+  claimDateTo: null,
+  amountOperator: 'lte',
+  amountValue: null,
+  locationType: null,
+  claimDateSort: 'desc',
+  hodApprovedFrom: null,
+  hodApprovedTo: null,
+  financeApprovedFrom: null,
+  financeApprovedTo: null,
+}
+
+function toNullable(value: string): string | null {
+  const normalized = value.trim()
+  return normalized ? normalized : null
+}
+
 export function ApprovalFiltersBar({
   filters,
   statusCatalog,
-  employeeNameSuggestions,
   validationError,
   exportCurrentPageHref,
   exportAllHref,
 }: ApprovalFiltersBarProps) {
+  const router = useRouter()
+
+  const [claimStatus, setClaimStatus] = useState(filters.claimStatus ?? '')
+  const [employeeName, setEmployeeName] = useState(filters.employeeName ?? '')
+  const [claimDateFrom, setClaimDateFrom] = useState(
+    filters.claimDateFrom ?? ''
+  )
+  const [claimDateTo, setClaimDateTo] = useState(filters.claimDateTo ?? '')
+  const [amountOperator, setAmountOperator] = useState<ApprovalAmountOperator>(
+    filters.amountOperator
+  )
+  const [amountValue, setAmountValue] = useState(
+    filters.amountValue === null ? '' : String(filters.amountValue)
+  )
+  const [locationType, setLocationType] = useState<ApprovalLocationType | ''>(
+    filters.locationType ?? ''
+  )
+  const [claimDateSort, setClaimDateSort] = useState(filters.claimDateSort)
+
+  const deferredEmployeeName = useDeferredValue(employeeName)
+
+  const employeeNameSuggestionsQuery = useQuery<string[], Error>({
+    queryKey: ['approval-employee-name-suggestions', deferredEmployeeName],
+    queryFn: async () => {
+      const result =
+        await getApprovalEmployeeNameSuggestionsAction(deferredEmployeeName)
+
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+
+      return result.data
+    },
+    enabled: deferredEmployeeName.trim().length >= 2,
+    staleTime: 30_000,
+    gcTime: 2 * 60 * 1000,
+  })
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const parsedAmount = toNullable(amountValue)
+    const amountAsNumber = parsedAmount === null ? null : Number(parsedAmount)
+
+    const nextFilters: ApprovalHistoryFilters = {
+      claimStatus: toNullable(claimStatus),
+      employeeName: toNullable(employeeName),
+      claimDateFrom: toNullable(claimDateFrom),
+      claimDateTo: toNullable(claimDateTo),
+      amountOperator,
+      amountValue:
+        amountAsNumber !== null && Number.isFinite(amountAsNumber)
+          ? amountAsNumber
+          : null,
+      locationType: locationType || null,
+      claimDateSort,
+      hodApprovedFrom: filters.hodApprovedFrom,
+      hodApprovedTo: filters.hodApprovedTo,
+      financeApprovedFrom: filters.financeApprovedFrom,
+      financeApprovedTo: filters.financeApprovedTo,
+    }
+
+    const params = addApprovalFiltersToParams(
+      new URLSearchParams(),
+      nextFilters
+    )
+    const queryString = params.toString()
+
+    router.push(queryString ? `/approvals?${queryString}` : '/approvals')
+  }
+
+  function handleClear() {
+    setClaimStatus('')
+    setEmployeeName('')
+    setClaimDateFrom('')
+    setClaimDateTo('')
+    setAmountOperator(DEFAULT_FILTERS.amountOperator)
+    setAmountValue('')
+    setLocationType('')
+    setClaimDateSort(DEFAULT_FILTERS.claimDateSort)
+    router.push('/approvals')
+  }
+
+  const inputCls =
+    'h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none'
+
   return (
     <section className="rounded-lg border border-border bg-surface p-6">
       <h2 className="flex items-center gap-2.5 text-base font-semibold">
@@ -32,23 +147,14 @@ export function ApprovalFiltersBar({
         Approval Filters
       </h2>
 
-      <form
-        action="/approvals"
-        method="get"
-        className="mt-5 grid gap-4 md:grid-cols-4"
-      >
-        <input
-          type="hidden"
-          name="claimDateSort"
-          value={filters.claimDateSort}
-        />
-
+      <form onSubmit={handleSubmit} className="mt-5 grid gap-4 md:grid-cols-4">
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Status</span>
           <select
             name="claimStatus"
-            defaultValue={filters.claimStatus ?? ''}
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            value={claimStatus}
+            onChange={(event) => setClaimStatus(event.target.value)}
+            className={inputCls}
           >
             <option value="">All Statuses</option>
             {statusCatalog.map((status) => (
@@ -64,20 +170,14 @@ export function ApprovalFiltersBar({
 
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Employee Name</span>
-          <input
-            name="employeeName"
-            list="approval-employee-name-options"
-            defaultValue={filters.employeeName ?? ''}
-            placeholder="Search by employee name"
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
+          <EmployeeNameSuggestionInput
+            value={employeeName}
+            onValueChange={setEmployeeName}
+            suggestions={employeeNameSuggestionsQuery.data ?? []}
+            isLoading={employeeNameSuggestionsQuery.isFetching}
+            placeholder="Search by full employee name"
+            inputClassName={inputCls}
           />
-          {employeeNameSuggestions.length > 0 ? (
-            <datalist id="approval-employee-name-options">
-              {employeeNameSuggestions.map((employeeName) => (
-                <option key={employeeName} value={employeeName} />
-              ))}
-            </datalist>
-          ) : null}
         </label>
 
         <label className="space-y-1.5 text-sm">
@@ -85,8 +185,9 @@ export function ApprovalFiltersBar({
           <input
             name="claimDateFrom"
             type="date"
-            defaultValue={filters.claimDateFrom ?? ''}
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            value={claimDateFrom}
+            onChange={(event) => setClaimDateFrom(event.target.value)}
+            className={inputCls}
           />
         </label>
 
@@ -95,8 +196,9 @@ export function ApprovalFiltersBar({
           <input
             name="claimDateTo"
             type="date"
-            defaultValue={filters.claimDateTo ?? ''}
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            value={claimDateTo}
+            onChange={(event) => setClaimDateTo(event.target.value)}
+            className={inputCls}
           />
         </label>
 
@@ -104,8 +206,11 @@ export function ApprovalFiltersBar({
           <span className="font-medium text-foreground">Amount Condition</span>
           <select
             name="amountOperator"
-            defaultValue={filters.amountOperator}
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            value={amountOperator}
+            onChange={(event) =>
+              setAmountOperator(event.target.value as ApprovalAmountOperator)
+            }
+            className={inputCls}
           >
             <option value="lte">Less than or equal (≤)</option>
             <option value="gte">Greater than or equal (≥)</option>
@@ -120,11 +225,10 @@ export function ApprovalFiltersBar({
             type="number"
             min="0"
             step="0.01"
-            defaultValue={
-              filters.amountValue === null ? '' : String(filters.amountValue)
-            }
+            value={amountValue}
+            onChange={(event) => setAmountValue(event.target.value)}
             placeholder="Enter amount"
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-muted-foreground"
+            className={`${inputCls} placeholder:text-muted-foreground`}
           />
         </label>
 
@@ -132,8 +236,11 @@ export function ApprovalFiltersBar({
           <span className="font-medium text-foreground">Location Type</span>
           <select
             name="locationType"
-            defaultValue={filters.locationType ?? ''}
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            value={locationType}
+            onChange={(event) =>
+              setLocationType(event.target.value as ApprovalLocationType | '')
+            }
+            className={inputCls}
           >
             <option value="">All Location Types</option>
             <option value="base">Base Location</option>
@@ -154,12 +261,13 @@ export function ApprovalFiltersBar({
           >
             Apply Filters
           </button>
-          <Link
-            href="/approvals"
+          <button
+            type="button"
+            onClick={handleClear}
             className="rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium shadow-xs transition-all hover:bg-muted"
           >
             Clear
-          </Link>
+          </button>
           <CsvExportActions
             exportCurrentPageHref={exportCurrentPageHref}
             exportAllHref={exportAllHref}

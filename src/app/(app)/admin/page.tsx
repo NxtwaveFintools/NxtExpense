@@ -83,8 +83,14 @@ export default async function AdminPage() {
         <h2 className="text-lg font-semibold text-foreground">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/admin/claims"
+            href="/dashboard"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Open Admin Dashboard
+          </Link>
+          <Link
+            href="/admin/claims"
+            className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             Claim Operations
           </Link>

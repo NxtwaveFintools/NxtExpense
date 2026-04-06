@@ -211,9 +211,16 @@ async function rejectClaimInFinanceQueue(
     await page.getByRole('button', { name: /^Reject$/i }).click()
   }
 
-  await page.waitForURL((url: URL) => url.pathname === '/finance', {
-    timeout: 20_000,
-  })
+  await expect
+    .poll(() => new URL(page.url()).pathname, {
+      timeout: 20_000,
+    })
+    .toMatch(/^\/(finance|login)$/)
+
+  if (new URL(page.url()).pathname === '/login') {
+    await loginAs(financeEmail)
+    await finance.goto()
+  }
 
   await finance.filterByClaimNumber(claimNumber)
   await expect

@@ -42,6 +42,8 @@ type FinanceHistoryListProps = {
     nextHref: string | null
     pageNumber: number
     pageSize: number
+    pageSizeOptions?: number[]
+    pageSizeHrefByValue?: Record<number, string>
     totalPages?: number
     totalItems?: number
   }
@@ -219,6 +221,9 @@ export function FinanceHistoryList({
           backHref={pagination.backHref}
           nextHref={pagination.nextHref}
           pageNumber={pagination.pageNumber}
+          pageSize={pagination.pageSize}
+          pageSizeOptions={pagination.pageSizeOptions}
+          pageSizeHrefByValue={pagination.pageSizeHrefByValue}
           totalPages={pagination.totalPages}
           totalItems={pagination.totalItems}
         />

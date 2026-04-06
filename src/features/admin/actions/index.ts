@@ -20,3 +20,9 @@ export {
   prepareEmployeeReplacementAction,
 } from '@/features/admin/actions/employee-actions'
 export { upsertApproverRuleAction } from '@/features/admin/actions/approver-rules-actions'
+export {
+  getAdminAnalyticsFilterOptionsAction,
+  getAdminAnalyticsEmployeeNameSuggestionsAction,
+  getAdminAnalyticsClaimsPageAction,
+  getAdminDashboardAnalyticsAction,
+} from '@/features/admin/actions/analytics-actions'
