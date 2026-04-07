@@ -422,7 +422,7 @@ describe('getMyClaimsAction', () => {
     })
   })
 
-  it('should throw unauthorized error when no user session is present', async () => {
+  it('should return empty page when no user session is present', async () => {
     // Arrange
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
@@ -430,10 +430,16 @@ describe('getMyClaimsAction', () => {
       },
     })
 
-    // Act + Assert
-    await expect(getMyClaimsAction(null, 10)).rejects.toThrow(
-      'Unauthorized request.'
-    )
+    // Act
+    const result = await getMyClaimsAction(null, 10)
+
+    // Assert
+    expect(result).toEqual({
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 10,
+    })
   })
 
   it('should return empty page when employee profile is missing', async () => {
@@ -480,5 +486,20 @@ describe('getMyClaimsAction', () => {
       'cursor-1',
       10
     )
+  })
+
+  it('should return empty page when pagination query throws unexpectedly', async () => {
+    mocks.getMyClaimsPaginated.mockRejectedValueOnce(
+      new Error('Database timeout')
+    )
+
+    const result = await getMyClaimsAction('cursor-1', 10)
+
+    expect(result).toEqual({
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 10,
+    })
   })
 })

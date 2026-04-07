@@ -121,7 +121,11 @@ describe('admin actions integration', () => {
     mocks.createSupabaseAdminClient.mockReturnValue({
       auth: {
         admin: {
-          createUser: vi.fn().mockResolvedValue({ data: {}, error: null }),
+          createUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'auth-user-default' } },
+            error: null,
+          }),
+          deleteUser: vi.fn().mockResolvedValue({ error: null }),
         },
       },
     })
@@ -552,6 +556,43 @@ describe('admin actions integration', () => {
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
+  it('should rollback provisioned auth user when employee RPC fails', async () => {
+    const createUserMock = vi.fn().mockResolvedValue({
+      data: { user: { id: 'auth-user-rollback' } },
+      error: null,
+    })
+    const deleteUserMock = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.createSupabaseAdminClient.mockReturnValue({
+      auth: {
+        admin: {
+          createUser: createUserMock,
+          deleteUser: deleteUserMock,
+        },
+      },
+    })
+
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Employee ID already exists.' },
+    })
+
+    const result = await createEmployeeAction({
+      employeeId: 'NXT-EMP-1004',
+      employeeName: 'Rollback User',
+      employeeEmail: 'rollback@nxtwave.co.in',
+      loginPassword: 'test1234',
+      designationId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      employeeStatusId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      roleId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+      stateId: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('Employee ID already exists.')
+    expect(deleteUserMock).toHaveBeenCalledWith('auth-user-rollback')
+  })
+
   it('should fetch employee form options for admin', async () => {
     const tableRows: Record<string, unknown[]> = {
       designations: [
@@ -585,12 +626,10 @@ describe('admin actions integration', () => {
         ) {
           return {
             eq: vi.fn().mockReturnValue({
-              order: vi
-                .fn()
-                .mockResolvedValue({
-                  data: tableRows[table] ?? [],
-                  error: null,
-                }),
+              order: vi.fn().mockResolvedValue({
+                data: tableRows[table] ?? [],
+                error: null,
+              }),
             }),
           }
         }

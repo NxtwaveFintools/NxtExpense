@@ -46,14 +46,15 @@ type ClaimStatusRow = {
   is_payment_issued: boolean
 }
 
-type FinanceHistoryAnalyticsRow = {
-  id: string
-  action: string
-  acted_at: string
-  claim:
-    | { total_amount: number | string }
-    | Array<{ total_amount: number | string }>
-    | null
+type FinanceHistoryMetricsRow = {
+  total_count: number | string | null
+  total_amount: number | string | null
+  approved_count: number | string | null
+  approved_amount: number | string | null
+  rejected_count: number | string | null
+  rejected_amount: number | string | null
+  other_count: number | string | null
+  other_amount: number | string | null
 }
 
 function createMetricSummary(): ClaimMetricSummary {
@@ -69,9 +70,8 @@ function createEmptyAnalytics(): FinanceHistoryAnalytics {
   }
 }
 
-function addToMetric(metric: ClaimMetricSummary, amount: number) {
-  metric.count += 1
-  metric.amount += amount
+function toNumber(value: number | string | null | undefined): number {
+  return Number(value ?? 0)
 }
 
 function normalizeFinanceHistoryActionCode(
@@ -87,10 +87,6 @@ function normalizeFinanceHistoryActionCode(
   }
 
   return actionCode
-}
-
-function buildActionCursorFilter(actedAt: string, id: string): string {
-  return `acted_at.lt.${actedAt},and(acted_at.eq.${actedAt},id.lt.${id})`
 }
 
 async function getFinanceActionBuckets(supabase: SupabaseClient): Promise<{
@@ -212,85 +208,51 @@ export async function getFinanceHistoryAnalytics(
     return analytics
   }
 
-  const pageSize = 500
-  let nextCursor: { acted_at: string; id: string } | null = null
-
-  for (;;) {
-    let query = supabase
-      .from('finance_actions')
-      .select('id, action, acted_at, claim:expense_claims!inner(total_amount)')
-      .order('acted_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(pageSize)
-
-    if (filterByFinanceActionDate) {
-      query = query.in('action', [...dateScopedActions])
-
-      const dateFrom = toIstDayStart(filters.dateFrom)
-      const dateTo = toIstDayEnd(filters.dateTo)
-
-      if (dateFrom) {
-        query = query.gte('acted_at', dateFrom)
-      }
-
-      if (dateTo) {
-        query = query.lte('acted_at', dateTo)
-      }
-    } else if (filters.actionFilter) {
-      query = query.eq('action', filters.actionFilter)
+  const { data: metricsData, error: metricsError } = await supabase.rpc(
+    'get_finance_history_action_metrics',
+    {
+      p_claim_ids: Array.isArray(filteredClaimIds) ? filteredClaimIds : null,
+      p_action_filter: filterByFinanceActionDate ? null : filters.actionFilter,
+      p_date_from: filterByFinanceActionDate
+        ? toIstDayStart(filters.dateFrom)
+        : null,
+      p_date_to: filterByFinanceActionDate ? toIstDayEnd(filters.dateTo) : null,
+      p_date_scoped_actions: filterByFinanceActionDate
+        ? [...dateScopedActions]
+        : null,
+      p_approved_actions: [...approvedActions],
+      p_rejected_actions: [...rejectedActions],
     }
+  )
 
-    if (Array.isArray(filteredClaimIds)) {
-      query = query.in('claim_id', filteredClaimIds)
-    }
-
-    if (nextCursor) {
-      query = query.or(
-        buildActionCursorFilter(nextCursor.acted_at, nextCursor.id)
-      )
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    const rows = (data ?? []) as FinanceHistoryAnalyticsRow[]
-
-    if (rows.length === 0) {
-      break
-    }
-
-    for (const row of rows) {
-      const claim = Array.isArray(row.claim) ? row.claim[0] : row.claim
-      const amount = Number(claim?.total_amount ?? 0)
-
-      addToMetric(analytics.total, amount)
-
-      if (approvedActions.has(row.action)) {
-        addToMetric(analytics.approvedHistory, amount)
-        continue
-      }
-
-      if (rejectedActions.has(row.action)) {
-        addToMetric(analytics.rejected, amount)
-        continue
-      }
-
-      addToMetric(analytics.other, amount)
-    }
-
-    if (rows.length < pageSize) {
-      break
-    }
-
-    const lastRow = rows[rows.length - 1]
-    nextCursor = {
-      acted_at: lastRow.acted_at,
-      id: lastRow.id,
-    }
+  if (metricsError) {
+    throw new Error(metricsError.message)
   }
 
-  return analytics
+  const metrics = (
+    Array.isArray(metricsData) ? metricsData[0] : metricsData
+  ) as FinanceHistoryMetricsRow | null
+
+  if (!metrics) {
+    return analytics
+  }
+
+  return {
+    total: {
+      count: toNumber(metrics.total_count),
+      amount: toNumber(metrics.total_amount),
+    },
+    approvedHistory: {
+      count: toNumber(metrics.approved_count),
+      amount: toNumber(metrics.approved_amount),
+    },
+    rejected: {
+      count: toNumber(metrics.rejected_count),
+      amount: toNumber(metrics.rejected_amount),
+    },
+    other: {
+      count: toNumber(metrics.other_count),
+      amount: toNumber(metrics.other_amount),
+    },
+  }
 }

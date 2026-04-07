@@ -11,16 +11,17 @@ import {
   mapApprovalHistoryToCsvRow,
 } from '@/features/approvals/utils/history-filters'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import {
+  buildDatedCsvFilename,
+  createCsvErrorResponse,
+  createCsvResponse,
+  createExportRouteHandlers,
+  getExportMode,
+} from '@/lib/utils/export-route'
 // FIX [ISSUE#2] — Streaming chunked export to eliminate unbounded in-memory arrays
 import { createStreamingCsvResponse } from '@/lib/utils/streaming-export'
 
 const PAGE_EXPORT_LIMIT = 10
-
-type ExportMode = 'page' | 'all'
-
-function getExportMode(value: string | null): ExportMode {
-  return value === 'all' ? 'all' : 'page'
-}
 
 async function handleExportRequest(request: Request) {
   try {
@@ -67,8 +68,7 @@ async function handleExportRequest(request: Request) {
       return new Response('Access denied.', { status: 403 })
     }
 
-    const dateStamp = new Date().toISOString().slice(0, 10)
-    const filename = `approvals-history-${mode}-${dateStamp}.csv`
+    const filename = buildDatedCsvFilename('approvals-history', mode)
 
     // FIX [ISSUE#2] — Stream export-all instead of holding full dataset in memory
     if (mode === 'all') {
@@ -89,26 +89,10 @@ async function handleExportRequest(request: Request) {
     )
     const csv = buildApprovalHistoryCsv(paginated.data)
 
-    return new Response(csv, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'no-store',
-      },
-    })
+    return createCsvResponse(csv, filename)
   } catch (error) {
-    return new Response(
-      error instanceof Error ? error.message : 'Failed to export CSV.',
-      { status: 400 }
-    )
+    return createCsvErrorResponse(error)
   }
 }
 
-export async function GET(request: Request) {
-  return handleExportRequest(request)
-}
-
-export async function POST(request: Request) {
-  return handleExportRequest(request)
-}
+export const { GET, POST } = createExportRouteHandlers(handleExportRequest)

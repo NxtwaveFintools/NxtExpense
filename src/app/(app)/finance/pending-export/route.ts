@@ -4,14 +4,20 @@ import { getFinanceQueuePaginated } from '@/features/finance/queries'
 import type { FinanceDateFilterField } from '@/features/finance/types'
 import {
   buildFinancePendingClaimsCsv,
+  FINANCE_PENDING_CLAIMS_CSV_HEADERS,
+  mapFinancePendingClaimToCsvRow,
   normalizeFinanceFilters,
 } from '@/features/finance/utils/filters'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import {
+  buildDatedCsvFilename,
+  createCsvErrorResponse,
+  createCsvResponse,
+  createExportRouteHandlers,
+  getExportMode,
+} from '@/lib/utils/export-route'
 import { normalizeCursorPageSize } from '@/lib/utils/pagination'
-
-const ALL_EXPORT_BATCH_SIZE = 200
-
-type ExportMode = 'page' | 'all'
+import { createStreamingCsvResponse } from '@/lib/utils/streaming-export'
 
 const PENDING_CLAIMS_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
   'claim_date',
@@ -21,10 +27,6 @@ const PENDING_CLAIMS_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
 const PENDING_CLAIMS_DATE_FILTER_OPTION_SET = new Set(
   PENDING_CLAIMS_DATE_FILTER_OPTIONS
 )
-
-function getExportMode(value: string | null): ExportMode {
-  return value === 'all' ? 'all' : 'page'
-}
 
 function getPendingClaimsExportFilters(searchParams: URLSearchParams) {
   const normalizedFilters = normalizeFinanceFilters({
@@ -52,33 +54,6 @@ function getPendingClaimsExportFilters(searchParams: URLSearchParams) {
   }
 }
 
-async function getAllPendingQueueRows(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  filters: ReturnType<typeof getPendingClaimsExportFilters>
-) {
-  const rows = []
-  let cursor: string | null = null
-
-  for (;;) {
-    const page = await getFinanceQueuePaginated(
-      supabase,
-      cursor,
-      ALL_EXPORT_BATCH_SIZE,
-      filters
-    )
-
-    rows.push(...page.data)
-
-    if (!page.hasNextPage || !page.nextCursor) {
-      break
-    }
-
-    cursor = page.nextCursor
-  }
-
-  return rows
-}
-
 async function handleExportRequest(request: Request) {
   try {
     const url = new URL(request.url)
@@ -102,43 +77,27 @@ async function handleExportRequest(request: Request) {
     if (!employee || !(await isFinanceTeamMember(supabase, employee))) {
       return new Response('Finance access is required.', { status: 403 })
     }
+    const filename = buildDatedCsvFilename('pending-claims', mode)
 
-    const rows =
-      mode === 'all'
-        ? await getAllPendingQueueRows(supabase, filters)
-        : (
-            await getFinanceQueuePaginated(
-              supabase,
-              queueCursor,
-              pageSize,
-              filters
-            )
-          ).data
+    if (mode === 'all') {
+      return createStreamingCsvResponse({
+        fetcher: (cursor, limit) =>
+          getFinanceQueuePaginated(supabase, cursor, limit, filters),
+        headers: FINANCE_PENDING_CLAIMS_CSV_HEADERS,
+        mapRow: mapFinancePendingClaimToCsvRow,
+        filename,
+      })
+    }
 
+    const rows = (
+      await getFinanceQueuePaginated(supabase, queueCursor, pageSize, filters)
+    ).data
     const csv = buildFinancePendingClaimsCsv(rows)
-    const dateStamp = new Date().toISOString().slice(0, 10)
-    const filename = `pending-claims-${mode}-${dateStamp}.csv`
 
-    return new Response(csv, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'no-store',
-      },
-    })
+    return createCsvResponse(csv, filename)
   } catch (error) {
-    return new Response(
-      error instanceof Error ? error.message : 'Failed to export CSV.',
-      { status: 400 }
-    )
+    return createCsvErrorResponse(error)
   }
 }
 
-export async function GET(request: Request) {
-  return handleExportRequest(request)
-}
-
-export async function POST(request: Request) {
-  return handleExportRequest(request)
-}
+export const { GET, POST } = createExportRouteHandlers(handleExportRequest)

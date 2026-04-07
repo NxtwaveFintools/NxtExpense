@@ -1,4 +1,5 @@
 import { formatDate, formatDatetime } from '@/lib/utils/date'
+import { toCsvCell } from '@/lib/utils/csv'
 import type { Claim, MyClaimsFilters } from '@/features/claims/types'
 import { myClaimsFiltersSchema } from '@/features/claims/validations'
 
@@ -9,11 +10,6 @@ type ClaimsFilterInput = Partial<
 function normalizeText(value: string | undefined): string | null {
   const normalized = value?.trim() ?? ''
   return normalized ? normalized : null
-}
-
-function normalizeCsvCell(value: string): string {
-  const escaped = value.replaceAll('"', '""')
-  return `"${escaped}"`
 }
 
 export function normalizeMyClaimsFilters(
@@ -85,8 +81,6 @@ export function buildMyClaimsCsv(rows: Claim[]): string {
   const bodyRows = rows.map(mapMyClaimToCsvRow)
 
   return [MY_CLAIMS_CSV_HEADERS, ...bodyRows]
-    .map((cells) =>
-      cells.map((cell) => normalizeCsvCell(String(cell))).join(',')
-    )
+    .map((cells) => cells.map((cell) => toCsvCell(String(cell))).join(','))
     .join('\n')
 }

@@ -19,44 +19,6 @@ function mergeClassNames(...values: Array<string | undefined>) {
   return values.filter(Boolean).join(' ')
 }
 
-function extractDownloadFilename(
-  contentDisposition: string | null,
-  fallback: string
-) {
-  if (!contentDisposition) {
-    return fallback
-  }
-
-  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition)
-  if (utf8Match?.[1]) {
-    return decodeURIComponent(utf8Match[1]).replace(/[\\/:*?"<>|]/g, '-')
-  }
-
-  const asciiMatch = /filename="?([^";]+)"?/i.exec(contentDisposition)
-  if (asciiMatch?.[1]) {
-    return asciiMatch[1].replace(/[\\/:*?"<>|]/g, '-')
-  }
-
-  return fallback
-}
-
-function triggerFileDownload(blob: Blob, filename: string) {
-  const blobUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = blobUrl
-  link.download = filename
-  link.style.display = 'none'
-
-  document.body.append(link)
-  link.click()
-  link.remove()
-
-  window.setTimeout(() => {
-    URL.revokeObjectURL(blobUrl)
-  }, 1000)
-}
-
 function fallbackToDirectDownload(href: string) {
   const link = document.createElement('a')
   link.href = href
@@ -95,7 +57,6 @@ export function CsvExportActions({
   const [activeMode, setActiveMode] = useState<ExportMode | null>(null)
   const [progress, setProgress] = useState(0)
 
-  const abortControllerRef = useRef<AbortController | null>(null)
   const resetTimerRef = useRef<number | null>(null)
   const progressAnimationFrameRef = useRef<number | null>(null)
   const progressRef = useRef(0)
@@ -104,7 +65,6 @@ export function CsvExportActions({
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort()
       if (resetTimerRef.current !== null) {
         window.clearTimeout(resetTimerRef.current)
       }
@@ -210,10 +170,6 @@ export function CsvExportActions({
       return
     }
 
-    const fallbackName = mode === 'page' ? 'page-export.csv' : 'all-export.csv'
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-
     setActiveMode(mode)
     setProgressValue(8)
 
@@ -222,85 +178,11 @@ export function CsvExportActions({
     }, PROGRESS_PULSE_INTERVAL_MS)
 
     try {
-      const response = await fetch(href, {
-        method: 'GET',
-        cache: 'no-store',
-        signal: controller.signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`CSV export failed with status ${response.status}`)
-      }
-
-      const contentDisposition = response.headers.get('content-disposition')
-      if (!contentDisposition?.toLowerCase().includes('attachment')) {
-        fallbackToDirectDownload(href)
-        setActiveMode(null)
-        setProgressValue(0)
-        return
-      }
-
-      const filename = extractDownloadFilename(contentDisposition, fallbackName)
-
-      const totalBytes = Number(response.headers.get('content-length'))
-      const hasByteLength = Number.isFinite(totalBytes) && totalBytes > 0
-
-      if (!response.body) {
-        raiseProgressTo(80)
-        const blob = await response.blob()
-        await animateProgressTo(100, FINALIZE_ANIMATION_MS)
-        triggerFileDownload(blob, filename)
-        clearProgressWithDelay()
-        return
-      }
-
-      const reader = response.body.getReader()
-      const chunks: Uint8Array[] = []
-      let receivedBytes = 0
-
-      while (true) {
-        const { done, value } = await reader.read()
-
-        if (done) {
-          break
-        }
-
-        if (!value) {
-          continue
-        }
-
-        const chunkCopy = new Uint8Array(value.byteLength)
-        chunkCopy.set(value)
-
-        chunks.push(chunkCopy)
-        receivedBytes += chunkCopy.byteLength
-
-        if (hasByteLength) {
-          const nextProgress = Math.round((receivedBytes / totalBytes) * 100)
-          raiseProgressTo(Math.min(97, Math.max(8, nextProgress)))
-        }
-      }
-
-      const mergedBytes = new Uint8Array(receivedBytes)
-      let offset = 0
-
-      for (const chunk of chunks) {
-        mergedBytes.set(chunk, offset)
-        offset += chunk.byteLength
-      }
-
-      const blob = new Blob([mergedBytes], {
-        type: response.headers.get('content-type') ?? 'text/csv; charset=utf-8',
-      })
-
+      raiseProgressTo(80)
+      fallbackToDirectDownload(href)
       await animateProgressTo(100, FINALIZE_ANIMATION_MS)
-      triggerFileDownload(blob, filename)
       clearProgressWithDelay()
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        fallbackToDirectDownload(href)
-      }
-
+    } catch {
       setActiveMode(null)
       setProgressValue(0)
     } finally {
@@ -308,7 +190,6 @@ export function CsvExportActions({
         window.clearInterval(pulseTimer)
         pulseTimer = null
       }
-      abortControllerRef.current = null
     }
   }
 

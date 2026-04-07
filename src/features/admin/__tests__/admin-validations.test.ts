@@ -7,6 +7,7 @@ import {
   adminToggleActiveSchema,
   adminUpdateRateSchema,
   adminUpdateVehicleRatesSchema,
+  normalizeOptionalUuid,
 } from '@/features/admin/validations'
 
 const VALID_UUID = '5db22d75-b209-4f30-b5c8-f4f27ebee9e8'
@@ -177,5 +178,66 @@ describe('adminCreateEmployeeSchema', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  it('rejects payload when replacement employee is provided without reason', () => {
+    const result = adminCreateEmployeeSchema.safeParse({
+      employeeId: 'NXT-EMP-1003',
+      employeeName: 'Replacement Missing Reason',
+      employeeEmail: 'replace.reason@nxtwave.co.in',
+      designationId: VALID_UUID,
+      employeeStatusId: VALID_UUID,
+      roleId: VALID_UUID,
+      stateId: VALID_UUID,
+      replacementEmployeeId: VALID_UUID,
+    })
+
+    expect(result.success).toBe(false)
+
+    if (result.success) {
+      return
+    }
+
+    expect(
+      result.error.issues.some((issue) => issue.path[0] === 'replacementReason')
+    ).toBe(true)
+  })
+
+  it('rejects payload when replacement confirmation is missing', () => {
+    const result = adminCreateEmployeeSchema.safeParse({
+      employeeId: 'NXT-EMP-1004',
+      employeeName: 'Replacement Missing Confirmation',
+      employeeEmail: 'replace.confirm@nxtwave.co.in',
+      designationId: VALID_UUID,
+      employeeStatusId: VALID_UUID,
+      roleId: VALID_UUID,
+      stateId: VALID_UUID,
+      replacementEmployeeId: VALID_UUID,
+      replacementReason: 'Backfill due to role transition',
+    })
+
+    expect(result.success).toBe(false)
+
+    if (result.success) {
+      return
+    }
+
+    expect(
+      result.error.issues.some(
+        (issue) => issue.path[0] === 'replacementConfirmation'
+      )
+    ).toBe(true)
+  })
+})
+
+describe('normalizeOptionalUuid', () => {
+  it('returns null for undefined and blank values', () => {
+    expect(normalizeOptionalUuid()).toBeNull()
+    expect(normalizeOptionalUuid('')).toBeNull()
+    expect(normalizeOptionalUuid('   ')).toBeNull()
+  })
+
+  it('returns a trimmed UUID value for non-empty input', () => {
+    expect(normalizeOptionalUuid(`  ${VALID_UUID}  `)).toBe(VALID_UUID)
   })
 })

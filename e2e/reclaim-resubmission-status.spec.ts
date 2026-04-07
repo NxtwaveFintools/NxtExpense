@@ -40,6 +40,25 @@ function toIsoDateDaysBack(daysBack: number): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
+async function hasRecoverableSubmissionConflict(page: Page): Promise<boolean> {
+  const duplicateDateError =
+    (await page
+      .getByText(
+        /already have .*claim for this date|claim already submitted for this date/i
+      )
+      .count()) > 0
+  const duplicateConstraintError =
+    (await page
+      .getByText(/duplicate key value violates unique constraint/i)
+      .count()) > 0
+  const permanentlyClosedError =
+    (await page.getByText(/permanently closed/i).count()) > 0
+
+  return (
+    duplicateDateError || duplicateConstraintError || permanentlyClosedError
+  )
+}
+
 async function submitOfficeClaimAndGetClaimNumber(
   page: Page,
   loginAs: LoginAs,
@@ -99,6 +118,15 @@ async function submitOfficeClaimAndGetClaimNumber(
       await page.waitForTimeout(250)
     }
 
+    if ((await hasRecoverableSubmissionConflict(page)) === true) {
+      const currentPath = new URL(page.url()).pathname
+      if (currentPath !== '/claims/new') {
+        await claims.gotoNewClaim()
+        await claims.ensureNewClaimFormReady()
+      }
+      continue
+    }
+
     const submittedClaimNumber =
       (await claims.getSubmittedClaimNumberFromSuccessToast(
         navigatedToClaims ? 1_500 : 5_000
@@ -117,24 +145,7 @@ async function submitOfficeClaimAndGetClaimNumber(
       await claims.ensureNewClaimFormReady()
     }
 
-    const duplicateDateError =
-      (await page
-        .getByText(
-          /already have .*claim for this date|claim already submitted for this date/i
-        )
-        .count()) > 0
-    const duplicateConstraintError =
-      (await page
-        .getByText(/duplicate key value violates unique constraint/i)
-        .count()) > 0
-    const permanentlyClosedError =
-      (await page.getByText(/permanently closed/i).count()) > 0
-
-    if (
-      duplicateDateError ||
-      duplicateConstraintError ||
-      permanentlyClosedError
-    ) {
+    if (await hasRecoverableSubmissionConflict(page)) {
       continue
     }
 

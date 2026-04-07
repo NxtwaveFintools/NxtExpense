@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
+import { isRecoverableAuthSessionError } from '@/lib/supabase/auth-errors'
 import { getSupabasePublicEnv } from '@/lib/supabase/env'
 import { copyResponseCookies } from '@/lib/utils/session-utils'
 import {
@@ -127,13 +128,21 @@ export async function middleware(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('[middleware] Session refresh failed', error)
+    const isRecoverableAuthError = isRecoverableAuthSessionError(error)
+
+    if (!isRecoverableAuthError) {
+      console.error('[middleware] Session refresh failed', error)
+    }
 
     if (isProtectedRoute(pathname)) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/login'
       loginUrl.search = ''
-      loginUrl.searchParams.set('error', 'auth_verification_failed')
+
+      if (!isRecoverableAuthError) {
+        loginUrl.searchParams.set('error', 'auth_verification_failed')
+      }
+
       return NextResponse.redirect(loginUrl)
     }
 

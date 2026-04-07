@@ -21,8 +21,13 @@ const DEFAULT_PENDING_FILTERS: PendingApprovalsFilters = {
   claimDateSort: 'desc',
 }
 
-function toInList(ids: string[]) {
-  return ids.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(',')
+type PendingApprovalScopeSummaryRow = {
+  claim_count: number | string | null
+  total_amount: number | string | null
+}
+
+function toNumber(value: number | string | null | undefined): number {
+  return Number(value ?? 0)
 }
 
 export async function getPendingApprovalsSummary(
@@ -103,21 +108,7 @@ export async function getPendingApprovalsSummary(
   const level1Ids = (level1Employees.data ?? []).map((row) => row.id)
   const level2Ids = (level2Employees.data ?? []).map((row) => row.id)
 
-  const approvalFilters: string[] = []
-
-  if (level1Ids.length > 0) {
-    approvalFilters.push(
-      `and(current_approval_level.eq.1,employee_id.in.(${toInList(level1Ids)}))`
-    )
-  }
-
-  if (level2Ids.length > 0) {
-    approvalFilters.push(
-      `and(current_approval_level.eq.2,employee_id.in.(${toInList(level2Ids)}))`
-    )
-  }
-
-  if (approvalFilters.length === 0) {
+  if (level1Ids.length === 0 && level2Ids.length === 0) {
     return { count: 0, amount: 0 }
   }
 
@@ -135,102 +126,33 @@ export async function getPendingApprovalsSummary(
     }
   }
 
-  // FIX [ISSUE#4] — Use COUNT + SUM queries instead of O(N) cursor loop
-  let countQuery = supabase
-    .from('expense_claims')
-    .select('id', { count: 'exact', head: true })
-    .in('status_id', pendingStatusIds)
-    .or(approvalFilters.join(','))
-
-  let sumQuery = supabase
-    .from('expense_claims')
-    .select('total_amount')
-    .in('status_id', pendingStatusIds)
-    .or(approvalFilters.join(','))
-
-  if (allowResubmitFilter !== null) {
-    countQuery = countQuery.eq('allow_resubmit', allowResubmitFilter)
-    sumQuery = sumQuery.eq('allow_resubmit', allowResubmitFilter)
-  }
-
-  if (normalizedName) {
-    const escapedName = normalizedName
-      .replaceAll('%', '\\%')
-      .replaceAll('_', '\\_')
-    // Need inner join with employees for name filter — switch to non-head query
-    countQuery = supabase
-      .from('expense_claims')
-      .select('id, employees!employee_id!inner(employee_name)', {
-        count: 'exact',
-        head: true,
-      })
-      .in('status_id', pendingStatusIds)
-      .or(approvalFilters.join(','))
-      .ilike(
-        'employees.employee_name',
-        `%${escapedName}%`
-      ) as unknown as typeof countQuery
-    sumQuery = supabase
-      .from('expense_claims')
-      .select('total_amount, employees!employee_id!inner(employee_name)')
-      .in('status_id', pendingStatusIds)
-      .or(approvalFilters.join(','))
-      .ilike(
-        'employees.employee_name',
-        `%${escapedName}%`
-      ) as unknown as typeof sumQuery
-
-    if (allowResubmitFilter !== null) {
-      countQuery = countQuery.eq('allow_resubmit', allowResubmitFilter)
-      sumQuery = sumQuery.eq('allow_resubmit', allowResubmitFilter)
+  const { data, error } = await supabase.rpc(
+    'get_pending_approval_scope_summary',
+    {
+      p_level1_employee_ids: level1Ids.length > 0 ? level1Ids : null,
+      p_level2_employee_ids: level2Ids.length > 0 ? level2Ids : null,
+      p_pending_status_ids: pendingStatusIds,
+      p_allow_resubmit: allowResubmitFilter,
+      p_employee_name: normalizedName || null,
+      p_claim_date_from: filters.claimDateFrom,
+      p_claim_date_to: filters.claimDateTo,
+      p_amount_operator:
+        filters.amountValue !== null ? filters.amountOperator : null,
+      p_amount_value: filters.amountValue,
+      p_location_ids: scopedLocationIds,
     }
+  )
+
+  if (error) {
+    throw new Error(error.message)
   }
 
-  if (filters.claimDateFrom) {
-    countQuery = countQuery.gte('claim_date', filters.claimDateFrom)
-    sumQuery = sumQuery.gte('claim_date', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    countQuery = countQuery.lte('claim_date', filters.claimDateTo)
-    sumQuery = sumQuery.lte('claim_date', filters.claimDateTo)
-  }
-
-  if (filters.amountValue !== null) {
-    if (filters.amountOperator === 'gte') {
-      countQuery = countQuery.gte('total_amount', filters.amountValue)
-      sumQuery = sumQuery.gte('total_amount', filters.amountValue)
-    } else if (filters.amountOperator === 'eq') {
-      countQuery = countQuery.eq('total_amount', filters.amountValue)
-      sumQuery = sumQuery.eq('total_amount', filters.amountValue)
-    } else {
-      countQuery = countQuery.lte('total_amount', filters.amountValue)
-      sumQuery = sumQuery.lte('total_amount', filters.amountValue)
-    }
-  }
-
-  if (scopedLocationIds) {
-    countQuery = countQuery.in('work_location_id', scopedLocationIds)
-    sumQuery = sumQuery.in('work_location_id', scopedLocationIds)
-  }
-
-  const [countResult, sumResult] = await Promise.all([countQuery, sumQuery])
-
-  if (countResult.error) {
-    throw new Error(countResult.error.message)
-  }
-
-  if (sumResult.error) {
-    throw new Error(sumResult.error.message)
-  }
-
-  const totalCount = countResult.count ?? 0
-  const totalAmount = (
-    (sumResult.data ?? []) as Array<{ total_amount: number | string }>
-  ).reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0)
+  const summary = (
+    Array.isArray(data) ? data[0] : data
+  ) as PendingApprovalScopeSummaryRow | null
 
   return {
-    count: totalCount,
-    amount: totalAmount,
+    count: toNumber(summary?.claim_count),
+    amount: toNumber(summary?.total_amount),
   }
 }

@@ -12,81 +12,53 @@ export type MyClaimsStats = {
   rejectedAllowReclaim: MyClaimsMetricSummary
 }
 
-type ClaimStatusSummaryRow = {
-  id: string
-  is_rejection: boolean
-  is_payment_issued: boolean
+type EmployeeClaimMetricsRow = {
+  total_count: number | string | null
+  total_amount: number | string | null
+  pending_count: number | string | null
+  pending_amount: number | string | null
+  rejected_count: number | string | null
+  rejected_amount: number | string | null
+  rejected_allow_reclaim_count: number | string | null
+  rejected_allow_reclaim_amount: number | string | null
 }
 
-type MyClaimStatsRow = {
-  id: string
-  created_at: string
-  status_id: string
-  total_amount: number | string
-  allow_resubmit: boolean
-}
-
-function createMetricSummary(): MyClaimsMetricSummary {
-  return { count: 0, amount: 0 }
-}
-
-function addToMetric(metric: MyClaimsMetricSummary, amount: number) {
-  metric.count += 1
-  metric.amount += amount
+function toNumber(value: number | string | null | undefined): number {
+  return Number(value ?? 0)
 }
 
 export async function getMyClaimsStats(
   supabase: SupabaseClient,
   employeeId: string
 ): Promise<MyClaimsStats> {
-  const { data: statusCatalog, error: statusError } = await supabase
-    .from('claim_statuses')
-    .select('id, is_rejection, is_payment_issued')
-    .eq('is_active', true)
+  const { data, error } = await supabase.rpc('get_employee_claim_metrics', {
+    p_employee_id: employeeId,
+  })
 
-  if (statusError) {
-    throw new Error(statusError.message)
+  if (error) {
+    throw new Error(error.message)
   }
 
-  const statusRowById = new Map(
-    ((statusCatalog ?? []) as ClaimStatusSummaryRow[]).map((row) => [
-      row.id,
-      row,
-    ])
-  )
+  const metrics = (
+    Array.isArray(data) ? data[0] : data
+  ) as EmployeeClaimMetricsRow | null
 
-  const { data: claims, error: claimsError } = await supabase
-    .from('expense_claims')
-    .select('id, created_at, status_id, total_amount, allow_resubmit')
-    .eq('employee_id', employeeId)
-
-  if (claimsError) {
-    throw new Error(claimsError.message)
+  return {
+    total: {
+      count: toNumber(metrics?.total_count),
+      amount: toNumber(metrics?.total_amount),
+    },
+    pending: {
+      count: toNumber(metrics?.pending_count),
+      amount: toNumber(metrics?.pending_amount),
+    },
+    rejected: {
+      count: toNumber(metrics?.rejected_count),
+      amount: toNumber(metrics?.rejected_amount),
+    },
+    rejectedAllowReclaim: {
+      count: toNumber(metrics?.rejected_allow_reclaim_count),
+      amount: toNumber(metrics?.rejected_allow_reclaim_amount),
+    },
   }
-
-  const stats: MyClaimsStats = {
-    total: createMetricSummary(),
-    pending: createMetricSummary(),
-    rejected: createMetricSummary(),
-    rejectedAllowReclaim: createMetricSummary(),
-  }
-
-  for (const claim of (claims ?? []) as MyClaimStatsRow[]) {
-    const statusInfo = statusRowById.get(claim.status_id)
-    const amount = Number(claim.total_amount ?? 0)
-
-    addToMetric(stats.total, amount)
-
-    if (statusInfo?.is_rejection) {
-      addToMetric(stats.rejected, amount)
-
-      if (claim.allow_resubmit) {
-        addToMetric(stats.rejectedAllowReclaim, amount)
-      }
-    } else if (!statusInfo?.is_payment_issued) {
-      addToMetric(stats.pending, amount)
-    }
-  }
-
-  return stats
 }

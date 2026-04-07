@@ -25,7 +25,9 @@ Set these in `.env.local`:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_AUTH_CALLBACK_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `ALLOW_PASSWORD_LOGIN_IN_PROD` (set to `true` or `1` to enable email/password login in production.)
+- `ALLOW_PASSWORD_LOGIN_IN_PROD` (optional explicit override in production: `true`/`1` enables, `false`/`0` disables)
+
+Local note: `npm start` runs with `NODE_ENV=production`. When `VERCEL_ENV` is not `production`, email/password login remains enabled by default for internal local testing.
 
 ## Run Locally
 

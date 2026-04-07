@@ -237,27 +237,13 @@ export async function getAllFilteredApprovalHistory(
   filters: ApprovalHistoryFilters,
   batchSize = 200
 ): Promise<ApprovalHistoryRecord[]> {
-  const allRows: ApprovalHistoryRecord[] = []
-  let cursor: string | null = null
+  void supabase
+  void filters
+  void batchSize
 
-  for (;;) {
-    const page = await getFilteredApprovalHistoryPaginated(
-      supabase,
-      cursor,
-      batchSize,
-      filters
-    )
-
-    allRows.push(...page.data)
-
-    if (!page.hasNextPage || !page.nextCursor) {
-      break
-    }
-
-    cursor = page.nextCursor
-  }
-
-  return allRows
+  throw new Error(
+    'Unbounded getAllFilteredApprovalHistory is disabled. Use getFilteredApprovalHistoryPaginated for cursor-based access.'
+  )
 }
 
 function toNumericCount(value: unknown): number {
@@ -316,13 +302,9 @@ export async function getFilteredApprovalHistoryCount(
 
   if (error) {
     if (isMissingHistoryCountRpcError(error)) {
-      const fallbackRows = await getAllFilteredApprovalHistory(
-        supabase,
-        filters,
-        200
+      throw new Error(
+        'Approval history count RPC is unavailable. Full-row fallback counting is disabled for performance; apply the latest DB migrations and refresh the schema cache.'
       )
-
-      return fallbackRows.length
     }
 
     throw new Error(error.message)

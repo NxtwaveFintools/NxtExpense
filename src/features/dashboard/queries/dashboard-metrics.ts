@@ -27,147 +27,58 @@ type DashboardSupabaseClient = Awaited<
   ReturnType<typeof createSupabaseServerClient>
 >
 
-type ClaimStatusRow = {
-  id: string
-  is_rejection: boolean
-  is_payment_issued: boolean
+type EmployeeClaimMetricsRow = {
+  total_count: number | string | null
+  total_amount: number | string | null
+  pending_count: number | string | null
+  pending_amount: number | string | null
+  approved_count: number | string | null
+  approved_amount: number | string | null
+  rejected_count: number | string | null
+  rejected_amount: number | string | null
+  rejected_allow_reclaim_count: number | string | null
+  rejected_allow_reclaim_amount: number | string | null
 }
 
-// FIX [ISSUE#4] — Push aggregations to Postgres instead of O(N) JS loops
 export async function getEmployeeClaimStats(
   supabase: DashboardSupabaseClient,
   employeeId: string
 ): Promise<DashboardClaimStats> {
-  const { data: statusRows, error: statusError } = await supabase
-    .from('claim_statuses')
-    .select('id, is_rejection, is_payment_issued')
-    .eq('is_active', true)
+  const { data, error } = await supabase.rpc('get_employee_claim_metrics', {
+    p_employee_id: employeeId,
+  })
 
-  if (statusError) {
-    throw new Error(statusError.message)
+  if (error) {
+    throw new Error(error.message)
   }
 
-  const rejectedStatusIds = ((statusRows ?? []) as ClaimStatusRow[])
-    .filter((s) => s.is_rejection)
-    .map((s) => s.id)
+  const metrics = (
+    Array.isArray(data) ? data[0] : data
+  ) as EmployeeClaimMetricsRow | null
 
-  const approvedStatusIds = ((statusRows ?? []) as ClaimStatusRow[])
-    .filter((s) => s.is_payment_issued)
-    .map((s) => s.id)
-
-  // Use parallel HEAD count queries + a single SUM query to compute all metrics
-  // without fetching individual rows into JS memory
-  const baseFilter = { column: 'employee_id' as const, value: employeeId }
-
-  const [
-    totalResult,
-    totalAmountResult,
-    rejectedResult,
-    rejectedAmountResult,
-    rejectedReclaimResult,
-    rejectedReclaimAmountResult,
-    approvedResult,
-    approvedAmountResult,
-  ] = await Promise.all([
-    // Total count
-    supabase
-      .from('expense_claims')
-      .select('id', { count: 'exact', head: true })
-      .eq(baseFilter.column, baseFilter.value),
-    // Total amount
-    supabase
-      .from('expense_claims')
-      .select('total_amount')
-      .eq(baseFilter.column, baseFilter.value),
-    // Rejected count (not allow_resubmit)
-    rejectedStatusIds.length > 0
-      ? supabase
-          .from('expense_claims')
-          .select('id', { count: 'exact', head: true })
-          .eq(baseFilter.column, baseFilter.value)
-          .in('status_id', rejectedStatusIds)
-          .eq('allow_resubmit', false)
-      : Promise.resolve({ count: 0, error: null }),
-    // Rejected amount (not allow_resubmit)
-    rejectedStatusIds.length > 0
-      ? supabase
-          .from('expense_claims')
-          .select('total_amount')
-          .eq(baseFilter.column, baseFilter.value)
-          .in('status_id', rejectedStatusIds)
-          .eq('allow_resubmit', false)
-      : Promise.resolve({ data: [], error: null }),
-    // Rejected allow reclaim count
-    rejectedStatusIds.length > 0
-      ? supabase
-          .from('expense_claims')
-          .select('id', { count: 'exact', head: true })
-          .eq(baseFilter.column, baseFilter.value)
-          .in('status_id', rejectedStatusIds)
-          .eq('allow_resubmit', true)
-      : Promise.resolve({ count: 0, error: null }),
-    // Rejected allow reclaim amount
-    rejectedStatusIds.length > 0
-      ? supabase
-          .from('expense_claims')
-          .select('total_amount')
-          .eq(baseFilter.column, baseFilter.value)
-          .in('status_id', rejectedStatusIds)
-          .eq('allow_resubmit', true)
-      : Promise.resolve({ data: [], error: null }),
-    // Approved count
-    approvedStatusIds.length > 0
-      ? supabase
-          .from('expense_claims')
-          .select('id', { count: 'exact', head: true })
-          .eq(baseFilter.column, baseFilter.value)
-          .in('status_id', approvedStatusIds)
-      : Promise.resolve({ count: 0, error: null }),
-    // Approved amount
-    approvedStatusIds.length > 0
-      ? supabase
-          .from('expense_claims')
-          .select('total_amount')
-          .eq(baseFilter.column, baseFilter.value)
-          .in('status_id', approvedStatusIds)
-      : Promise.resolve({ data: [], error: null }),
-  ])
-
-  function sumAmounts(
-    result: { data?: Array<{ total_amount: number | string }> | null } | null
-  ): number {
-    if (!result?.data) return 0
-    return result.data.reduce(
-      (sum, row) => sum + Number(row.total_amount ?? 0),
-      0
-    )
-  }
-
-  const totalCount = totalResult.count ?? 0
-  const totalAmount = sumAmounts(totalAmountResult)
-  const rejectedCount =
-    'count' in rejectedResult ? (rejectedResult.count ?? 0) : 0
-  const rejectedAmount = sumAmounts(rejectedAmountResult)
-  const rejectedReclaimCount =
-    'count' in rejectedReclaimResult ? (rejectedReclaimResult.count ?? 0) : 0
-  const rejectedReclaimAmount = sumAmounts(rejectedReclaimAmountResult)
-  const approvedCount =
-    'count' in approvedResult ? (approvedResult.count ?? 0) : 0
-  const approvedAmount = sumAmounts(approvedAmountResult)
-
-  const pendingCount =
-    totalCount - rejectedCount - rejectedReclaimCount - approvedCount
-  const pendingAmount =
-    totalAmount - rejectedAmount - rejectedReclaimAmount - approvedAmount
+  const toNumber = (value: number | string | null | undefined): number =>
+    Number(value ?? 0)
 
   return {
-    total: { count: totalCount, amount: totalAmount },
-    pending: { count: Math.max(0, pendingCount), amount: pendingAmount },
-    approved: { count: approvedCount, amount: approvedAmount },
-    rejected: { count: rejectedCount, amount: rejectedAmount },
+    total: {
+      count: toNumber(metrics?.total_count),
+      amount: toNumber(metrics?.total_amount),
+    },
+    pending: {
+      count: toNumber(metrics?.pending_count),
+      amount: toNumber(metrics?.pending_amount),
+    },
+    approved: {
+      count: toNumber(metrics?.approved_count),
+      amount: toNumber(metrics?.approved_amount),
+    },
+    rejected: {
+      count: toNumber(metrics?.rejected_count),
+      amount: toNumber(metrics?.rejected_amount),
+    },
     rejectedAllowReclaim: {
-      count: rejectedReclaimCount,
-      amount: rejectedReclaimAmount,
+      count: toNumber(metrics?.rejected_allow_reclaim_count),
+      amount: toNumber(metrics?.rejected_allow_reclaim_amount),
     },
   }
 }

@@ -125,6 +125,27 @@ describe('middleware', () => {
     )
   })
 
+  it('treats missing auth session errors as signed-out on protected routes', async () => {
+    refreshAuthSessionMock.mockRejectedValue({
+      __isAuthError: true,
+      status: 400,
+      name: 'AuthSessionMissingError',
+      message: 'Auth session missing!',
+    })
+
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined)
+
+    const request = new NextRequest('http://localhost:3000/dashboard')
+    const response = await middleware(request)
+
+    expect(response.headers.get('location')).toBe('http://localhost:3000/login')
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
+  })
+
   it('keeps public auth routes reachable when session refresh fails', async () => {
     refreshAuthSessionMock.mockRejectedValue(
       new Error('Missing environment variable')

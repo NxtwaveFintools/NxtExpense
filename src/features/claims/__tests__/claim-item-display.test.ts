@@ -111,4 +111,63 @@ describe('getClaimItemPresentation', () => {
       detail: '100 KM @ ₹5/KM',
     })
   })
+
+  it('returns null detail for blank non-intracity description', () => {
+    const presentation = getClaimItemPresentation(
+      createClaim(),
+      createItem({
+        item_type: 'food',
+        description: '   ',
+      })
+    )
+
+    expect(presentation).toEqual({
+      label: 'Food allowance',
+      detail: null,
+    })
+  })
+
+  it('builds title-cased label for unknown item types', () => {
+    const presentation = getClaimItemPresentation(
+      createClaim(),
+      createItem({
+        item_type: 'special_misc_allowance',
+        description: 'One-time adjustment',
+      })
+    )
+
+    expect(presentation).toEqual({
+      label: 'Special Misc Allowance',
+      detail: 'One-time adjustment',
+    })
+  })
+
+  it('keeps own-vehicle description untouched when already qualified', () => {
+    const presentation = getClaimItemPresentation(
+      createClaim({ intracity_vehicle_mode: 'OWN_VEHICLE' }),
+      createItem({
+        description:
+          'Two Wheeler fixed intra-city fuel allowance (own vehicle travel)',
+      })
+    )
+
+    expect(presentation.detail).toBe(
+      'Two Wheeler fixed intra-city fuel allowance (own vehicle travel)'
+    )
+  })
+
+  it('infers own-vehicle qualifier from intracity own-vehicle flag', () => {
+    const presentation = getClaimItemPresentation(
+      createClaim({
+        has_intercity_travel: false,
+        intracity_own_vehicle_used: true,
+        intracity_vehicle_mode: null,
+      }),
+      createItem({ description: null })
+    )
+
+    expect(presentation.detail).toBe(
+      'Two Wheeler fixed intra-city fuel allowance (own vehicle travel)'
+    )
+  })
 })

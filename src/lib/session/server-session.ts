@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { cache } from 'react'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
+import { isRecoverableAuthSessionError } from '@/lib/supabase/auth-errors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 /**
@@ -15,19 +16,25 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
  */
 export const getServerUser = cache(async (): Promise<User | null> => {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
 
-  if (error || !user) return null
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-  if (!(await isAllowedCorporateEmail(supabase, user.email))) {
-    await supabase.auth.signOut()
-    return null
+    if (error || !user) return null
+
+    if (!(await isAllowedCorporateEmail(supabase, user.email))) {
+      await supabase.auth.signOut()
+      return null
+    }
+
+    return user
+  } catch (error) {
+    if (isRecoverableAuthSessionError(error)) return null
+    throw error
   }
-
-  return user
 })
 
 /**

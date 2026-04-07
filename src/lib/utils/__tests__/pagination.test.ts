@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CURSOR_PAGE_SIZE_OPTIONS,
+  DEFAULT_CURSOR_PAGE_SIZE,
   buildCursorNavigationLinks,
   decodeCursor,
   decodeCursorTrail,
@@ -8,6 +10,7 @@ import {
   encodeCursorTrail,
   getCursorPageStartIndex,
   getCursorTotalPages,
+  normalizeCursorPageSize,
 } from '@/lib/utils/pagination'
 
 describe('pagination cursor utils', () => {
@@ -147,5 +150,46 @@ describe('pagination cursor utils', () => {
     expect(getCursorPageStartIndex(2, 10)).toBe(11)
     expect(getCursorPageStartIndex(3, 25)).toBe(51)
     expect(getCursorPageStartIndex(0, 10)).toBe(1)
+  })
+
+  it('normalizes cursor page size from valid and invalid values', () => {
+    expect(normalizeCursorPageSize(CURSOR_PAGE_SIZE_OPTIONS[0])).toBe(10)
+    expect(normalizeCursorPageSize(CURSOR_PAGE_SIZE_OPTIONS[1])).toBe(25)
+    expect(normalizeCursorPageSize('50')).toBe(50)
+    expect(normalizeCursorPageSize('12')).toBe(DEFAULT_CURSOR_PAGE_SIZE)
+    expect(normalizeCursorPageSize('abc')).toBe(DEFAULT_CURSOR_PAGE_SIZE)
+    expect(normalizeCursorPageSize(null)).toBe(DEFAULT_CURSOR_PAGE_SIZE)
+    expect(normalizeCursorPageSize(undefined)).toBe(DEFAULT_CURSOR_PAGE_SIZE)
+  })
+
+  it('falls back to safe integer handling in total/page start math', () => {
+    expect(getCursorTotalPages(11, Number.NaN)).toBe(11)
+    expect(getCursorTotalPages(11, Number.POSITIVE_INFINITY)).toBe(11)
+    expect(getCursorPageStartIndex(Number.NaN, 10)).toBe(1)
+    expect(getCursorPageStartIndex(2, Number.NaN)).toBe(2)
+  })
+
+  it('returns empty trail when decoded base64 payload is not an array', () => {
+    const encoded = Buffer.from(
+      JSON.stringify({ not: 'an-array' }),
+      'utf-8'
+    ).toString('base64')
+    expect(decodeCursorTrail(encoded)).toEqual([])
+  })
+
+  it('builds navigation links correctly when query object is undefined', () => {
+    const links = buildCursorNavigationLinks({
+      pathname: '/claims',
+      query: undefined,
+      cursorKey: 'cursor',
+      trailKey: 'trail',
+      currentCursor: null,
+      currentTrail: [],
+      nextCursor: 'cursor-1',
+    })
+
+    expect(links.backHref).toBeNull()
+    expect(links.pageNumber).toBe(1)
+    expect(links.nextHref).toContain('/claims?cursor=cursor-1')
   })
 })

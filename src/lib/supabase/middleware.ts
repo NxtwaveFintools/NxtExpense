@@ -2,19 +2,16 @@ import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import {
+  isMissingAuthSessionError,
+  isStaleRefreshTokenError,
+} from '@/lib/supabase/auth-errors'
 import { getSupabasePublicEnv } from '@/lib/supabase/env'
 
 const SUPABASE_AUTH_COOKIE_SUFFIXES = [
   'auth-token',
   'auth-token-code-verifier',
 ] as const
-
-const STALE_REFRESH_TOKEN_ERROR_CODES = new Set(['refresh_token_not_found'])
-
-type SupabaseAuthErrorLike = {
-  __isAuthError?: boolean
-  code?: string
-}
 
 function getSupabaseProjectRef(supabaseUrl: string): string | null {
   try {
@@ -64,16 +61,6 @@ export function clearSupabaseAuthCookies(
   return didClearCookies
 }
 
-function isStaleRefreshTokenError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-
-  const authError = error as SupabaseAuthErrorLike
-  return (
-    authError.__isAuthError === true &&
-    STALE_REFRESH_TOKEN_ERROR_CODES.has(authError.code ?? '')
-  )
-}
-
 type RefreshedSession = {
   response: NextResponse
   user: User | null
@@ -116,14 +103,20 @@ export async function refreshAuthSession(
     } = await supabase.auth.getUser()
 
     if (error) {
-      if (!isStaleRefreshTokenError(error)) throw error
-      didEncounterStaleRefreshToken = true
+      if (isStaleRefreshTokenError(error)) {
+        didEncounterStaleRefreshToken = true
+      } else if (!isMissingAuthSessionError(error)) {
+        throw error
+      }
     } else {
       user = resolvedUser
     }
   } catch (error) {
-    if (!isStaleRefreshTokenError(error)) throw error
-    didEncounterStaleRefreshToken = true
+    if (isStaleRefreshTokenError(error)) {
+      didEncounterStaleRefreshToken = true
+    } else if (!isMissingAuthSessionError(error)) {
+      throw error
+    }
   }
 
   return {

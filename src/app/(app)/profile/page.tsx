@@ -22,6 +22,13 @@ type ClaimStats = {
   paymentReleased: number
 }
 
+type EmployeeClaimMetricsRow = {
+  total_count: number | string | null
+  pending_count: number | string | null
+  approved_count: number | string | null
+  rejected_count: number | string | null
+}
+
 async function getClaimStats(
   supabase: ReturnType<typeof createSupabaseServerClient> extends Promise<
     infer T
@@ -30,15 +37,11 @@ async function getClaimStats(
     : never,
   employeeId: string
 ): Promise<ClaimStats> {
-  const [statusCatalog, claimsResult] = await Promise.all([
-    getAllClaimStatuses(supabase),
-    supabase
-      .from('expense_claims')
-      .select('status_id')
-      .eq('employee_id', employeeId),
-  ])
+  const { data, error } = await supabase.rpc('get_employee_claim_metrics', {
+    p_employee_id: employeeId,
+  })
 
-  if (claimsResult.error)
+  if (error) {
     return {
       total: 0,
       pending: 0,
@@ -46,38 +49,35 @@ async function getClaimStats(
       rejected: 0,
       paymentReleased: 0,
     }
+  }
 
-  const rows = claimsResult.data ?? []
+  const metrics = (
+    Array.isArray(data) ? data[0] : data
+  ) as EmployeeClaimMetricsRow | null
 
-  const rejectionIds = new Set(
-    statusCatalog.filter((s) => s.is_rejection).map((s) => s.id)
-  )
-  const financeApprovedIds = new Set(
-    statusCatalog.filter((s) => s.status_code === 'APPROVED').map((s) => s.id)
-  )
-  const paymentReleasedIds = new Set(
-    statusCatalog.filter((s) => s.is_payment_issued).map((s) => s.id)
-  )
+  const total = Number(metrics?.total_count ?? 0)
+  const pending = Number(metrics?.pending_count ?? 0)
+  const rejected = Number(metrics?.rejected_count ?? 0)
+  const paymentReleased = Number(metrics?.approved_count ?? 0)
 
-  let pending = 0
-  let rejected = 0
-  let paymentReleased = 0
+  const statusCatalog = await getAllClaimStatuses(supabase)
+  const financeApprovedStatusIds = statusCatalog
+    .filter((status) => status.status_code === 'APPROVED')
+    .map((status) => status.id)
+
   let financeApproved = 0
-  for (const row of rows) {
-    const sid = row.status_id as string
-    if (paymentReleasedIds.has(sid)) {
-      paymentReleased++
-    } else if (rejectionIds.has(sid)) {
-      rejected++
-    } else if (financeApprovedIds.has(sid)) {
-      financeApproved++
-    } else {
-      pending++
-    }
+  if (financeApprovedStatusIds.length > 0) {
+    const { count: financeApprovedCount } = await supabase
+      .from('expense_claims')
+      .select('id', { count: 'exact', head: true })
+      .eq('employee_id', employeeId)
+      .in('status_id', financeApprovedStatusIds)
+
+    financeApproved = financeApprovedCount ?? 0
   }
 
   return {
-    total: rows.length,
+    total,
     pending,
     financeApproved,
     rejected,

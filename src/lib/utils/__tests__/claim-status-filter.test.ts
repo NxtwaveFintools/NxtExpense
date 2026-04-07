@@ -41,8 +41,27 @@ describe('claim status filter value helpers', () => {
   it('rejects invalid filter values', () => {
     expect(parseClaimStatusFilterValue('invalid')).toBeNull()
     expect(parseClaimStatusFilterValue('')).toBeNull()
+    expect(parseClaimStatusFilterValue('   ')).toBeNull()
     expect(parseClaimStatusFilterValue(null)).toBeNull()
     expect(isValidClaimStatusFilterValue('invalid')).toBe(false)
+  })
+
+  it('rejects malformed allow-resubmit encoded values', () => {
+    expect(
+      parseClaimStatusFilterValue(`${REJECTED_STATUS_ID}:wrong_suffix`)
+    ).toBeNull()
+    expect(
+      parseClaimStatusFilterValue(
+        `${REJECTED_STATUS_ID}:allow_resubmit:extra_part`
+      )
+    ).toBeNull()
+    expect(parseClaimStatusFilterValue('not-a-uuid:allow_resubmit')).toBeNull()
+  })
+
+  it('validates allow-resubmit encoded values as legal filter values', () => {
+    expect(
+      isValidClaimStatusFilterValue(`${REJECTED_STATUS_ID}:allow_resubmit`)
+    ).toBe(true)
   })
 })
 
@@ -69,6 +88,26 @@ describe('buildClaimStatusFilterOptions', () => {
         label: 'Rejected - Allow Reclaim',
         statusId: REJECTED_STATUS_ID,
         allowResubmitOnly: true,
+      },
+    ])
+  })
+
+  it('skips allow-resubmit option when alternate label is blank', () => {
+    const options = buildClaimStatusFilterOptions([
+      {
+        id: REJECTED_STATUS_ID,
+        status_code: 'REJECTED',
+        status_name: 'Rejected',
+        allow_resubmit_status_name: '   ',
+      },
+    ])
+
+    expect(options).toEqual([
+      {
+        value: REJECTED_STATUS_ID,
+        label: 'Rejected',
+        statusId: REJECTED_STATUS_ID,
+        allowResubmitOnly: false,
       },
     ])
   })

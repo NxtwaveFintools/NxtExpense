@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { ClaimAvailableAction } from '@/features/claims/types'
 import {
   buildFinanceActionIntents,
-  sortFinanceActionIntents,
+  getFinanceActionToneClass,
   getFinanceSuccessLabel,
+  sortFinanceActionIntents,
   supportsFinanceIntent,
 } from '@/features/finance/utils/action-intents'
 
@@ -118,5 +119,85 @@ describe('finance action intents', () => {
     expect(getFinanceSuccessLabel(defaultIntent, 3)).toBe(
       'Approve completed for 3 claims.'
     )
+  })
+
+  it('clamps success label count to one when processed count is zero', () => {
+    const defaultIntent = buildFinanceActionIntents(FINANCE_APPROVE_ACTION)[0]
+
+    expect(getFinanceSuccessLabel(defaultIntent, 0)).toBe(
+      'Approve completed successfully.'
+    )
+  })
+
+  it('supports allow-resubmit intent when queue action enables it', () => {
+    const allowIntent = buildFinanceActionIntents(REJECT_ACTION)[1]
+
+    expect(
+      supportsFinanceIntent(
+        {
+          availableActions: [REJECT_ACTION],
+        },
+        allowIntent
+      )
+    ).toBe(true)
+  })
+
+  it('falls back to neutral tone for unknown finance action code', () => {
+    const toneClass = getFinanceActionToneClass({
+      key: 'manual_review:default',
+      actionCode: 'manual_review',
+      label: 'Manual Review',
+      allowResubmit: false,
+    })
+
+    expect(toneClass).toBe('bg-sky-600 hover:bg-sky-700')
+  })
+
+  it('returns expected tone classes for release/reject intent variants', () => {
+    expect(
+      getFinanceActionToneClass({
+        key: 'payment_released:default',
+        actionCode: 'payment_released',
+        label: 'Release Payment',
+        allowResubmit: false,
+      })
+    ).toBe('bg-emerald-600 hover:bg-emerald-700')
+
+    expect(
+      getFinanceActionToneClass({
+        key: 'finance_rejected:default',
+        actionCode: 'finance_rejected',
+        label: 'Reject',
+        allowResubmit: false,
+      })
+    ).toBe('bg-rose-600 hover:bg-rose-700')
+
+    expect(
+      getFinanceActionToneClass({
+        key: 'finance_rejected:allow_resubmit',
+        actionCode: 'finance_rejected',
+        label: 'Reject & Allow Reclaim',
+        allowResubmit: true,
+      })
+    ).toBe('bg-amber-600 hover:bg-amber-700')
+  })
+
+  it('uses label ordering as tie-breaker when sort ranks are equal', () => {
+    const sorted = sortFinanceActionIntents([
+      {
+        key: 'manual_review:z',
+        actionCode: 'manual_review',
+        label: 'Zeta',
+        allowResubmit: false,
+      },
+      {
+        key: 'manual_review:a',
+        actionCode: 'manual_review',
+        label: 'Alpha',
+        allowResubmit: false,
+      },
+    ])
+
+    expect(sorted.map((intent) => intent.label)).toEqual(['Alpha', 'Zeta'])
   })
 })

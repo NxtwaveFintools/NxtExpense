@@ -1,4 +1,5 @@
 import { formatDate, formatDatetime } from '@/lib/utils/date'
+import { toCsvCell } from '@/lib/utils/csv'
 import type {
   ApprovalHistoryFilters,
   ApprovalHistoryRecord,
@@ -12,11 +13,6 @@ type ApprovalHistoryFilterInput = Partial<
 function normalizeText(value: string | undefined): string | null {
   const normalized = value?.trim() ?? ''
   return normalized ? normalized : null
-}
-
-function normalizeCsvCell(value: string): string {
-  const escaped = value.replaceAll('"', '""')
-  return `"${escaped}"`
 }
 
 function toFriendlyStatus(value: string): string {
@@ -167,8 +163,6 @@ export function buildApprovalHistoryCsv(rows: ApprovalHistoryRecord[]): string {
   const bodyRows = rows.map(mapApprovalHistoryToCsvRow)
 
   return [APPROVAL_HISTORY_CSV_HEADERS, ...bodyRows]
-    .map((cells) =>
-      cells.map((cell) => normalizeCsvCell(String(cell))).join(',')
-    )
+    .map((cells) => cells.map((cell) => toCsvCell(String(cell))).join(','))
     .join('\n')
 }

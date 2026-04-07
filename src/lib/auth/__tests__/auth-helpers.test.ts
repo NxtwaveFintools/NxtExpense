@@ -47,9 +47,16 @@ describe('hasInvalidAzureTenantPath', () => {
 describe('isDevelopmentAuthEnabled', () => {
   const originalNodeEnv = process.env.NODE_ENV
   const originalProductionFlag = process.env.ALLOW_PASSWORD_LOGIN_IN_PROD
+  const originalVercelEnv = process.env.VERCEL_ENV
 
   afterEach(() => {
     vi.stubEnv('NODE_ENV', originalNodeEnv)
+
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV
+    } else {
+      vi.stubEnv('VERCEL_ENV', originalVercelEnv)
+    }
 
     if (originalProductionFlag === undefined) {
       delete process.env.ALLOW_PASSWORD_LOGIN_IN_PROD
@@ -69,8 +76,16 @@ describe('isDevelopmentAuthEnabled', () => {
     expect(isDevelopmentAuthEnabled()).toBe(true)
   })
 
-  it('returns false in production when the flag is missing', () => {
+  it('returns true in local production runtime when the flag is missing', () => {
     vi.stubEnv('NODE_ENV', 'production')
+    delete process.env.VERCEL_ENV
+    delete process.env.ALLOW_PASSWORD_LOGIN_IN_PROD
+    expect(isDevelopmentAuthEnabled()).toBe(true)
+  })
+
+  it('returns false in hosted production when the flag is missing', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL_ENV', 'production')
     delete process.env.ALLOW_PASSWORD_LOGIN_IN_PROD
     expect(isDevelopmentAuthEnabled()).toBe(false)
   })

@@ -1,4 +1,5 @@
 // FIX [ISSUE#2] — Streaming chunked export utility to eliminate unbounded in-memory arrays
+import { toCsvCell } from '@/lib/utils/csv'
 
 /** Hard server-side cap to prevent memory exhaustion on large exports. */
 export const MAX_EXPORT_ROWS = 50_000
@@ -22,20 +23,8 @@ type StreamingExportOptions<T> = {
   filename: string
 }
 
-function normalizeCsvCell(value: string): string {
-  if (
-    value.includes(',') ||
-    value.includes('"') ||
-    value.includes('\n') ||
-    value.includes('\r')
-  ) {
-    return `"${value.replaceAll('"', '""')}"`
-  }
-  return value
-}
-
 function toCsvLine(cells: string[]): string {
-  return cells.map((cell) => normalizeCsvCell(cell)).join(',')
+  return cells.map((cell) => toCsvCell(cell)).join(',')
 }
 
 export function createStreamingCsvResponse<T>({

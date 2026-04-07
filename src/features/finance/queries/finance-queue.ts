@@ -8,7 +8,6 @@ import {
 } from '@/features/claims/queries'
 import type {
   FinanceFilters,
-  FinanceOwner,
   PaginatedFinanceQueue,
 } from '@/features/finance/types'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'

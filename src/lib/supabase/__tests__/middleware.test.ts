@@ -88,4 +88,20 @@ describe('refreshAuthSession', () => {
       result.response.cookies.get('sb-acbgmixcdtfgurgbkqgh-auth-token')
     ).toBeUndefined()
   })
+
+  it('treats missing auth session as signed-out without stale refresh handling', async () => {
+    getUserMock.mockRejectedValue({
+      __isAuthError: true,
+      status: 400,
+      name: 'AuthSessionMissingError',
+      message: 'Auth session missing!',
+    })
+
+    const request = new NextRequest('http://localhost:3000/login')
+    const result = await refreshAuthSession(request)
+
+    expect(result.user).toBeNull()
+    expect(result.didResetSession).toBe(false)
+    expect(result.didEncounterStaleRefreshToken).toBe(false)
+  })
 })

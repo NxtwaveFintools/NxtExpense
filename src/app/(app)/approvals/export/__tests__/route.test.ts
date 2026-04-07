@@ -153,4 +153,44 @@ describe('approvals export route', () => {
     expect(response.status).toBe(200)
     expect(mocks.createStreamingCsvResponse).toHaveBeenCalledTimes(1)
   })
+
+  it('returns 401 when request is unauthenticated', async () => {
+    mocks.createSupabaseServerClient.mockResolvedValueOnce({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    })
+
+    const response = await GET(
+      new Request('http://localhost:3000/approvals/export?mode=page')
+    )
+
+    expect(response.status).toBe(401)
+    expect(await response.text()).toBe('Unauthorized request.')
+  })
+
+  it('returns 403 when approver profile is missing', async () => {
+    mocks.getEmployeeByEmail.mockResolvedValueOnce(null)
+
+    const response = await GET(
+      new Request('http://localhost:3000/approvals/export?mode=page')
+    )
+
+    expect(response.status).toBe(403)
+    expect(await response.text()).toBe('Approver profile not found.')
+  })
+
+  it('returns 403 when user has no approval access', async () => {
+    mocks.hasApproverAssignments.mockResolvedValueOnce(false)
+    mocks.canAccessApprovals.mockReturnValueOnce(false)
+
+    const response = await POST(
+      new Request('http://localhost:3000/approvals/export?mode=all', {
+        method: 'POST',
+      })
+    )
+
+    expect(response.status).toBe(403)
+    expect(await response.text()).toBe('Access denied.')
+  })
 })

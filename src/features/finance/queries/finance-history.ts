@@ -256,25 +256,11 @@ export async function getAllFilteredFinanceHistory(
   filters: FinanceFilters,
   batchSize = 200
 ): Promise<FinanceHistoryItem[]> {
-  const allRows: FinanceHistoryItem[] = []
-  let cursor: string | null = null
+  void supabase
+  void filters
+  void batchSize
 
-  for (;;) {
-    const page = await getFinanceHistoryPaginated(
-      supabase,
-      cursor,
-      batchSize,
-      filters
-    )
-
-    allRows.push(...page.data)
-
-    if (!page.hasNextPage || !page.nextCursor) {
-      break
-    }
-
-    cursor = page.nextCursor
-  }
-
-  return allRows
+  throw new Error(
+    'Unbounded getAllFilteredFinanceHistory is disabled. Use getFinanceHistoryPaginated for cursor-based access.'
+  )
 }

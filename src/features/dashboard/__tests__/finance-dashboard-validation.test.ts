@@ -46,4 +46,52 @@ describe('financeDashboardFilterSchema', () => {
 
     expect(result.data.employeeName).toBe('Mansoor')
   })
+
+  it('normalizes DD/MM/YYYY dates into ISO format', () => {
+    const result = financeDashboardFilterSchema.safeParse({
+      dateFrom: '07/04/2026',
+      dateTo: '08/04/2026',
+    })
+
+    expect(result.success).toBe(true)
+
+    if (!result.success) {
+      return
+    }
+
+    expect(result.data.dateFrom).toBe('2026-04-07')
+    expect(result.data.dateTo).toBe('2026-04-08')
+  })
+
+  it('rejects invalid date formats for optional date fields', () => {
+    const result = financeDashboardFilterSchema.safeParse({
+      dateTo: '2026/04/08',
+    })
+
+    expect(result.success).toBe(false)
+
+    if (result.success) {
+      return
+    }
+
+    expect(result.error.issues[0]?.message).toBe(
+      'Date to must be in DD/MM/YYYY format.'
+    )
+  })
+
+  it('treats blank optional date inputs as undefined', () => {
+    const result = financeDashboardFilterSchema.safeParse({
+      dateFrom: '   ',
+      dateTo: '   ',
+    })
+
+    expect(result.success).toBe(true)
+
+    if (!result.success) {
+      return
+    }
+
+    expect(result.data.dateFrom).toBeUndefined()
+    expect(result.data.dateTo).toBeUndefined()
+  })
 })

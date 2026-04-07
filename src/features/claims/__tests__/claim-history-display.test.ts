@@ -109,4 +109,70 @@ describe('claim-history-display helpers', () => {
 
     expect(text).toBe('Reason: Insufficient supporting documents')
   })
+
+  it('returns null when rejection notes are absent', () => {
+    const text = getClaimHistoryRejectionDisplayText(
+      buildHistory({ rejection_notes: null })
+    )
+
+    expect(text).toBeNull()
+  })
+
+  it('formats location with outstation city and state when intercity route is absent', () => {
+    const location = formatClaimHistoryLocation(
+      buildClaim({
+        from_city_name: null,
+        to_city_name: null,
+      })
+    )
+
+    expect(location).toBe('Field - Outstation (Vijayawada, Andhra Pradesh)')
+  })
+
+  it('formats location with city only when state is absent', () => {
+    const location = formatClaimHistoryLocation(
+      buildClaim({
+        from_city_name: null,
+        to_city_name: null,
+        outstation_state_name: null,
+      })
+    )
+
+    expect(location).toBe('Field - Outstation (Vijayawada)')
+  })
+
+  it('formats location with state only when city is absent', () => {
+    const location = formatClaimHistoryLocation(
+      buildClaim({
+        from_city_name: null,
+        to_city_name: null,
+        outstation_city_name: null,
+      })
+    )
+
+    expect(location).toBe('Field - Outstation (Andhra Pradesh)')
+  })
+
+  it('falls back to work location when no route/city/state details exist', () => {
+    const location = formatClaimHistoryLocation(
+      buildClaim({
+        from_city_name: null,
+        to_city_name: null,
+        outstation_city_name: null,
+        outstation_state_name: null,
+      })
+    )
+
+    expect(location).toBe('Field - Outstation')
+  })
+
+  it('trims user-facing rejection reason text', () => {
+    const text = getClaimHistoryRejectionDisplayText(
+      buildHistory({
+        rejection_notes: '  Missing manager note  ',
+      })
+    )
+
+    expect(text).toBe('Reason: Missing manager note')
+  })
 })

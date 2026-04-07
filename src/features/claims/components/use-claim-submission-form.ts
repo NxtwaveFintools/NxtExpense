@@ -3,12 +3,16 @@
 import { useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
 
-import { submitClaimAction } from '@/features/claims/actions'
+import { createClaimSubmitHandler } from '@/features/claims/components/claim-submission-submit'
+import { createTravelSelectionHandlers } from '@/features/claims/components/claim-submission-travel-handlers'
 import { getClaimSummaryPreview } from '@/features/claims/components/claim-summary-preview'
-import { formatDate } from '@/lib/utils/date'
+import {
+  fetchCitiesByState,
+  getFallbackKmLimit,
+  resolveDefaultBaseLocationDayTypeCode,
+} from '@/features/claims/components/claim-submission-form-utils'
 
 import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summary-preview'
 import type {
@@ -16,7 +20,6 @@ import type {
   CityOption,
   ClaimFormInitialValues,
   IntracityVehicleMode,
-  ClaimFormValues,
   SelectOption,
   VehicleType,
   WorkLocation,
@@ -29,45 +32,6 @@ type UseClaimSubmissionFormArgs = {
   workLocationOptions: readonly WorkLocationOption[]
   claimRateSnapshot: ClaimRateSnapshot
   initialValues?: ClaimFormInitialValues | null
-}
-
-type CityApiRow = { id: string; city_name: string; state_id: string }
-
-async function fetchCitiesByState(stateId: string): Promise<CityOption[]> {
-  const response = await fetch(
-    `/api/config/cities?state_id=${encodeURIComponent(stateId)}`
-  )
-  if (!response.ok) throw new Error('Failed to fetch cities')
-  const rows: CityApiRow[] = await response.json()
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.city_name,
-    stateId: row.state_id,
-  }))
-}
-
-function getFallbackKmLimit(
-  maxKmRoundTripByVehicle: Record<string, number>
-): number | null {
-  const limits = Object.values(maxKmRoundTripByVehicle).filter(
-    (value) => Number.isFinite(value) && value > 0
-  )
-
-  if (limits.length === 0) {
-    return null
-  }
-
-  return Math.max(...limits)
-}
-
-function resolveDefaultBaseLocationDayTypeCode(
-  baseLocationDayTypeOptions: readonly BaseLocationDayTypeOption[]
-): string {
-  return (
-    baseLocationDayTypeOptions.find((option) => option.isDefault)?.code ??
-    baseLocationDayTypeOptions[0]?.code ??
-    'FULL_DAY'
-  )
 }
 
 export function useClaimSubmissionForm({
@@ -233,229 +197,44 @@ export function useClaimSubmissionForm({
     claimRateSnapshot,
   ])
 
-  function handleIntercityOwnVehicleUsedChange(value: boolean) {
-    setIntercityOwnVehicleUsed(value)
+  const {
+    handleIntercityOwnVehicleUsedChange,
+    handleIntracityTravelUsedChange,
+    handleIntracityVehicleModeChange,
+    handleOutstationStateChange,
+  } = createTravelSelectionHandlers({
+    intercityOwnVehicleUsed,
+    setIntercityOwnVehicleUsed,
+    setIntracityTravelUsed,
+    setIntracityVehicleMode,
+    setOutstationCityId,
+    setOutstationStateId,
+    setFromCityId,
+    setToCityId,
+    setKmTravelled,
+  })
 
-    if (value) {
-      setIntracityTravelUsed(null)
-      setIntracityVehicleMode(null)
-      setOutstationCityId('')
-      return
-    }
-
-    setFromCityId('')
-    setToCityId('')
-    setKmTravelled('')
-    setIntracityTravelUsed(null)
-    setIntracityVehicleMode(null)
-    setOutstationStateId('')
-    setOutstationCityId('')
-  }
-
-  function handleIntracityTravelUsedChange(value: boolean) {
-    setIntracityTravelUsed(value)
-
-    if (!value) {
-      setIntracityVehicleMode(null)
-      setOutstationCityId('')
-
-      if (intercityOwnVehicleUsed !== true) {
-        setOutstationStateId('')
-      }
-
-      return
-    }
-
-    if (intercityOwnVehicleUsed === true) {
-      setIntercityOwnVehicleUsed(false)
-      setKmTravelled('')
-      setFromCityId('')
-      setToCityId('')
-    }
-  }
-
-  function handleIntracityVehicleModeChange(value: IntracityVehicleMode) {
-    setIntracityVehicleMode(value)
-  }
-
-  function handleOutstationStateChange(value: string) {
-    setOutstationStateId(value)
-    setOutstationCityId('')
-    setFromCityId('')
-    setToCityId('')
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!claimDate) {
-      const message = 'Claim date is required.'
-      setError(message)
-      toast.error(message)
-      return
-    }
-
-    if (kmValidationMessage) {
-      setError(kmValidationMessage)
-      toast.error(kmValidationMessage)
-      return
-    }
-
-    const kmTravelledValue = Number.parseFloat(kmTravelled)
-    const requiresOutstationDetails =
-      selectedLocation?.requires_outstation_details ?? false
-    const requiresVehicleSelection =
-      selectedLocation?.requires_vehicle_selection ?? false
-
-    if (requiresOutstationDetails && intercityOwnVehicleUsed === null) {
-      const message =
-        'Please select whether you travelled between cities using your own vehicle.'
-      setError(message)
-      toast.error(message)
-      return
-    }
-
-    if (
-      requiresOutstationDetails &&
-      intercityOwnVehicleUsed === false &&
-      intracityTravelUsed === null
-    ) {
-      const message =
-        'Please select whether you travelled within the city using your own vehicle/rental vehicle.'
-      setError(message)
-      toast.error(message)
-      return
-    }
-
-    setIsSubmitting(true)
-    setError(null)
-
-    const intercitySelection = requiresOutstationDetails
-      ? intercityOwnVehicleUsed
-      : null
-    const intracitySelection =
-      requiresOutstationDetails && intercityOwnVehicleUsed === true
-        ? true
-        : requiresOutstationDetails
-          ? intracityTravelUsed
-          : null
-
-    if (
-      requiresOutstationDetails &&
-      intercitySelection === false &&
-      intracitySelection === true &&
-      intracityVehicleMode === null
-    ) {
-      const message =
-        'Please select the vehicle type used within the city (Own Vehicle or Rent Vehicle).'
-      setError(message)
-      toast.error(message)
-      setIsSubmitting(false)
-      return
-    }
-
-    const effectiveIntracityVehicleMode =
-      requiresOutstationDetails && intracitySelection === true
-        ? intercitySelection === true
-          ? 'OWN_VEHICLE'
-          : intracityVehicleMode
-        : null
-
-    const isIntercityOwnVehicle = intercitySelection === true
-    const isIntracityOwnVehicle =
-      intracitySelection === true &&
-      effectiveIntracityVehicleMode === 'OWN_VEHICLE'
-    const hasOutstationOwnVehicle =
-      isIntercityOwnVehicle || isIntracityOwnVehicle
-
-    const isOutstationIntercity = intercitySelection === true
-    const isOutstationIntracity = intracitySelection === true
-    const isOutstationOwnVehicle = hasOutstationOwnVehicle
-
-    const derivedOutstationCityId = isOutstationIntracity
-      ? isOutstationIntercity
-        ? toCityId
-        : outstationCityId
-      : ''
-    const outstationState =
-      isOutstationIntercity || isOutstationIntracity ? outstationStateId : ''
-
-    const payload: ClaimFormValues = {
-      claimDate: formatDate(claimDate),
-      workLocation,
-      baseLocationDayTypeCode: requiresVehicleSelection
-        ? baseLocationDayTypeCode
-        : undefined,
-      ownVehicleUsed: requiresOutstationDetails
-        ? isOutstationOwnVehicle
-        : undefined,
-      hasIntercityTravel:
-        requiresOutstationDetails && intercitySelection !== null
-          ? isOutstationIntercity
-          : undefined,
-      hasIntracityTravel:
-        requiresOutstationDetails && intracitySelection !== null
-          ? isOutstationIntracity
-          : undefined,
-      intracityTravelUsed:
-        requiresOutstationDetails && intracitySelection !== null
-          ? intracitySelection
-          : undefined,
-      intercityOwnVehicleUsed:
-        requiresOutstationDetails && intercitySelection !== null
-          ? intercitySelection
-          : undefined,
-      intracityOwnVehicleUsed:
-        requiresOutstationDetails && intracitySelection !== null
-          ? isIntracityOwnVehicle
-          : undefined,
-      intracityVehicleMode:
-        requiresOutstationDetails && intracitySelection === true
-          ? (effectiveIntracityVehicleMode ?? undefined)
-          : undefined,
-      vehicleType:
-        requiresVehicleSelection ||
-        isOutstationIntercity ||
-        isOutstationIntracity
-          ? vehicleType || undefined
-          : undefined,
-      outstationStateId: requiresOutstationDetails
-        ? outstationState || undefined
-        : undefined,
-      outstationCityId: isOutstationIntracity
-        ? derivedOutstationCityId || undefined
-        : undefined,
-      fromCityId: isOutstationIntercity ? fromCityId || undefined : undefined,
-      toCityId: isOutstationIntercity ? toCityId || undefined : undefined,
-      kmTravelled:
-        isIntercityOwnVehicle && Number.isFinite(kmTravelledValue)
-          ? kmTravelledValue
-          : undefined,
-    }
-
-    try {
-      const result = await submitClaimAction(payload)
-
-      if (!result.ok) {
-        setError(result.error)
-        toast.error(result.error ?? 'Unable to submit claim.')
-        return
-      }
-
-      toast.success(
-        result.claimNumber
-          ? `Claim submitted successfully (${result.claimNumber}).`
-          : 'Claim submitted successfully.'
-      )
+  const handleSubmit = createClaimSubmitHandler({
+    claimDate,
+    kmValidationMessage,
+    selectedLocation,
+    workLocation,
+    baseLocationDayTypeCode,
+    vehicleType,
+    intercityOwnVehicleUsed,
+    intracityTravelUsed,
+    intracityVehicleMode,
+    outstationStateId,
+    outstationCityId,
+    fromCityId,
+    toCityId,
+    kmTravelled,
+    setError,
+    setIsSubmitting,
+    onSuccessNavigate: () => {
       router.replace('/claims')
-    } catch {
-      const message = 'Unexpected error while submitting claim.'
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+    },
+  })
 
   return {
     isEditingReturnedClaim,

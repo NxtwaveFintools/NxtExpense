@@ -272,28 +272,14 @@ export async function getAllFilteredMyClaims(
   filters: MyClaimsFilters,
   batchSize = 200
 ): Promise<Claim[]> {
-  const allRows: Claim[] = []
-  let cursor: string | null = null
+  void supabase
+  void employeeId
+  void filters
+  void batchSize
 
-  for (;;) {
-    const page = await getMyClaimsPaginated(
-      supabase,
-      employeeId,
-      cursor,
-      batchSize,
-      filters
-    )
-
-    allRows.push(...page.data)
-
-    if (!page.hasNextPage || !page.nextCursor) {
-      break
-    }
-
-    cursor = page.nextCursor
-  }
-
-  return allRows
+  throw new Error(
+    'Unbounded getAllFilteredMyClaims is disabled. Use getMyClaimsPaginated for cursor-based access.'
+  )
 }
 
 export async function getMyClaimsTotalCount(

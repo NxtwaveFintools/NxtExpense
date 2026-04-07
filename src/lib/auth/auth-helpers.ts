@@ -12,14 +12,28 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
     'Unable to verify your session right now. Please try again.',
 }
 
+function parseBooleanEnvironmentValue(
+  value: string | undefined
+): boolean | null {
+  if (!value) return null
+
+  const normalizedValue = value.trim().toLowerCase()
+  if (normalizedValue === 'true' || normalizedValue === '1') return true
+  if (normalizedValue === 'false' || normalizedValue === '0') return false
+  return null
+}
+
 export function isDevelopmentAuthEnabled(): boolean {
   if (process.env.NODE_ENV !== 'production') return true
 
-  const productionOverride = process.env.ALLOW_PASSWORD_LOGIN_IN_PROD
-  if (!productionOverride) return false
+  const productionOverride = parseBooleanEnvironmentValue(
+    process.env.ALLOW_PASSWORD_LOGIN_IN_PROD
+  )
 
-  const normalizedValue = productionOverride.trim().toLowerCase()
-  return normalizedValue === 'true' || normalizedValue === '1'
+  if (productionOverride !== null) return productionOverride
+
+  const vercelEnvironment = process.env.VERCEL_ENV?.trim().toLowerCase()
+  return vercelEnvironment !== 'production'
 }
 
 /**
