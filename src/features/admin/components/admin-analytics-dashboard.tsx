@@ -164,6 +164,18 @@ export function AdminAnalyticsDashboard() {
 
   const analyticsData = analyticsQuery.data
   const claimsPage = claimsPageQuery.data ?? null
+  const rejectedWithoutReclaimCount =
+    analyticsData?.kpi.rejected_without_reclaim_count ??
+    analyticsData?.kpi.rejected_count ??
+    0
+  const rejectedWithoutReclaimAmount =
+    analyticsData?.kpi.rejected_without_reclaim_amount ??
+    analyticsData?.kpi.rejected_amount ??
+    0
+  const rejectedAllowReclaimCount =
+    analyticsData?.kpi.rejected_allow_reclaim_count ?? 0
+  const rejectedAllowReclaimAmount =
+    analyticsData?.kpi.rejected_allow_reclaim_amount ?? 0
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
@@ -196,6 +208,7 @@ export function AdminAnalyticsDashboard() {
         />
 
         <ClaimAnalyticsCards
+          columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
           cards={[
             {
               label: 'Total Claims',
@@ -217,8 +230,14 @@ export function AdminAnalyticsDashboard() {
             },
             {
               label: 'Rejected Claims',
-              count: analyticsData?.kpi.rejected_count ?? 0,
-              amount: analyticsData?.kpi.rejected_amount ?? 0,
+              count: rejectedWithoutReclaimCount,
+              amount: rejectedWithoutReclaimAmount,
+              tone: 'rejected',
+            },
+            {
+              label: 'Rejected - Allow Reclaim',
+              count: rejectedAllowReclaimCount,
+              amount: rejectedAllowReclaimAmount,
               tone: 'rejected',
             },
           ]}

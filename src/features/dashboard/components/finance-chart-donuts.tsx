@@ -112,11 +112,18 @@ function ChartTooltip({
 }: {
   active?: boolean
   label?: string
-  payload?: Array<{ value?: number | string }>
+  payload?: Array<{
+    value?: number | string
+    payload?: {
+      claimCount?: number
+    }
+  }>
 }) {
   if (!active || !payload || payload.length === 0) {
     return null
   }
+
+  const claimCount = payload[0]?.payload?.claimCount
 
   return (
     <div className="rounded-xl border border-border bg-surface/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
@@ -124,6 +131,11 @@ function ChartTooltip({
       <p className="mt-1 text-muted-foreground">
         {formatINR(Number(payload[0]?.value ?? 0))}
       </p>
+      {typeof claimCount === 'number' ? (
+        <p className="mt-0.5 text-muted-foreground">
+          {claimCount.toLocaleString('en-IN')} claims
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -250,9 +262,11 @@ export function VehicleTypeDonut({ data }: { data: VehicleTypeBreakdown[] }) {
   const chartData = data.map((row) => ({
     name: row.vehicle_name,
     value: Number(row.total_amount),
+    claimCount: Number(row.claim_count),
   }))
 
   const total = chartData.reduce((sum, row) => sum + row.value, 0)
+  const totalClaims = chartData.reduce((sum, row) => sum + row.claimCount, 0)
 
   return (
     <ChartCard
@@ -287,6 +301,9 @@ export function VehicleTypeDonut({ data }: { data: VehicleTypeBreakdown[] }) {
           <p className="text-lg font-semibold text-foreground">
             {formatINR(total)}
           </p>
+          <p className="text-xs text-muted-foreground">
+            {totalClaims.toLocaleString('en-IN')} claims
+          </p>
           <div className="space-y-1.5">
             {chartData.map((entry) => (
               <div
@@ -298,6 +315,10 @@ export function VehicleTypeDonut({ data }: { data: VehicleTypeBreakdown[] }) {
                   style={{ backgroundColor: getVehicleTypeColor(entry.name) }}
                 />
                 <span className="truncate">{entry.name}</span>
+                <span className="ml-auto whitespace-nowrap font-medium text-foreground">
+                  {entry.claimCount.toLocaleString('en-IN')} /{' '}
+                  {formatINR(entry.value)}
+                </span>
               </div>
             ))}
           </div>

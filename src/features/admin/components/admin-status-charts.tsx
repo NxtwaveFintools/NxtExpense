@@ -23,6 +23,10 @@ const AXIS_STYLE = {
 function getStatusColor(statusName: string): string {
   const normalized = statusName.toLowerCase()
 
+  if (normalized.includes('reject') && normalized.includes('reclaim')) {
+    return '#e11d48'
+  }
+
   if (
     normalized.includes('submitted') &&
     normalized.includes('await') &&
@@ -92,6 +96,10 @@ function getStatusColor(statusName: string): string {
 
 function getStatusStageOrder(statusName: string): number {
   const normalized = statusName.toLowerCase()
+
+  if (normalized.includes('reject') && normalized.includes('reclaim')) {
+    return 91
+  }
 
   if (
     normalized.includes('submitted') &&
@@ -222,6 +230,7 @@ export function TopStatusAmountChart({
       status_name: row.status_name,
       total_amount: Number(row.total_amount),
     }))
+    .sort((left, right) => right.total_amount - left.total_amount)
     .slice(0, 6)
 
   if (chartData.length === 0) {

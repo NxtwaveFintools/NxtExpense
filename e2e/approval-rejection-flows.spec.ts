@@ -42,22 +42,6 @@ function toIsoDateDaysBack(daysBack: number): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function normalizeLocationLabelForMatch(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[–—]/g, '-')
-    .replace(/\s*\/\s*/g, '/')
-    .replace(/[^a-z0-9/]/g, '')
-}
-
-function isOfficeWfhLocationLabel(value: string): boolean {
-  const normalized = normalizeLocationLabelForMatch(value)
-
-  return normalized === 'office/wfh'
-    ? true
-    : normalized.includes('office') && normalized.includes('wfh')
-}
-
 async function ensureClaimFormReady(
   page: Page,
   claims: ClaimsPage
@@ -71,36 +55,6 @@ async function ensureClaimFormReady(
   })
   await expect(claims.dateInput).toBeVisible({ timeout: 20_000 })
   await expect(claims.workLocationSelect).toBeVisible({ timeout: 20_000 })
-}
-
-async function selectOfficeWorkLocation(
-  page: Page,
-  claims: ClaimsPage
-): Promise<void> {
-  const maxAttempts = 3
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    await ensureClaimFormReady(page, claims)
-
-    const options = await claims.getWorkLocationOptions()
-    const officeOption = options.find((option) =>
-      isOfficeWfhLocationLabel(option.label)
-    )
-
-    if (officeOption) {
-      await claims.selectWorkLocationByValue(officeOption.value)
-      return
-    }
-
-    await page.waitForTimeout(250)
-  }
-
-  const options = await claims.getWorkLocationOptions()
-  throw new Error(
-    `Unable to find Office/WFH work location. Available options: ${options
-      .map((option) => option.label)
-      .join(', ')}`
-  )
 }
 
 async function submitOfficeClaimAndGetClaimNumber(
