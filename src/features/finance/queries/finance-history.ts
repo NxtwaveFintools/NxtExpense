@@ -26,15 +26,21 @@ import {
   normalizeFinanceOwner,
 } from './finance-shared'
 
+type FinanceHistoryPaginationOptions = {
+  maxFilteredClaimIds?: number | null
+}
+
 export async function getFinanceHistoryPaginated(
   supabase: SupabaseClient,
   cursor: string | null,
   limit = 10,
-  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS,
+  options: FinanceHistoryPaginationOptions = {}
 ): Promise<PaginatedFinanceHistory> {
   const filteredClaimIds = await getFilteredClaimIdsForFinance(
     supabase,
-    filters
+    filters,
+    { maxClaimIds: options.maxFilteredClaimIds }
   )
 
   if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {

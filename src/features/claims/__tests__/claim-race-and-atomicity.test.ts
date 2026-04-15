@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getVehicleTypeById: vi.fn(),
   countFoodWithPrincipalsInMonth: vi.fn(),
   getFoodWithPrincipalsLimit: vi.fn(),
+  getExpenseLocationById: vi.fn(),
   getClaimForDate: vi.fn(),
   insertClaim: vi.fn(),
   insertClaimItems: vi.fn(),
@@ -75,6 +76,17 @@ vi.mock('@/lib/services/calculation-service', async () => {
   }
 })
 
+vi.mock('@/lib/services/expense-location-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/services/expense-location-service')
+  >('@/lib/services/expense-location-service')
+
+  return {
+    ...actual,
+    getExpenseLocationById: mocks.getExpenseLocationById,
+  }
+})
+
 vi.mock('@/features/claims/mutations', async () => {
   const actual = await vi.importActual<
     typeof import('@/features/claims/mutations')
@@ -93,6 +105,7 @@ import { submitClaimAction } from '@/features/claims/actions'
 const VALID_FORM_INPUT = {
   claimDate: '06/03/2026',
   workLocation: 'Office / WFH',
+  expenseLocationId: 'expense-location-1',
 }
 
 function buildClaimStatusesQuery() {
@@ -154,6 +167,13 @@ describe('submitClaimAction race and atomicity coverage', () => {
     })
 
     mocks.getClaimForDate.mockResolvedValue(null)
+    mocks.getExpenseLocationById.mockResolvedValue({
+      id: 'expense-location-1',
+      location_name: 'Presales-Hyderabad',
+      region_code: 'TELUGU',
+      display_order: 1,
+      is_active: true,
+    })
     mocks.insertClaim.mockResolvedValue({
       id: 'claim-new-1',
       claim_number: 'CLAIM-260306-001',

@@ -7,6 +7,7 @@ import { Filter } from 'lucide-react'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
+import { ApprovedHistoryExportActions } from '@/features/finance/components/approved-history-export-actions'
 import { getFinanceEmployeeNameSuggestionsAction } from '@/features/finance/actions/employee-name-suggestions'
 
 import type {
@@ -27,6 +28,9 @@ type FinanceFiltersBarProps = {
   dateFilterOptions?: FinanceDateFilterField[]
   exportCurrentPageHref?: string
   exportAllHref?: string
+  approvedHistoryExportAllHref?: string
+  approvedHistoryBcExpenseHref?: string
+  approvedHistoryPaymentJournalsHref?: string
 }
 
 const DEFAULT_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
@@ -64,6 +68,9 @@ export function FinanceFiltersBar({
   dateFilterOptions = DEFAULT_DATE_FILTER_OPTIONS,
   exportCurrentPageHref,
   exportAllHref,
+  approvedHistoryExportAllHref,
+  approvedHistoryBcExpenseHref,
+  approvedHistoryPaymentJournalsHref,
 }: FinanceFiltersBarProps) {
   const router = useRouter()
 
@@ -336,7 +343,16 @@ export function FinanceFiltersBar({
           >
             Clear Filters
           </button>
-          {exportCurrentPageHref && exportAllHref ? (
+          {approvedHistoryExportAllHref &&
+          approvedHistoryBcExpenseHref &&
+          approvedHistoryPaymentJournalsHref ? (
+            <ApprovedHistoryExportActions
+              exportAllHref={approvedHistoryExportAllHref}
+              exportBcExpenseHref={approvedHistoryBcExpenseHref}
+              exportPaymentJournalsHref={approvedHistoryPaymentJournalsHref}
+              buttonClassName="rounded-md"
+            />
+          ) : exportCurrentPageHref && exportAllHref ? (
             <CsvExportActions
               exportCurrentPageHref={exportCurrentPageHref}
               exportAllHref={exportAllHref}

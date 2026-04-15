@@ -172,26 +172,15 @@ export default async function ApprovedHistoryPage({
     })
   )
 
-  const currentPageCsvParams = addFinanceFiltersToParams(
-    new URLSearchParams(),
-    effectiveFilters
-  )
-  currentPageCsvParams.set('mode', 'page')
-  if (historyCursor) {
-    currentPageCsvParams.set('historyCursor', historyCursor)
-  }
-  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
-    currentPageCsvParams.set('pageSize', String(pageSize))
-  }
-
   const allRowsCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
   )
   allRowsCsvParams.set('mode', 'all')
 
-  const exportCurrentPageHref = `/approved-history/export?${currentPageCsvParams.toString()}`
   const exportAllHref = `/approved-history/export?${allRowsCsvParams.toString()}`
+  const exportBcExpenseHref = `/approved-history/bc-expense-export?${allRowsCsvParams.toString()}`
+  const exportPaymentJournalsHref = `/approved-history/payment-journals-export?${allRowsCsvParams.toString()}`
 
   return (
     <>
@@ -206,8 +195,9 @@ export default async function ApprovedHistoryPage({
               options={filterOptions}
               showHodApproverFilter={false}
               showClaimStatusFilter={false}
-              exportCurrentPageHref={exportCurrentPageHref}
-              exportAllHref={exportAllHref}
+              approvedHistoryExportAllHref={exportAllHref}
+              approvedHistoryBcExpenseHref={exportBcExpenseHref}
+              approvedHistoryPaymentJournalsHref={exportPaymentJournalsHref}
             />
             <ClaimAnalyticsCards
               cards={[

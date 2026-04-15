@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getVehicleTypeById: vi.fn(),
   countFoodWithPrincipalsInMonth: vi.fn(),
   getFoodWithPrincipalsLimit: vi.fn(),
+  getExpenseLocationById: vi.fn(),
   getClaimForDate: vi.fn(),
   insertClaim: vi.fn(),
   insertClaimItems: vi.fn(),
@@ -74,6 +75,17 @@ vi.mock('@/lib/services/calculation-service', async () => {
   }
 })
 
+vi.mock('@/lib/services/expense-location-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/services/expense-location-service')
+  >('@/lib/services/expense-location-service')
+
+  return {
+    ...actual,
+    getExpenseLocationById: mocks.getExpenseLocationById,
+  }
+})
+
 vi.mock('@/features/claims/mutations', async () => {
   const actual = await vi.importActual<
     typeof import('@/features/claims/mutations')
@@ -96,6 +108,7 @@ import { getMyClaimsAction, submitClaimAction } from '@/features/claims/actions'
 const VALID_FORM_INPUT = {
   claimDate: '06/03/2026',
   workLocation: 'Office / WFH',
+  expenseLocationId: 'expense-location-1',
 }
 
 describe('submitClaimAction', () => {
@@ -187,6 +200,13 @@ describe('submitClaimAction', () => {
     })
     mocks.countFoodWithPrincipalsInMonth.mockResolvedValue(0)
     mocks.getFoodWithPrincipalsLimit.mockResolvedValue(0)
+    mocks.getExpenseLocationById.mockResolvedValue({
+      id: 'expense-location-1',
+      location_name: 'Presales-Hyderabad',
+      region_code: 'TELUGU',
+      display_order: 1,
+      is_active: true,
+    })
 
     mocks.insertClaim.mockResolvedValue({
       id: 'claim-new-1',
@@ -325,6 +345,7 @@ describe('submitClaimAction', () => {
     const differentDateInput = {
       claimDate: '07/03/2026',
       workLocation: 'Office / WFH',
+      expenseLocationId: 'expense-location-1',
     }
 
     // Act
@@ -383,6 +404,7 @@ describe('submitClaimAction', () => {
     const result = await submitClaimAction({
       claimDate: '31-03-2026',
       workLocation: 'Office / WFH',
+      expenseLocationId: 'expense-location-1',
     } as never)
 
     // Assert

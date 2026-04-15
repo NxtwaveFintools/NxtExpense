@@ -13,6 +13,7 @@ import type {
 
 type CreateClaimSubmitHandlerParams = {
   claimDate: string
+  expenseLocationId: string
   kmValidationMessage: string | null
   selectedLocation: WorkLocationOption | null
   workLocation: WorkLocation
@@ -33,6 +34,7 @@ type CreateClaimSubmitHandlerParams = {
 
 export function createClaimSubmitHandler({
   claimDate,
+  expenseLocationId,
   kmValidationMessage,
   selectedLocation,
   workLocation,
@@ -63,6 +65,13 @@ export function createClaimSubmitHandler({
     if (kmValidationMessage) {
       setError(kmValidationMessage)
       toast.error(kmValidationMessage)
+      return
+    }
+
+    if (!expenseLocationId.trim()) {
+      const message = 'Expense location is required.'
+      setError(message)
+      toast.error(message)
       return
     }
 
@@ -148,6 +157,7 @@ export function createClaimSubmitHandler({
     const payload: ClaimFormValues = {
       claimDate: formatDate(claimDate),
       workLocation,
+      expenseLocationId,
       baseLocationDayTypeCode: requiresVehicleSelection
         ? baseLocationDayTypeCode
         : undefined,

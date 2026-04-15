@@ -16,6 +16,7 @@ import {
   getExpenseRateByType,
   getIntracityAllowanceRateByVehicle,
 } from '@/lib/services/config-service'
+import { getAllExpenseLocations } from '@/lib/services/expense-location-service'
 import { getValidationRuleBoolean } from '@/lib/services/validation-rule-service'
 import type { BaseLocationDayTypeOption } from '@/features/claims/types'
 
@@ -35,15 +36,21 @@ export default async function NewClaimPage() {
   }
 
   // Fetch lookup data from DB
-  const [workLocations, allowedVehicles, states, baseDayTypes] =
-    await Promise.all([
-      getAllWorkLocations(supabase),
-      employee.designation_id
-        ? getVehicleTypesByDesignation(supabase, employee.designation_id)
-        : Promise.resolve([]),
-      getAllStates(supabase),
-      getActiveBaseLocationDayTypes(supabase),
-    ])
+  const [
+    workLocations,
+    expenseLocations,
+    allowedVehicles,
+    states,
+    baseDayTypes,
+  ] = await Promise.all([
+    getAllWorkLocations(supabase),
+    getAllExpenseLocations(supabase),
+    employee.designation_id
+      ? getVehicleTypesByDesignation(supabase, employee.designation_id)
+      : Promise.resolve([]),
+    getAllStates(supabase),
+    getActiveBaseLocationDayTypes(supabase),
+  ])
 
   const workLocationOptions = workLocations
   const allowedVehicleTypes = allowedVehicles.map((vt) => ({
@@ -184,6 +191,7 @@ export default async function NewClaimPage() {
           <ClaimSubmissionForm
             allowedVehicleTypes={allowedVehicleTypes}
             baseLocationDayTypeOptions={baseLocationDayTypeOptions}
+            expenseLocationOptions={expenseLocations}
             workLocationOptions={workLocationOptions}
             stateOptions={stateOptions}
             claimRateSnapshot={claimRateSnapshot}

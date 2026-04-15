@@ -11,6 +11,7 @@ import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summa
 import type {
   BaseLocationDayTypeOption,
   ClaimFormInitialValues,
+  ExpenseLocationOption,
   SelectOption,
   WorkLocation,
   WorkLocationOption,
@@ -19,6 +20,7 @@ import type {
 type ClaimSubmissionFormProps = {
   allowedVehicleTypes: readonly SelectOption[]
   baseLocationDayTypeOptions: readonly BaseLocationDayTypeOption[]
+  expenseLocationOptions: readonly ExpenseLocationOption[]
   workLocationOptions: readonly WorkLocationOption[]
   stateOptions: readonly SelectOption[]
   claimRateSnapshot: ClaimRateSnapshot
@@ -28,6 +30,7 @@ type ClaimSubmissionFormProps = {
 export function ClaimSubmissionForm({
   allowedVehicleTypes,
   baseLocationDayTypeOptions,
+  expenseLocationOptions,
   workLocationOptions,
   stateOptions,
   claimRateSnapshot,
@@ -36,6 +39,7 @@ export function ClaimSubmissionForm({
   const {
     isEditingReturnedClaim,
     workLocation,
+    expenseLocationId,
     claimDate,
     baseLocationDayTypeCode,
     vehicleType,
@@ -56,6 +60,7 @@ export function ClaimSubmissionForm({
     kmValidationMessage,
     summary,
     setWorkLocation,
+    setExpenseLocationId,
     setClaimDate,
     setBaseLocationDayTypeCode,
     setVehicleType,
@@ -71,6 +76,7 @@ export function ClaimSubmissionForm({
   } = useClaimSubmissionForm({
     allowedVehicleTypes,
     baseLocationDayTypeOptions,
+    expenseLocationOptions,
     workLocationOptions,
     claimRateSnapshot,
     initialValues,
@@ -144,6 +150,28 @@ export function ClaimSubmissionForm({
             ))}
           </select>
         </label>
+
+        {selectedLocation ? (
+          <label className="block space-y-2 text-sm">
+            <span className="inline-flex items-center gap-2 font-medium text-foreground">
+              Expense Location
+            </span>
+            <select
+              name="expenseLocationId"
+              value={expenseLocationId}
+              onChange={(event) => setExpenseLocationId(event.target.value)}
+              className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+              required
+            >
+              <option value="">Select Expense Location</option>
+              {expenseLocationOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.location_name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         {selectedLocation?.requires_vehicle_selection ? (
           <BaseLocationFields
