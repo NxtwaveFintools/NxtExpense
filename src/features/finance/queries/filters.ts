@@ -15,12 +15,7 @@ import {
 } from './filter-date-resolvers'
 
 // Re-export submodules for consumers that import from this path
-export {
-  isFinanceActionDateFilterField,
-  getFinanceActionCodesForDateFilter,
-  type FinanceActionDateFilterField,
-} from './filter-date-resolvers'
-export { getFinanceFilterOptions } from './filter-options'
+export { isFinanceActionDateFilterField } from './filter-date-resolvers'
 
 type ClaimFilterScope = {
   /** Pre-fetched UUID of the status that results must be constrained to. */

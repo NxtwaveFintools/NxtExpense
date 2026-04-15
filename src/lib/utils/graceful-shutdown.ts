@@ -2,15 +2,15 @@ type ProcessLike = Pick<NodeJS.Process, 'once' | 'exit'>
 
 type GracefulShutdownLogger = Pick<Console, 'info' | 'warn' | 'error'>
 
-export type GracefulShutdownHandler = () => Promise<void> | void
+type GracefulShutdownHandler = () => Promise<void> | void
 
-export type GracefulShutdownOptions = {
+type GracefulShutdownOptions = {
   processRef?: ProcessLike
   timeoutMs?: number
   logger?: GracefulShutdownLogger
 }
 
-export type GracefulShutdownManager = {
+type GracefulShutdownManager = {
   initialize: (options?: GracefulShutdownOptions) => void
   registerHandler: (
     name: string,

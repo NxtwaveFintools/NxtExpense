@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type MyClaimsMetricSummary = {
+type MyClaimsMetricSummary = {
   count: number
   amount: number
 }
 
-export type MyClaimsStats = {
+type MyClaimsStats = {
   total: MyClaimsMetricSummary
   pending: MyClaimsMetricSummary
   rejected: MyClaimsMetricSummary

@@ -250,17 +250,3 @@ export async function getFinanceHistoryTotalCount(
 
   return count ?? 0
 }
-
-export async function getAllFilteredFinanceHistory(
-  supabase: SupabaseClient,
-  filters: FinanceFilters,
-  batchSize = 200
-): Promise<FinanceHistoryItem[]> {
-  void supabase
-  void filters
-  void batchSize
-
-  throw new Error(
-    'Unbounded getAllFilteredFinanceHistory is disabled. Use getFinanceHistoryPaginated for cursor-based access.'
-  )
-}

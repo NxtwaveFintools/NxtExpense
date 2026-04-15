@@ -1,4 +1,4 @@
-export type ExportMode = 'page' | 'all'
+type ExportMode = 'page' | 'all'
 
 export function getExportMode(value: string | null): ExportMode {
   return value === 'all' ? 'all' : 'page'

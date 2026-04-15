@@ -37,6 +37,11 @@
       "prettier --write"
     ]
   },
+  "knip": {
+    "ignore": [
+      ".uv-python/**"
+    ]
+  },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",

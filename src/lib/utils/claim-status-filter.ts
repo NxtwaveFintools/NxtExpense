@@ -11,14 +11,14 @@ export type ParsedClaimStatusFilter = {
   allowResubmitOnly: boolean
 }
 
-export type ClaimStatusFilterOptionSource = {
+type ClaimStatusFilterOptionSource = {
   id: string
   status_code: string
   status_name: string
   allow_resubmit_status_name: string | null
 }
 
-export type ClaimStatusFilterOption = {
+type ClaimStatusFilterOption = {
   value: string
   label: string
   statusId: string

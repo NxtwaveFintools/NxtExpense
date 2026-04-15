@@ -6,7 +6,7 @@ import {
   type PaginatedResult,
 } from '@/lib/utils/pagination'
 
-export type AdminLogRow = {
+type AdminLogRow = {
   id: string
   admin_id: string
   action_type: string
@@ -19,13 +19,13 @@ export type AdminLogRow = {
   admin_email: string
 }
 
-export type AdminLogFilters = {
+type AdminLogFilters = {
   actionType: string | null
   entityType: string | null
   search: string | null
 }
 
-export type AdminLogFilterOptions = {
+type AdminLogFilterOptions = {
   actionTypes: string[]
   entityTypes: string[]
 }
