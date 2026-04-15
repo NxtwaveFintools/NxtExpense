@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -62,6 +63,9 @@ function formatShortINR(value: number): string {
 type TooltipEntry = {
   name?: string
   value?: number | string
+  payload?: {
+    claimCount?: number
+  }
 }
 
 function ChartTooltip({
@@ -78,11 +82,17 @@ function ChartTooltip({
   }
 
   const value = Number(payload[0]?.value ?? 0)
+  const claimCount = payload[0]?.payload?.claimCount
 
   return (
     <div className="rounded-xl border border-border bg-surface/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
       {label ? <p className="font-semibold text-foreground">{label}</p> : null}
       <p className="mt-1 text-muted-foreground">{formatINR(value)}</p>
+      {typeof claimCount === 'number' ? (
+        <p className="mt-0.5 text-muted-foreground">
+          {claimCount.toLocaleString('en-IN')} claims
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -134,6 +144,7 @@ export function AmountByDesignationChart({
   const chartData = data.map((row) => ({
     label: row.designation_name,
     amount: Number(row.total_amount),
+    claimCount: Number(row.claim_count),
   }))
 
   return (
@@ -185,7 +196,15 @@ export function AmountByDesignationChart({
             fill="url(#designationAmountGradient)"
             radius={[12, 12, 12, 12]}
             barSize={16}
-          />
+          >
+            <LabelList
+              dataKey="claimCount"
+              position="right"
+              fill="#475569"
+              fontSize={11}
+              formatter={(value) => Number(value ?? 0).toLocaleString('en-IN')}
+            />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -211,6 +230,7 @@ export function ClaimsByWorkLocationChart({
   const chartData = data.map((row) => ({
     label: row.location_name,
     amount: Number(row.total_amount),
+    claimCount: Number(row.claim_count),
     fill: getWorkLocationColor(row.location_name),
   }))
 
@@ -244,6 +264,13 @@ export function ClaimsByWorkLocationChart({
             cursor={{ fill: '#f1f5f9', opacity: 0.55 }}
           />
           <Bar dataKey="amount" radius={[12, 12, 0, 0]} barSize={26}>
+            <LabelList
+              dataKey="claimCount"
+              position="top"
+              fill="#475569"
+              fontSize={11}
+              formatter={(value) => Number(value ?? 0).toLocaleString('en-IN')}
+            />
             {chartData.map((entry) => (
               <Cell key={entry.label} fill={entry.fill} />
             ))}

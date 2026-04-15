@@ -59,3 +59,4 @@ test-results/
 .agents
 prod_schema.sql
 test_schema.sql
+supabase/.temp

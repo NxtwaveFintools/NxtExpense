@@ -10,6 +10,10 @@ export type AdminAnalyticsKpi = {
   payment_released_amount: number
   rejected_count: number
   rejected_amount: number
+  rejected_without_reclaim_count?: number
+  rejected_without_reclaim_amount?: number
+  rejected_allow_reclaim_count?: number
+  rejected_allow_reclaim_amount?: number
 }
 
 export type AdminStatusBreakdown = {

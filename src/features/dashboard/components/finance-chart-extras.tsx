@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -33,6 +34,9 @@ function formatShortINR(value: number): string {
 type TooltipEntry = {
   name?: string
   value?: number | string
+  payload?: {
+    claimCount?: number
+  }
 }
 
 function ChartTooltip({
@@ -49,11 +53,17 @@ function ChartTooltip({
   }
 
   const value = Number(payload[0]?.value ?? 0)
+  const claimCount = payload[0]?.payload?.claimCount
 
   return (
     <div className="rounded-xl border border-border bg-surface/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
       {label ? <p className="font-semibold text-foreground">{label}</p> : null}
       <p className="mt-1 text-muted-foreground">{formatINR(value)}</p>
+      {typeof claimCount === 'number' ? (
+        <p className="mt-0.5 text-muted-foreground">
+          {claimCount.toLocaleString('en-IN')} claims
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -101,60 +111,76 @@ export function ClaimsByStateChart({ data }: { data: StateBreakdown[] }) {
   const chartData = data.map((row) => ({
     label: row.state_name,
     amount: Number(row.total_amount),
+    claimCount: Number(row.claim_count),
   }))
+  const minChartWidth = Math.max(640, chartData.length * 92)
 
   return (
     <ChartCard
       title="Claims by State"
       subtitle="State-level reimbursement spend visibility"
     >
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={chartData}>
-          <defs>
-            <linearGradient
-              id="stateAmountGradient"
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.95} />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity={0.85} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid
-            strokeDasharray="2 5"
-            vertical={false}
-            stroke="#cbd5e1"
-            strokeOpacity={0.45}
-          />
-          <XAxis
-            dataKey="label"
-            angle={-20}
-            textAnchor="end"
-            height={60}
-            tick={AXIS_STYLE}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tickFormatter={formatShortINR}
-            tick={AXIS_STYLE}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip
-            content={<ChartTooltip />}
-            cursor={{ fill: '#f1f5f9', opacity: 0.55 }}
-          />
-          <Bar
-            dataKey="amount"
-            fill="url(#stateAmountGradient)"
-            radius={[12, 12, 0, 0]}
-            barSize={22}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="overflow-x-auto pb-1">
+        <div style={{ minWidth: `${minChartWidth}px` }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData}>
+              <defs>
+                <linearGradient
+                  id="stateAmountGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.85} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                strokeDasharray="2 5"
+                vertical={false}
+                stroke="#cbd5e1"
+                strokeOpacity={0.45}
+              />
+              <XAxis
+                dataKey="label"
+                angle={-20}
+                textAnchor="end"
+                height={60}
+                tick={AXIS_STYLE}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={formatShortINR}
+                tick={AXIS_STYLE}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                content={<ChartTooltip />}
+                cursor={{ fill: '#f1f5f9', opacity: 0.55 }}
+              />
+              <Bar
+                dataKey="amount"
+                fill="url(#stateAmountGradient)"
+                radius={[12, 12, 0, 0]}
+                barSize={22}
+              >
+                <LabelList
+                  dataKey="claimCount"
+                  position="top"
+                  fill="#475569"
+                  fontSize={11}
+                  formatter={(value) =>
+                    Number(value ?? 0).toLocaleString('en-IN')
+                  }
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </ChartCard>
   )
 }
