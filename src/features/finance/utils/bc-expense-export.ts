@@ -1,5 +1,6 @@
 import type { FinanceExportProfile } from '@/lib/services/finance-export-config-service'
 import type { FinanceHistoryItem } from '@/features/finance/types'
+import { getCanonicalExportAccountItemType } from '@/features/finance/utils/export-item-type-mapping'
 
 export type ClaimExpenseItemRow = {
   claim_id: string
@@ -60,7 +61,12 @@ export function buildBcExpenseRows({
     const claimItems = claimItemsByClaimId.get(historyRow.claim.id) ?? []
 
     for (const claimItem of claimItems) {
-      const balAccountNo = balAccountNoByItemType.get(claimItem.item_type)
+      const canonicalItemType = getCanonicalExportAccountItemType(
+        claimItem.item_type
+      )
+      const balAccountNo =
+        balAccountNoByItemType.get(canonicalItemType) ??
+        balAccountNoByItemType.get(claimItem.item_type)
 
       if (!balAccountNo) {
         continue

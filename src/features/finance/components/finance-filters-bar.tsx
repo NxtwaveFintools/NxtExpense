@@ -21,6 +21,7 @@ type FinanceFiltersBarProps = {
   heading?: string
   filters: FinanceFilters
   options: FinanceFilterOptions
+  showEmployeeIdFilter?: boolean
   showHodApproverFilter?: boolean
   showClaimStatusFilter?: boolean
   showActionFilter?: boolean
@@ -61,6 +62,7 @@ export function FinanceFiltersBar({
   heading = 'Finance Filters',
   filters,
   options,
+  showEmployeeIdFilter = false,
   showHodApproverFilter = true,
   showClaimStatusFilter = true,
   showActionFilter = true,
@@ -74,6 +76,7 @@ export function FinanceFiltersBar({
 }: FinanceFiltersBarProps) {
   const router = useRouter()
 
+  const [employeeId, setEmployeeId] = useState(filters.employeeId ?? '')
   const [employeeName, setEmployeeName] = useState(filters.employeeName ?? '')
   const [claimNumber, setClaimNumber] = useState(filters.claimNumber ?? '')
   const [ownerDesignation, setOwnerDesignation] = useState(
@@ -114,6 +117,7 @@ export function FinanceFiltersBar({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const params = new URLSearchParams()
+    if (showEmployeeIdFilter && employeeId) params.set('employeeId', employeeId)
     if (employeeName) params.set('employeeName', employeeName)
     if (claimNumber) params.set('claimNumber', claimNumber)
     if (ownerDesignation) params.set('ownerDesignation', ownerDesignation)
@@ -138,6 +142,7 @@ export function FinanceFiltersBar({
   }
 
   function handleClear() {
+    setEmployeeId('')
     setEmployeeName('')
     setClaimNumber('')
     setOwnerDesignation('')
@@ -165,6 +170,19 @@ export function FinanceFiltersBar({
       </h2>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4 md:grid-cols-4">
+        {showEmployeeIdFilter ? (
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Employee ID</span>
+            <input
+              name="employeeId"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              placeholder="Search by employee ID"
+              className={`${inputCls} placeholder:text-muted-foreground`}
+            />
+          </label>
+        ) : null}
+
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">Employee Name</span>
           <EmployeeNameSuggestionInput

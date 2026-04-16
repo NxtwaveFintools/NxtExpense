@@ -1,11 +1,11 @@
 import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
 import { getFinanceHistoryPaginated } from '@/features/finance/queries'
+import { getMappedClaimItemsByClaimId } from '@/features/finance/queries/mapped-claim-items'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import {
   buildBcExpenseRows,
   BC_EXPENSE_CSV_HEADERS,
-  type ClaimExpenseItemRow,
   toCsvLine,
 } from '@/features/finance/utils/bc-expense-export'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -77,64 +77,13 @@ function createStreamingCsvResponse(
   })
 }
 
-function toNormalizedAmount(value: number | string): number {
-  const numericValue = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(numericValue) ? numericValue : 0
-}
-
-async function getClaimItemsForExportChunk(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  claimIds: string[],
-  mappedExpenseItemTypes: string[]
-): Promise<Map<string, ClaimExpenseItemRow[]>> {
-  if (claimIds.length === 0 || mappedExpenseItemTypes.length === 0) {
-    return new Map<string, ClaimExpenseItemRow[]>()
-  }
-
-  const { data, error } = await supabase
-    .from('expense_claim_items')
-    .select('claim_id, item_type, amount')
-    .in('claim_id', claimIds)
-    .in('item_type', mappedExpenseItemTypes)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  const rows = (data ?? []) as Array<{
-    claim_id: string
-    item_type: string
-    amount: number | string
-  }>
-
-  const claimItemsByClaimId = new Map<string, ClaimExpenseItemRow[]>()
-
-  for (const row of rows) {
-    const item: ClaimExpenseItemRow = {
-      claim_id: row.claim_id,
-      item_type: row.item_type,
-      amount: toNormalizedAmount(row.amount),
-    }
-
-    const currentRows = claimItemsByClaimId.get(row.claim_id)
-
-    if (currentRows) {
-      currentRows.push(item)
-      continue
-    }
-
-    claimItemsByClaimId.set(row.claim_id, [item])
-  }
-
-  return claimItemsByClaimId
-}
-
 async function handleExportRequest(request: Request) {
   try {
     const url = new URL(request.url)
     const searchParams = url.searchParams
 
     const filters = normalizeFinanceFilters({
+      employeeId: searchParams.get('employeeId') ?? undefined,
       employeeName: searchParams.get('employeeName') ?? undefined,
       claimNumber: searchParams.get('claimNumber') ?? undefined,
       ownerDesignation: searchParams.get('ownerDesignation') ?? undefined,
@@ -146,11 +95,6 @@ async function handleExportRequest(request: Request) {
       dateFrom: searchParams.get('dateFrom') ?? undefined,
       dateTo: searchParams.get('dateTo') ?? undefined,
     })
-
-    const effectiveFilters = {
-      ...filters,
-      claimStatus: null,
-    }
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -199,14 +143,15 @@ async function handleExportRequest(request: Request) {
           supabase,
           cursor,
           HISTORY_CHUNK_SIZE,
-          effectiveFilters
+          filters,
+          { maxFilteredClaimIds: null }
         )
 
         const claimIds = [
           ...new Set(historyPage.data.map((historyRow) => historyRow.claim.id)),
         ]
 
-        const claimItemsByClaimId = await getClaimItemsForExportChunk(
+        const claimItemsByClaimId = await getMappedClaimItemsByClaimId(
           supabase,
           claimIds,
           mappedExpenseItemTypes

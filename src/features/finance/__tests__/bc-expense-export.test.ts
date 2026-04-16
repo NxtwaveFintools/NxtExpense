@@ -124,10 +124,43 @@ describe('bc expense export util', () => {
     })
 
     expect(rows).toHaveLength(2)
+    expect(rows[0][3]).toBe('NW0004545')
+    expect(rows[1][3]).toBe('NW0004545')
     expect(rows[0][5]).toBe('-120')
     expect(rows[0][8]).toBe('503063')
     expect(rows[1][5]).toBe('-150.50')
     expect(rows[1][8]).toBe('535002')
+  })
+
+  it('maps intercity travel to fuel GL account in BC export rows', () => {
+    const historyRows = [buildHistoryRow('claim-km', 'CLAIM-KM-1')]
+    const claimItemsByClaimId = new Map([
+      [
+        'claim-km',
+        [
+          {
+            claim_id: 'claim-km',
+            item_type: 'intercity_travel',
+            amount: 480,
+          },
+        ],
+      ],
+    ])
+
+    const rows = buildBcExpenseRows({
+      historyRows,
+      claimItemsByClaimId,
+      balAccountNoByItemType: new Map([
+        ['food', '503063'],
+        ['fuel', '535002'],
+      ]),
+      postingDate: '15/04/2026',
+      exportProfile: BC_PROFILE,
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0][5]).toBe('-480')
+    expect(rows[0][8]).toBe('535002')
   })
 
   it('escapes csv rows correctly', () => {

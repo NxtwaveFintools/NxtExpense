@@ -53,28 +53,38 @@ function buildSupabaseWithClaimItems(
       }),
     },
     from: vi.fn((tableName: string) => {
-      if (tableName !== 'expense_claim_items') {
-        throw new Error(`Unexpected table: ${tableName}`)
-      }
+      if (tableName === 'expense_claim_items') {
+        let requestedClaimIds: string[] = []
 
-      let inCallCount = 0
-      const query = {
-        select: vi.fn().mockReturnThis(),
-        in: vi.fn().mockImplementation(() => {
-          inCallCount += 1
+        const query = {
+          select: vi.fn().mockReturnThis(),
+          in: vi.fn().mockImplementation((column: string, values: string[]) => {
+            if (column === 'claim_id') {
+              requestedClaimIds = values
+              return query
+            }
 
-          if (inCallCount === 1) {
+            if (column === 'item_type') {
+              const requestedItemTypes = values
+
+              return Promise.resolve({
+                data: claimItems.filter(
+                  (item) =>
+                    requestedClaimIds.includes(item.claim_id) &&
+                    requestedItemTypes.includes(item.item_type)
+                ),
+                error: null,
+              })
+            }
+
             return query
-          }
+          }),
+        }
 
-          return Promise.resolve({
-            data: claimItems,
-            error: null,
-          })
-        }),
+        return query
       }
 
-      return query
+      throw new Error(`Unexpected table: ${tableName}`)
     }),
   }
 }
@@ -84,6 +94,7 @@ describe('approved-history BC expense export route', () => {
     vi.clearAllMocks()
 
     mocks.normalizeFinanceFilters.mockReturnValue({
+      employeeId: null,
       employeeName: null,
       claimNumber: null,
       ownerDesignation: null,
@@ -161,6 +172,203 @@ describe('approved-history BC expense export route', () => {
     )
     expect(csv).toContain(
       '"15/04/2026","","Employee","NW0001123","ADVANCE","-300","CLAIM-31-03-26-0103","G/L Account","535002","NIAT","NIAT362","PRE-SALES","PRE-SALES","COMMON"'
+    )
+
+    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+      expect.anything(),
+      null,
+      500,
+      expect.objectContaining({
+        claimStatus: null,
+      }),
+      { maxFilteredClaimIds: null }
+    )
+  })
+
+  it('includes KM intercity travel items under fuel GL mapping', async () => {
+    mocks.createSupabaseServerClient.mockResolvedValue(
+      buildSupabaseWithClaimItems([
+        {
+          claim_id: 'claim-km',
+          item_type: 'intercity_travel',
+          amount: 480,
+        },
+      ])
+    )
+
+    mocks.getFinanceHistoryPaginated.mockResolvedValue({
+      data: [
+        {
+          claim: {
+            id: 'claim-km',
+            claim_number: 'CLAIM-KM-001',
+            expense_region_code: 'COMMON',
+          },
+          owner: {
+            employee_id: 'NW0000282',
+          },
+        },
+      ],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 500,
+    })
+
+    const response = await GET(
+      new Request('http://localhost:3000/approved-history/bc-expense-export')
+    )
+
+    expect(response.status).toBe(200)
+
+    const csv = await response.text()
+    expect(csv).toContain(
+      '"15/04/2026","","Employee","NW0000282","ADVANCE","-480","CLAIM-KM-001","G/L Account","535002","NIAT","NIAT362","PRE-SALES","PRE-SALES","COMMON"'
+    )
+  })
+
+  it('keeps applied action filter without overriding claim status', async () => {
+    mocks.normalizeFinanceFilters.mockReturnValueOnce({
+      employeeId: null,
+      employeeName: null,
+      claimNumber: null,
+      ownerDesignation: null,
+      hodApproverEmployeeId: null,
+      claimStatus: null,
+      workLocation: null,
+      actionFilter: 'payment_released',
+      dateFilterField: 'claim_date',
+      dateFrom: null,
+      dateTo: null,
+    })
+
+    mocks.createSupabaseServerClient.mockResolvedValue(
+      buildSupabaseWithClaimItems([
+        { claim_id: 'claim-1', item_type: 'food', amount: 120 },
+      ])
+    )
+
+    mocks.getFinanceHistoryPaginated.mockResolvedValue({
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 500,
+    })
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3000/approved-history/bc-expense-export?actionFilter=payment_released'
+      )
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+      expect.anything(),
+      null,
+      500,
+      expect.objectContaining({
+        claimStatus: null,
+        actionFilter: 'payment_released',
+      }),
+      { maxFilteredClaimIds: null }
+    )
+  })
+
+  it('keeps status scope unset for rejected action filters', async () => {
+    mocks.normalizeFinanceFilters.mockReturnValueOnce({
+      employeeId: null,
+      employeeName: null,
+      claimNumber: null,
+      ownerDesignation: null,
+      hodApproverEmployeeId: null,
+      claimStatus: null,
+      workLocation: null,
+      actionFilter: 'finance_rejected',
+      dateFilterField: 'claim_date',
+      dateFrom: null,
+      dateTo: null,
+    })
+
+    mocks.createSupabaseServerClient.mockResolvedValue(
+      buildSupabaseWithClaimItems([])
+    )
+
+    mocks.getFinanceHistoryPaginated.mockResolvedValue({
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 500,
+    })
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3000/approved-history/bc-expense-export?actionFilter=finance_rejected'
+      )
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+      expect.anything(),
+      null,
+      500,
+      expect.objectContaining({
+        claimStatus: null,
+        actionFilter: 'finance_rejected',
+      }),
+      { maxFilteredClaimIds: null }
+    )
+  })
+
+  it('forwards applied employee and date filters to history query', async () => {
+    mocks.normalizeFinanceFilters.mockReturnValueOnce({
+      employeeId: 'NW0000282',
+      employeeName: null,
+      claimNumber: null,
+      ownerDesignation: null,
+      hodApproverEmployeeId: null,
+      claimStatus: null,
+      workLocation: null,
+      actionFilter: null,
+      dateFilterField: 'claim_date',
+      dateFrom: '2026-04-10',
+      dateTo: '2026-04-16',
+    })
+
+    mocks.createSupabaseServerClient.mockResolvedValue(
+      buildSupabaseWithClaimItems([])
+    )
+
+    mocks.getFinanceHistoryPaginated.mockResolvedValue({
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 500,
+    })
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3000/approved-history/bc-expense-export?employeeId=NW0000282&dateFrom=2026-04-10&dateTo=2026-04-16'
+      )
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.normalizeFinanceFilters).toHaveBeenCalledWith(
+      expect.objectContaining({
+        employeeId: 'NW0000282',
+        dateFrom: '2026-04-10',
+        dateTo: '2026-04-16',
+      })
+    )
+    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+      expect.anything(),
+      null,
+      500,
+      expect.objectContaining({
+        employeeId: 'NW0000282',
+        dateFrom: '2026-04-10',
+        dateTo: '2026-04-16',
+        claimStatus: null,
+      }),
+      { maxFilteredClaimIds: null }
     )
   })
 

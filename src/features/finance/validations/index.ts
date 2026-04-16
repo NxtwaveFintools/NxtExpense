@@ -59,6 +59,7 @@ export const bulkFinanceActionSchema = z.object({
 
 export const financeFiltersSchema = z
   .object({
+    employeeId: z.string().trim().max(50).optional(),
     employeeName: z.string().trim().max(100).optional(),
     claimNumber: z.string().trim().max(50).optional(),
     ownerDesignation: z.string().trim().max(100).optional(),

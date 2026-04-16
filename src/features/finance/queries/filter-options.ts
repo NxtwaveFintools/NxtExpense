@@ -9,6 +9,11 @@ import {
   getAllWorkLocations,
 } from '@/lib/services/config-service'
 import { buildClaimStatusFilterOptions } from '@/lib/utils/claim-status-filter'
+import {
+  hasRejectFinanceActionCode,
+  REJECTED_ALLOW_RECLAIM_ACTION_FILTER_LABEL,
+  REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
+} from '@/features/finance/utils/action-filter'
 
 function formatDesignationLabel(name: string, abbreviation: string): string {
   return abbreviation ? `${name} (${abbreviation})` : name
@@ -133,6 +138,13 @@ export async function getFinanceFilterOptions(
       label: formatFinanceActionLabel(code),
     })
   )
+
+  if (hasRejectFinanceActionCode(financeActionCodes)) {
+    financeActions.push({
+      value: REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
+      label: REJECTED_ALLOW_RECLAIM_ACTION_FILTER_LABEL,
+    })
+  }
 
   if (hodEmployeeIds.length === 0) {
     return {

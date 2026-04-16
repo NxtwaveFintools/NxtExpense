@@ -17,6 +17,7 @@ import {
   isFinanceActionDateFilterField,
   getFinanceActionCodesForDateFilter,
 } from './filter-date-resolvers'
+import { getFinanceActionCodesForFilter } from '@/features/finance/utils/action-filter'
 import { getFilteredClaimIdsForFinance } from './filters'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 import {
@@ -87,7 +88,13 @@ export async function getFinanceHistoryPaginated(
 
     query = query.in('action', dateFilterActions)
   } else if (filters.actionFilter) {
-    query = query.eq('action', filters.actionFilter)
+    const actionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
+
+    if (actionCodes.length > 1) {
+      query = query.in('action', actionCodes)
+    } else {
+      query = query.eq('action', actionCodes[0])
+    }
   }
 
   if (filterByFinanceActionDate) {

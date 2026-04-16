@@ -6,6 +6,7 @@ import type {
   FinanceQueueItem,
 } from '@/features/finance/types'
 import { financeFiltersSchema } from '@/features/finance/validations'
+import { shouldForceAllowResubmitFromActionFilter } from './action-filter'
 
 type FinanceFilterInput = Partial<
   Record<keyof FinanceFilters, string | undefined>
@@ -33,6 +34,7 @@ export function normalizeFinanceFilters(
   const value = parsed.data
 
   return {
+    employeeId: normalizeText(value.employeeId),
     employeeName: normalizeText(value.employeeName),
     claimNumber: normalizeText(value.claimNumber),
     ownerDesignation: normalizeText(value.ownerDesignation),
@@ -48,11 +50,13 @@ export function normalizeFinanceFilters(
 
 export function hasFinanceClaimFilters(filters: FinanceFilters): boolean {
   return Boolean(
+    filters.employeeId ||
     filters.employeeName ||
     filters.claimNumber ||
     filters.ownerDesignation ||
     filters.hodApproverEmployeeId ||
     filters.claimStatus ||
+    shouldForceAllowResubmitFromActionFilter(filters.actionFilter) ||
     filters.workLocation ||
     filters.dateFrom ||
     filters.dateTo
@@ -63,6 +67,10 @@ export function addFinanceFiltersToParams(
   params: URLSearchParams,
   filters: FinanceFilters
 ): URLSearchParams {
+  if (filters.employeeId) {
+    params.set('employeeId', filters.employeeId)
+  }
+
   if (filters.employeeName) {
     params.set('employeeName', filters.employeeName)
   }

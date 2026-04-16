@@ -6,6 +6,7 @@ import {
   toIstDayEnd,
   toIstDayStart,
 } from '@/features/finance/utils/filters'
+import { shouldForceAllowResubmitFromActionFilter } from '@/features/finance/utils/action-filter'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 import {
@@ -180,6 +181,15 @@ export async function getFilteredClaimIdsForFinance(
     supabase,
     parsedStatusFilter
   )
+  const actionFilterAllowResubmit = shouldForceAllowResubmitFromActionFilter(
+    filters.actionFilter
+  )
+
+  const effectiveAllowResubmitFilter =
+    allowResubmitFilter !== null
+      ? allowResubmitFilter
+      : actionFilterAllowResubmit
+
   const allowResubmitOnlyStatusFilter = allowResubmitFilter === true
 
   if (scope.requiredStatusId && filters.claimStatus) {
@@ -275,7 +285,7 @@ export async function getFilteredClaimIdsForFinance(
     let query = supabase
       .from('expense_claims')
       .select(
-        'id, created_at, employees!employee_id!inner(employee_name, designation_id)'
+        'id, created_at, employees!employee_id!inner(employee_id, employee_name, designation_id)'
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -285,12 +295,19 @@ export async function getFilteredClaimIdsForFinance(
       query = query.eq('status_id', statusId)
     }
 
+    if (filters.employeeId) {
+      query = query.ilike(
+        'employees.employee_id',
+        toLikePattern(filters.employeeId)
+      )
+    }
+
     if (dateScopedStatusIds) {
       query = query.in('status_id', dateScopedStatusIds)
     }
 
-    if (allowResubmitFilter !== null) {
-      query = query.eq('allow_resubmit', allowResubmitFilter)
+    if (effectiveAllowResubmitFilter !== null) {
+      query = query.eq('allow_resubmit', effectiveAllowResubmitFilter)
     }
 
     if (filters.employeeName) {

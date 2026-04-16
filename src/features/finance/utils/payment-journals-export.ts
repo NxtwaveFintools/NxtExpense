@@ -120,6 +120,7 @@ type BuildRowsInput = {
 
 type AccumulateEmployeeTotalsInput = {
   historyRows: FinanceHistoryItem[]
+  claimItemsByClaimId: Map<string, Array<{ amount: number }>>
   seenClaimIds: Set<string>
   totalsByEmployeeId: EmployeeTotalMap
 }
@@ -135,6 +136,7 @@ function addEmployeeTotal(
 
 export function accumulatePaymentJournalsEmployeeTotals({
   historyRows,
+  claimItemsByClaimId,
   seenClaimIds,
   totalsByEmployeeId,
 }: AccumulateEmployeeTotalsInput) {
@@ -146,10 +148,21 @@ export function accumulatePaymentJournalsEmployeeTotals({
     }
 
     seenClaimIds.add(claimId)
+    const mappedClaimItems = claimItemsByClaimId.get(claimId) ?? []
+
+    if (mappedClaimItems.length === 0) {
+      continue
+    }
+
+    const mappedClaimTotal = mappedClaimItems.reduce(
+      (sum, item) => sum + item.amount,
+      0
+    )
+
     addEmployeeTotal(
       totalsByEmployeeId,
       historyRow.owner.employee_id,
-      historyRow.claim.total_amount
+      mappedClaimTotal
     )
   }
 }
