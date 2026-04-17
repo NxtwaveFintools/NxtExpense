@@ -46,6 +46,10 @@ function getDateFilterFieldLabel(field: FinanceDateFilterField): string {
     return 'Submission Date'
   }
 
+  if (field === 'hod_approved_date') {
+    return 'HOD Approved Date'
+  }
+
   if (field === 'finance_approved_date') {
     return 'Finance Approved Date'
   }

@@ -77,6 +77,16 @@ describe('finance validation schemas', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('accepts hod_approved_date filter values', () => {
+    const parsed = financeFiltersSchema.safeParse({
+      dateFilterField: 'hod_approved_date',
+      dateFrom: '07/03/2026',
+      dateTo: '08/03/2026',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
   it('accepts payment_released_date filter values', () => {
     const parsed = financeFiltersSchema.safeParse({
       dateFilterField: 'payment_released_date',

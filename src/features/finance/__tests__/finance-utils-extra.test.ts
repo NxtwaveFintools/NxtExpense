@@ -74,6 +74,19 @@ describe('finance filter serialization', () => {
     expect(params.get('dateFrom')).toBe('2026-03-01')
     expect(params.get('dateTo')).toBe('2026-03-07')
   })
+
+  it('serializes hod_approved_date in URL params', () => {
+    const params = addFinanceFiltersToParams(new URLSearchParams(), {
+      ...BASE_FILTERS,
+      dateFilterField: 'hod_approved_date',
+      dateFrom: '2026-03-01',
+      dateTo: '2026-03-07',
+    })
+
+    expect(params.get('dateFilterField')).toBe('hod_approved_date')
+    expect(params.get('dateFrom')).toBe('2026-03-01')
+    expect(params.get('dateTo')).toBe('2026-03-07')
+  })
 })
 
 describe('finance date helpers', () => {
