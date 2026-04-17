@@ -124,18 +124,48 @@ describe('finance pending export route', () => {
       dateTo: null,
     })
 
+    mocks.normalizeFinanceFilters.mockReturnValueOnce({
+      employeeName: null,
+      claimNumber: null,
+      ownerDesignation: null,
+      hodApproverEmployeeId: null,
+      claimStatus: null,
+      workLocation: null,
+      actionFilter: null,
+      dateFilterField: 'hod_approved_date',
+      dateFrom: null,
+      dateTo: null,
+    })
+
     await GET(
       new Request(
         'http://localhost:3000/finance/pending-export?mode=page&dateFilterField=submitted_at'
       )
     )
 
-    expect(mocks.getFinanceQueuePaginated).toHaveBeenCalledWith(
+    await GET(
+      new Request(
+        'http://localhost:3000/finance/pending-export?mode=page&dateFilterField=hod_approved_date'
+      )
+    )
+
+    expect(mocks.getFinanceQueuePaginated).toHaveBeenNthCalledWith(
+      1,
       expect.anything(),
       null,
       10,
       expect.objectContaining({
         dateFilterField: 'submitted_at',
+      })
+    )
+
+    expect(mocks.getFinanceQueuePaginated).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      null,
+      10,
+      expect.objectContaining({
+        dateFilterField: 'hod_approved_date',
       })
     )
   })

@@ -22,6 +22,7 @@ import { createStreamingCsvResponse } from '@/lib/utils/streaming-export'
 const PENDING_CLAIMS_DATE_FILTER_OPTIONS: FinanceDateFilterField[] = [
   'claim_date',
   'submitted_at',
+  'hod_approved_date',
 ]
 
 const PENDING_CLAIMS_DATE_FILTER_OPTION_SET = new Set(

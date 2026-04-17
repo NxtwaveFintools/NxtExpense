@@ -228,6 +228,15 @@ describe('financeFiltersSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('accepts hod_approved_date date range input', () => {
+    const parsed = financeFiltersSchema.safeParse({
+      dateFilterField: 'hod_approved_date',
+      dateFrom: '08/03/2026',
+      dateTo: '10/03/2026',
+    })
+    expect(parsed.success).toBe(true)
+  })
+
   it('accepts payment_released_date date range input', () => {
     const parsed = financeFiltersSchema.safeParse({
       dateFilterField: 'payment_released_date',
@@ -324,6 +333,16 @@ describe('normalizeFinanceFilters', () => {
   it('preserves payment released ISO dates', () => {
     const result = normalizeFinanceFilters({
       dateFilterField: 'payment_released_date',
+      dateFrom: '2026-03-01',
+      dateTo: '2026-03-07',
+    })
+    expect(result.dateFrom).toBe('2026-03-01')
+    expect(result.dateTo).toBe('2026-03-07')
+  })
+
+  it('preserves hod approved ISO dates', () => {
+    const result = normalizeFinanceFilters({
+      dateFilterField: 'hod_approved_date',
       dateFrom: '2026-03-01',
       dateTo: '2026-03-07',
     })

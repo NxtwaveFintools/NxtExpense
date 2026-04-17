@@ -6,6 +6,7 @@ export type FinanceActionFilter = string | null
 export type FinanceDateFilterField =
   | 'claim_date'
   | 'submitted_at'
+  | 'hod_approved_date'
   | 'finance_approved_date'
   | 'payment_released_date'
 

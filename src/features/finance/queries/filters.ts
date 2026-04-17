@@ -114,9 +114,13 @@ async function collectActionClaimIds(
 
 async function collectHodClaimIds(
   supabase: SupabaseClient,
-  approverEmployeeId: string,
   financeReviewStatusId: string,
-  maxClaimIds: number | null
+  maxClaimIds: number | null,
+  options: {
+    approverEmployeeId?: string | null
+    actedAtFrom?: string | null
+    actedAtTo?: string | null
+  } = {}
 ): Promise<string[]> {
   const claimIds = new Set<string>()
   let cursor: { acted_at: string; id: string } | null = null
@@ -125,11 +129,22 @@ async function collectHodClaimIds(
     let query = supabase
       .from('approval_history')
       .select('id, acted_at, claim_id')
-      .eq('approver_employee_id', approverEmployeeId)
       .eq('new_status_id', financeReviewStatusId)
       .order('acted_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(FILTER_BATCH_SIZE)
+
+    if (options.approverEmployeeId) {
+      query = query.eq('approver_employee_id', options.approverEmployeeId)
+    }
+
+    if (options.actedAtFrom) {
+      query = query.gte('acted_at', options.actedAtFrom)
+    }
+
+    if (options.actedAtTo) {
+      query = query.lte('acted_at', options.actedAtTo)
+    }
 
     if (cursor) {
       query = query.or(
@@ -208,6 +223,9 @@ export async function getFilteredClaimIdsForFinance(
   let dateScopedStatusIds: string[] | null = null
   let financeDateClaimIds: string[] | null = null
   let hodClaimIds: string[] | null = null
+  const filterByHodApprovedDate =
+    filters.dateFilterField === 'hod_approved_date' &&
+    (filters.dateFrom || filters.dateTo)
 
   if (
     isFinanceActionDateFilterField(filters.dateFilterField) &&
@@ -252,7 +270,7 @@ export async function getFilteredClaimIdsForFinance(
     }
   }
 
-  if (filters.hodApproverEmployeeId) {
+  if (filters.hodApproverEmployeeId || filterByHodApprovedDate) {
     const { data: financeReviewStatus } = await supabase
       .from('claim_statuses')
       .select('id')
@@ -266,11 +284,22 @@ export async function getFilteredClaimIdsForFinance(
       return []
     }
 
+    const hodApprovedDateFrom = filterByHodApprovedDate
+      ? toIstDayStart(filters.dateFrom)
+      : null
+    const hodApprovedDateTo = filterByHodApprovedDate
+      ? toIstDayEnd(filters.dateTo)
+      : null
+
     hodClaimIds = await collectHodClaimIds(
       supabase,
-      filters.hodApproverEmployeeId,
       financeReviewStatus.id,
-      maxClaimIds
+      maxClaimIds,
+      {
+        approverEmployeeId: filters.hodApproverEmployeeId,
+        actedAtFrom: hodApprovedDateFrom,
+        actedAtTo: hodApprovedDateTo,
+      }
     )
 
     if (hodClaimIds.length === 0) {

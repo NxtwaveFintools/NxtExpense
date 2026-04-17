@@ -52,6 +52,18 @@ describe('finance filter utilities', () => {
     expect(normalized.dateTo).toBe('2026-03-08')
   })
 
+  it('normalizes hod_approved_date filter values', () => {
+    const normalized = normalizeFinanceFilters({
+      dateFilterField: 'hod_approved_date',
+      dateFrom: '07/03/2026',
+      dateTo: '08/03/2026',
+    })
+
+    expect(normalized.dateFilterField).toBe('hod_approved_date')
+    expect(normalized.dateFrom).toBe('2026-03-07')
+    expect(normalized.dateTo).toBe('2026-03-08')
+  })
+
   it('normalizes payment_released_date filter values', () => {
     const normalized = normalizeFinanceFilters({
       dateFilterField: 'payment_released_date',
