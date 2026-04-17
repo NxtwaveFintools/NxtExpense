@@ -8,5 +8,4 @@ export {
 export {
   getFinanceHistoryPaginated,
   getFinanceHistoryTotalCount,
-  getAllFilteredFinanceHistory,
 } from './finance-history'

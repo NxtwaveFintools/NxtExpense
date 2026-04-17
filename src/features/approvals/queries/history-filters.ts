@@ -232,20 +232,6 @@ export async function getFilteredApprovalHistoryPaginated(
   }
 }
 
-export async function getAllFilteredApprovalHistory(
-  supabase: SupabaseClient,
-  filters: ApprovalHistoryFilters,
-  batchSize = 200
-): Promise<ApprovalHistoryRecord[]> {
-  void supabase
-  void filters
-  void batchSize
-
-  throw new Error(
-    'Unbounded getAllFilteredApprovalHistory is disabled. Use getFilteredApprovalHistoryPaginated for cursor-based access.'
-  )
-}
-
 function toNumericCount(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(0, Math.trunc(value))

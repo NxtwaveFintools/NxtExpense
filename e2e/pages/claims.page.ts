@@ -125,6 +125,10 @@ export class ClaimsPage {
     return this.page.locator('select[name="workLocation"]')
   }
 
+  get expenseLocationSelect() {
+    return this.page.locator('select[name="expenseLocationId"]')
+  }
+
   get vehicleTypeSelect() {
     return this.page.locator('select[name="vehicleType"]')
   }
@@ -241,8 +245,44 @@ export class ClaimsPage {
     return this.readWorkLocationOptions()
   }
 
+  async ensureExpenseLocationSelected(timeoutMs = 5_000) {
+    const select = this.expenseLocationSelect.first()
+    const selectCount = await this.expenseLocationSelect.count().catch(() => 0)
+
+    if (selectCount === 0) {
+      return
+    }
+
+    await select.waitFor({ state: 'visible', timeout: timeoutMs })
+
+    const currentValue = (await select.inputValue().catch(() => '')).trim()
+    if (currentValue) {
+      return
+    }
+
+    const options = select.locator('option')
+    const optionCount = await options.count()
+
+    for (let index = 0; index < optionCount; index += 1) {
+      const option = options.nth(index)
+      const value = (await option.getAttribute('value'))?.trim() ?? ''
+
+      if (!value) {
+        continue
+      }
+
+      await select.selectOption({ value })
+      return
+    }
+  }
+
+  async selectExpenseLocationByValue(value: string) {
+    await this.expenseLocationSelect.selectOption({ value })
+  }
+
   async selectWorkLocationByValue(value: string) {
     await this.workLocationSelect.selectOption({ value })
+    await this.ensureExpenseLocationSelected()
   }
 
   async selectWorkLocationByName(locationName: string) {

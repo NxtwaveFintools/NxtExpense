@@ -17,6 +17,7 @@ import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queri
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
+import { getPendingApprovalScopeByActor } from '@/features/approvals/queries/pending-scope'
 
 function buildClaimDateCursorFilter(
   claimDate: string,
@@ -93,24 +94,23 @@ export async function getPendingApprovalsPaginated(
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  // L1: actor is the level-1 approver for these employees (SBH for SRO/BOA/ABH)
-  // L2: actor is the level-3 approver (Mansoor's UUID is stored in approval_employee_id_level_3)
-  const [level1Employees, level2Employees] = await Promise.all([
-    supabase
-      .from('employees')
-      .select('id')
-      .eq('approval_employee_id_level_1', actorEmployeeId),
-    supabase
-      .from('employees')
-      .select('id')
-      .eq('approval_employee_id_level_3', actorEmployeeId),
-  ])
+  const pendingScope = await getPendingApprovalScopeByActor(
+    supabase,
+    actorEmployeeId
+  )
 
-  if (level1Employees.error) throw new Error(level1Employees.error.message)
-  if (level2Employees.error) throw new Error(level2Employees.error.message)
+  // L1 action scope comes from explicit level-1 assignments.
+  // ZBH users additionally receive read-only L1 visibility for employees
+  // where they are assigned as level-2 (zonal scope) approver.
+  const level1Ids = [
+    ...new Set([
+      ...pendingScope.level1ActionEmployeeIds,
+      ...pendingScope.level1ViewOnlyEmployeeIds,
+    ]),
+  ]
 
-  const level1Ids = (level1Employees.data ?? []).map((row) => row.id)
-  const level2Ids = (level2Employees.data ?? []).map((row) => row.id)
+  // L2 action scope is still derived from level-3 assignee mapping.
+  const level2Ids = pendingScope.level2ActionEmployeeIds
 
   const toInList = (ids: string[]) =>
     ids.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(',')

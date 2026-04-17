@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
-  Claim,
   ClaimHistoryEntry,
   MyClaimsFilters,
   ClaimItem,
@@ -23,11 +22,7 @@ export {
   getClaimAvailableActions,
   getClaimAvailableActionsByClaimIds,
 } from './claim-actions'
-export {
-  getMyClaimsStats,
-  type MyClaimsMetricSummary,
-  type MyClaimsStats,
-} from './claim-stats'
+export { getMyClaimsStats } from './claim-stats'
 
 const DEFAULT_MY_CLAIMS_FILTERS: MyClaimsFilters = {
   claimStatus: null,
@@ -264,22 +259,6 @@ export async function getClaimHistory(
       approver_name: r.approver?.employee_name ?? null,
     } as ClaimHistoryEntry
   })
-}
-
-export async function getAllFilteredMyClaims(
-  supabase: SupabaseClient,
-  employeeId: string,
-  filters: MyClaimsFilters,
-  batchSize = 200
-): Promise<Claim[]> {
-  void supabase
-  void employeeId
-  void filters
-  void batchSize
-
-  throw new Error(
-    'Unbounded getAllFilteredMyClaims is disabled. Use getMyClaimsPaginated for cursor-based access.'
-  )
 }
 
 export async function getMyClaimsTotalCount(

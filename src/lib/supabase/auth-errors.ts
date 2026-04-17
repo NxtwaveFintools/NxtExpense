@@ -29,9 +29,7 @@ function includesAnyHint(
   return hints.some((hint) => normalizedValue.includes(hint))
 }
 
-export function isSupabaseAuthError(
-  error: unknown
-): error is SupabaseAuthErrorLike {
+function isSupabaseAuthError(error: unknown): error is SupabaseAuthErrorLike {
   if (!error || typeof error !== 'object') return false
 
   const authError = error as SupabaseAuthErrorLike

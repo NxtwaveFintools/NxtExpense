@@ -17,6 +17,7 @@ import {
   isFinanceActionDateFilterField,
   getFinanceActionCodesForDateFilter,
 } from './filter-date-resolvers'
+import { getFinanceActionCodesForFilter } from '@/features/finance/utils/action-filter'
 import { getFilteredClaimIdsForFinance } from './filters'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 import {
@@ -26,15 +27,21 @@ import {
   normalizeFinanceOwner,
 } from './finance-shared'
 
+type FinanceHistoryPaginationOptions = {
+  maxFilteredClaimIds?: number | null
+}
+
 export async function getFinanceHistoryPaginated(
   supabase: SupabaseClient,
   cursor: string | null,
   limit = 10,
-  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS,
+  options: FinanceHistoryPaginationOptions = {}
 ): Promise<PaginatedFinanceHistory> {
   const filteredClaimIds = await getFilteredClaimIdsForFinance(
     supabase,
-    filters
+    filters,
+    { maxClaimIds: options.maxFilteredClaimIds }
   )
 
   if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
@@ -81,7 +88,13 @@ export async function getFinanceHistoryPaginated(
 
     query = query.in('action', dateFilterActions)
   } else if (filters.actionFilter) {
-    query = query.eq('action', filters.actionFilter)
+    const actionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
+
+    if (actionCodes.length > 1) {
+      query = query.in('action', actionCodes)
+    } else {
+      query = query.eq('action', actionCodes[0])
+    }
   }
 
   if (filterByFinanceActionDate) {
@@ -249,18 +262,4 @@ export async function getFinanceHistoryTotalCount(
   }
 
   return count ?? 0
-}
-
-export async function getAllFilteredFinanceHistory(
-  supabase: SupabaseClient,
-  filters: FinanceFilters,
-  batchSize = 200
-): Promise<FinanceHistoryItem[]> {
-  void supabase
-  void filters
-  void batchSize
-
-  throw new Error(
-    'Unbounded getAllFilteredFinanceHistory is disabled. Use getFinanceHistoryPaginated for cursor-based access.'
-  )
 }

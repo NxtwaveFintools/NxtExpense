@@ -50,6 +50,7 @@ function optionalNonEmptyStringField() {
 export const claimSubmissionSchema = z.object({
   claimDate: claimDateSchema,
   workLocation: z.string().trim().min(1, 'Work location is required.'),
+  expenseLocationId: optionalNonEmptyStringField(),
   baseLocationDayTypeCode: optionalNonEmptyStringField(),
   ownVehicleUsed: z.boolean().optional(),
   hasIntercityTravel: z.boolean().optional(),

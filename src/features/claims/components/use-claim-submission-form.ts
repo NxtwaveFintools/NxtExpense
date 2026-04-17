@@ -19,6 +19,7 @@ import type {
   BaseLocationDayTypeOption,
   CityOption,
   ClaimFormInitialValues,
+  ExpenseLocationOption,
   IntracityVehicleMode,
   SelectOption,
   VehicleType,
@@ -29,6 +30,7 @@ import type {
 type UseClaimSubmissionFormArgs = {
   allowedVehicleTypes: readonly SelectOption[]
   baseLocationDayTypeOptions: readonly BaseLocationDayTypeOption[]
+  expenseLocationOptions: readonly ExpenseLocationOption[]
   workLocationOptions: readonly WorkLocationOption[]
   claimRateSnapshot: ClaimRateSnapshot
   initialValues?: ClaimFormInitialValues | null
@@ -37,6 +39,7 @@ type UseClaimSubmissionFormArgs = {
 export function useClaimSubmissionForm({
   allowedVehicleTypes,
   baseLocationDayTypeOptions,
+  expenseLocationOptions,
   workLocationOptions,
   claimRateSnapshot,
   initialValues,
@@ -56,6 +59,9 @@ export function useClaimSubmissionForm({
 
   const [workLocation, setWorkLocation] =
     useState<WorkLocation>(initialWorkLocation)
+  const [expenseLocationId, setExpenseLocationId] = useState(
+    initialValues?.expenseLocationId ?? expenseLocationOptions[0]?.id ?? ''
+  )
   const [claimDate, setClaimDate] = useState(
     initialValues?.claimDateIso ?? dayjs().format('YYYY-MM-DD')
   )
@@ -216,6 +222,7 @@ export function useClaimSubmissionForm({
 
   const handleSubmit = createClaimSubmitHandler({
     claimDate,
+    expenseLocationId,
     kmValidationMessage,
     selectedLocation,
     workLocation,
@@ -239,6 +246,7 @@ export function useClaimSubmissionForm({
   return {
     isEditingReturnedClaim,
     workLocation,
+    expenseLocationId,
     claimDate,
     baseLocationDayTypeCode,
     vehicleType,
@@ -261,6 +269,7 @@ export function useClaimSubmissionForm({
     kmValidationMessage,
     summary,
     setWorkLocation,
+    setExpenseLocationId,
     setClaimDate,
     setBaseLocationDayTypeCode,
     setVehicleType,

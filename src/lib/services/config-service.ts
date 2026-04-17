@@ -50,7 +50,7 @@ export type VehicleType = {
   is_active: boolean
 }
 
-export type BaseLocationDayType = {
+type BaseLocationDayType = {
   day_type_code: string
   day_type_label: string
   include_food_allowance: boolean
@@ -120,17 +120,6 @@ export async function getAllStates(supabase: SupabaseClient): Promise<State[]> {
 
   if (error) throw new Error(`Failed to fetch states: ${error.message}`)
   return data as State[]
-}
-
-export async function getAllCities(supabase: SupabaseClient): Promise<City[]> {
-  const { data, error } = await supabase
-    .from('cities')
-    .select('id, city_name, state_id')
-    .eq('is_active', true)
-    .order('city_name')
-
-  if (error) throw new Error(`Failed to fetch cities: ${error.message}`)
-  return data as City[]
 }
 
 export async function getCitiesByState(

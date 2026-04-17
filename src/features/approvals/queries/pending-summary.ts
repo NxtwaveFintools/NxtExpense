@@ -4,6 +4,7 @@ import type { PendingApprovalsFilters } from '@/features/approvals/types'
 import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
+import { getPendingApprovalScopeByActor } from '@/features/approvals/queries/pending-scope'
 
 type PendingApprovalsSummary = {
   count: number
@@ -86,27 +87,18 @@ export async function getPendingApprovalsSummary(
 
   const actorEmployeeId = actorResult.data.id
 
-  const [level1Employees, level2Employees] = await Promise.all([
-    supabase
-      .from('employees')
-      .select('id')
-      .eq('approval_employee_id_level_1', actorEmployeeId),
-    supabase
-      .from('employees')
-      .select('id')
-      .eq('approval_employee_id_level_3', actorEmployeeId),
-  ])
+  const pendingScope = await getPendingApprovalScopeByActor(
+    supabase,
+    actorEmployeeId
+  )
 
-  if (level1Employees.error) {
-    throw new Error(level1Employees.error.message)
-  }
-
-  if (level2Employees.error) {
-    throw new Error(level2Employees.error.message)
-  }
-
-  const level1Ids = (level1Employees.data ?? []).map((row) => row.id)
-  const level2Ids = (level2Employees.data ?? []).map((row) => row.id)
+  const level1Ids = [
+    ...new Set([
+      ...pendingScope.level1ActionEmployeeIds,
+      ...pendingScope.level1ViewOnlyEmployeeIds,
+    ]),
+  ]
+  const level2Ids = pendingScope.level2ActionEmployeeIds
 
   if (level1Ids.length === 0 && level2Ids.length === 0) {
     return { count: 0, amount: 0 }

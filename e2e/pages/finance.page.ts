@@ -128,6 +128,18 @@ export class FinancePage {
     return this.page.locator('[data-testid="finance-history-row"]')
   }
 
+  get approvedHistoryAllCsvButton() {
+    return this.page.getByRole('button', { name: /^All CSV$/i })
+  }
+
+  get approvedHistoryBcExpenseButton() {
+    return this.page.getByRole('button', { name: /^BC Expense$/i })
+  }
+
+  get approvedHistoryPaymentJournalsButton() {
+    return this.page.getByRole('button', { name: /^Payment Journals$/i })
+  }
+
   getHistoryRowByClaimNumber(claimNumber: string) {
     return this.historyRows.filter({ hasText: claimNumber }).first()
   }

@@ -13,6 +13,7 @@ import {
   getDefaultBaseLocationDayType,
   getDesignationApprovalFlow,
 } from '@/lib/services/config-service'
+import { getExpenseLocationById } from '@/lib/services/expense-location-service'
 import {
   calculateBaseLocationItems,
   calculateOutstationTravelItems,
@@ -255,6 +256,25 @@ export async function submitClaimAction(
     }
 
     const workLocationId = wlFlags.id
+
+    if (!input.expenseLocationId) {
+      return {
+        ok: false,
+        error: 'Expense location is required.',
+      }
+    }
+
+    const expenseLocation = await getExpenseLocationById(
+      supabase,
+      input.expenseLocationId
+    )
+
+    if (!expenseLocation) {
+      return {
+        ok: false,
+        error: 'Unknown expense location.',
+      }
+    }
 
     const hasIntercitySelection =
       typeof input.intercityOwnVehicleUsed === 'boolean'
@@ -646,6 +666,7 @@ export async function submitClaimAction(
           employeeId: employee.id,
           claimDateIso: input.claimDate.iso,
           workLocationId,
+          expenseLocationId: expenseLocation.id,
           baseLocationDayTypeCode: isBaseLocation
             ? (resolvedBaseLocationDayType?.day_type_code ?? null)
             : null,
@@ -715,6 +736,7 @@ export async function submitClaimAction(
         employeeId: employee.id,
         claimDateIso: input.claimDate.iso,
         workLocationId,
+        expenseLocationId: expenseLocation.id,
         baseLocationDayTypeCode: isBaseLocation
           ? (resolvedBaseLocationDayType?.day_type_code ?? null)
           : null,

@@ -1,6 +1,7 @@
 import type { FinanceFilters, FinanceOwner } from '@/features/finance/types'
 
 export const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
+  employeeId: null,
   employeeName: null,
   claimNumber: null,
   ownerDesignation: null,

@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceFilters } from '@/features/finance/types'
 import {
+  getFinanceActionCodesForFilter,
+  REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
+} from '@/features/finance/utils/action-filter'
+import {
   getFilteredClaimIdsForFinance,
   isFinanceActionDateFilterField,
 } from '@/features/finance/queries/filters'
@@ -16,10 +20,12 @@ type FinanceHistoryAnalytics = {
   total: ClaimMetricSummary
   approvedHistory: ClaimMetricSummary
   rejected: ClaimMetricSummary
+  rejectedAllowReclaim: ClaimMetricSummary
   other: ClaimMetricSummary
 }
 
 const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
+  employeeId: null,
   employeeName: null,
   claimNumber: null,
   ownerDesignation: null,
@@ -53,6 +59,10 @@ type FinanceHistoryMetricsRow = {
   approved_amount: number | string | null
   rejected_count: number | string | null
   rejected_amount: number | string | null
+  rejected_without_reclaim_count?: number | string | null
+  rejected_without_reclaim_amount?: number | string | null
+  rejected_allow_reclaim_count?: number | string | null
+  rejected_allow_reclaim_amount?: number | string | null
   other_count: number | string | null
   other_amount: number | string | null
 }
@@ -66,6 +76,7 @@ function createEmptyAnalytics(): FinanceHistoryAnalytics {
     total: createMetricSummary(),
     approvedHistory: createMetricSummary(),
     rejected: createMetricSummary(),
+    rejectedAllowReclaim: createMetricSummary(),
     other: createMetricSummary(),
   }
 }
@@ -208,18 +219,28 @@ export async function getFinanceHistoryAnalytics(
     return analytics
   }
 
+  const actionFilterCodes = filterByFinanceActionDate
+    ? [...dateScopedActions]
+    : getFinanceActionCodesForFilter(filters.actionFilter)
+
+  const actionFilterCodesOrNull =
+    actionFilterCodes.length > 0 ? actionFilterCodes : null
+
+  const actionFilterForRpc =
+    !filterByFinanceActionDate && actionFilterCodes.length === 1
+      ? actionFilterCodes[0]
+      : null
+
   const { data: metricsData, error: metricsError } = await supabase.rpc(
     'get_finance_history_action_metrics',
     {
       p_claim_ids: Array.isArray(filteredClaimIds) ? filteredClaimIds : null,
-      p_action_filter: filterByFinanceActionDate ? null : filters.actionFilter,
+      p_action_filter: actionFilterForRpc,
       p_date_from: filterByFinanceActionDate
         ? toIstDayStart(filters.dateFrom)
         : null,
       p_date_to: filterByFinanceActionDate ? toIstDayEnd(filters.dateTo) : null,
-      p_date_scoped_actions: filterByFinanceActionDate
-        ? [...dateScopedActions]
-        : null,
+      p_date_scoped_actions: actionFilterCodesOrNull,
       p_approved_actions: [...approvedActions],
       p_rejected_actions: [...rejectedActions],
     }
@@ -237,6 +258,22 @@ export async function getFinanceHistoryAnalytics(
     return analytics
   }
 
+  const isReclaimOnlyActionFilter =
+    filters.actionFilter === REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE
+
+  const rejectedWithoutReclaimCount =
+    metrics.rejected_without_reclaim_count ??
+    (isReclaimOnlyActionFilter ? 0 : metrics.rejected_count)
+  const rejectedWithoutReclaimAmount =
+    metrics.rejected_without_reclaim_amount ??
+    (isReclaimOnlyActionFilter ? 0 : metrics.rejected_amount)
+  const rejectedAllowReclaimCount =
+    metrics.rejected_allow_reclaim_count ??
+    (isReclaimOnlyActionFilter ? metrics.rejected_count : 0)
+  const rejectedAllowReclaimAmount =
+    metrics.rejected_allow_reclaim_amount ??
+    (isReclaimOnlyActionFilter ? metrics.rejected_amount : 0)
+
   return {
     total: {
       count: toNumber(metrics.total_count),
@@ -247,8 +284,12 @@ export async function getFinanceHistoryAnalytics(
       amount: toNumber(metrics.approved_amount),
     },
     rejected: {
-      count: toNumber(metrics.rejected_count),
-      amount: toNumber(metrics.rejected_amount),
+      count: toNumber(rejectedWithoutReclaimCount),
+      amount: toNumber(rejectedWithoutReclaimAmount),
+    },
+    rejectedAllowReclaim: {
+      count: toNumber(rejectedAllowReclaimCount),
+      amount: toNumber(rejectedAllowReclaimAmount),
     },
     other: {
       count: toNumber(metrics.other_count),

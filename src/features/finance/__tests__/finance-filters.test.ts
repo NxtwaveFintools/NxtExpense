@@ -6,6 +6,7 @@ import {
   toIstDayEnd,
   toIstDayStart,
 } from '@/features/finance/utils/filters'
+import { REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE } from '@/features/finance/utils/action-filter'
 
 const VALID_STATUS_ID = '3ae9b558-c006-427d-8ce6-13057d438d17'
 
@@ -25,6 +26,7 @@ describe('finance filter utilities', () => {
     })
 
     expect(normalized).toEqual({
+      employeeId: null,
       employeeName: 'Rahul',
       claimNumber: 'CLAIM-001',
       ownerDesignation: 'Program Manager',
@@ -62,6 +64,14 @@ describe('finance filter utilities', () => {
     expect(normalized.dateTo).toBe('2026-03-08')
   })
 
+  it('normalizes employeeId filter values', () => {
+    const normalized = normalizeFinanceFilters({
+      employeeId: '  NW0000282  ',
+    })
+
+    expect(normalized.employeeId).toBe('NW0000282')
+  })
+
   it('detects whether claim-level filters are active', () => {
     expect(
       hasFinanceClaimFilters(
@@ -84,6 +94,14 @@ describe('finance filter utilities', () => {
         normalizeFinanceFilters({
           dateFilterField: 'claim_date',
           dateFrom: '2026-03-07',
+        })
+      )
+    ).toBe(true)
+
+    expect(
+      hasFinanceClaimFilters(
+        normalizeFinanceFilters({
+          actionFilter: REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
         })
       )
     ).toBe(true)

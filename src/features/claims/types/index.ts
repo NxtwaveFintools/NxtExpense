@@ -17,6 +17,11 @@ export type BaseLocationDayTypeOption = {
   isDefault: boolean
 }
 
+export type ExpenseLocationOption = {
+  id: string
+  location_name: string
+}
+
 /** City dropdown option with parent state linkage for dynamic filtering */
 export type CityOption = SelectOption & { stateId: string }
 
@@ -29,6 +34,9 @@ export type Claim = {
   employee_id: string
   claim_date: string
   work_location: WorkLocation
+  expense_location_id?: string | null
+  expense_location_name?: string | null
+  expense_region_code?: string | null
   base_location_day_type_code?: string | null
   own_vehicle_used: boolean | null
   vehicle_type: VehicleType | null
@@ -82,6 +90,7 @@ export type ClaimWithItems = {
 export type ClaimFormValues = {
   claimDate: string
   workLocation: WorkLocation
+  expenseLocationId?: string
   baseLocationDayTypeCode?: string
   ownVehicleUsed?: boolean
   hasIntercityTravel?: boolean
@@ -103,6 +112,7 @@ export type ClaimFormValues = {
 export type ClaimFormInitialValues = {
   claimDateIso: string
   workLocation: WorkLocation
+  expenseLocationId?: string | null
   baseLocationDayTypeCode?: string | null
   vehicleType?: VehicleType | null
   ownVehicleUsed?: boolean | null

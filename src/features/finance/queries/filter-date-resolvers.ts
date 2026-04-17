@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceDateFilterField } from '@/features/finance/types'
 
-export type FinanceActionDateFilterField = Extract<
+type FinanceActionDateFilterField = Extract<
   FinanceDateFilterField,
   'finance_approved_date' | 'payment_released_date'
 >

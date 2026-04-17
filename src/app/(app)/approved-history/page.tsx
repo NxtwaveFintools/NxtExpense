@@ -38,6 +38,7 @@ type ApprovedHistoryPageProps = {
     historyCursor?: string
     historyTrail?: string
     pageSize?: string
+    employeeId?: string
     employeeName?: string
     claimNumber?: string
     ownerDesignation?: string
@@ -65,6 +66,7 @@ export default async function ApprovedHistoryPage({
   const resolvedSearch = await searchParams
 
   const rawFilters = {
+    employeeId: resolvedSearch?.employeeId,
     employeeName: resolvedSearch?.employeeName,
     claimNumber: resolvedSearch?.claimNumber,
     ownerDesignation: resolvedSearch?.ownerDesignation,
@@ -93,6 +95,7 @@ export default async function ApprovedHistoryPage({
   }
 
   const normalizedFilterParams = {
+    employeeId: effectiveFilters.employeeId ?? undefined,
     employeeName: effectiveFilters.employeeName ?? undefined,
     claimNumber: effectiveFilters.claimNumber ?? undefined,
     ownerDesignation: effectiveFilters.ownerDesignation ?? undefined,
@@ -172,26 +175,15 @@ export default async function ApprovedHistoryPage({
     })
   )
 
-  const currentPageCsvParams = addFinanceFiltersToParams(
-    new URLSearchParams(),
-    effectiveFilters
-  )
-  currentPageCsvParams.set('mode', 'page')
-  if (historyCursor) {
-    currentPageCsvParams.set('historyCursor', historyCursor)
-  }
-  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
-    currentPageCsvParams.set('pageSize', String(pageSize))
-  }
-
   const allRowsCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
   )
   allRowsCsvParams.set('mode', 'all')
 
-  const exportCurrentPageHref = `/approved-history/export?${currentPageCsvParams.toString()}`
   const exportAllHref = `/approved-history/export?${allRowsCsvParams.toString()}`
+  const exportBcExpenseHref = `/approved-history/bc-expense-export?${allRowsCsvParams.toString()}`
+  const exportPaymentJournalsHref = `/approved-history/payment-journals-export?${allRowsCsvParams.toString()}`
 
   return (
     <>
@@ -204,10 +196,12 @@ export default async function ApprovedHistoryPage({
               heading="Approved History Filters"
               filters={effectiveFilters}
               options={filterOptions}
+              showEmployeeIdFilter
               showHodApproverFilter={false}
               showClaimStatusFilter={false}
-              exportCurrentPageHref={exportCurrentPageHref}
-              exportAllHref={exportAllHref}
+              approvedHistoryExportAllHref={exportAllHref}
+              approvedHistoryBcExpenseHref={exportBcExpenseHref}
+              approvedHistoryPaymentJournalsHref={exportPaymentJournalsHref}
             />
             <ClaimAnalyticsCards
               cards={[
@@ -228,6 +222,12 @@ export default async function ApprovedHistoryPage({
                   count: analytics.rejected.count,
                   amount: analytics.rejected.amount,
                   tone: 'rejected',
+                },
+                {
+                  label: 'Rejected & Allow Reclaim',
+                  count: analytics.rejectedAllowReclaim.count,
+                  amount: analytics.rejectedAllowReclaim.amount,
+                  tone: 'pending',
                 },
                 {
                   label: 'Other Actions',

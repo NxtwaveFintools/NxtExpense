@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type AdminFinanceOverview = {
+type AdminFinanceOverview = {
   totalClaims: {
     count: number
     amount: number

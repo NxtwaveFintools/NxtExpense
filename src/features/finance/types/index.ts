@@ -46,6 +46,7 @@ export type FinanceHistoryItem = {
 export type PaginatedFinanceHistory = PaginatedResult<FinanceHistoryItem>
 
 export type FinanceFilters = {
+  employeeId?: string | null
   employeeName: string | null
   claimNumber: string | null
   ownerDesignation: string | null

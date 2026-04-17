@@ -49,10 +49,6 @@ export function getActiveTrackedRequestCount(): number {
   return activeRequestCount
 }
 
-export function isShutdownRequestDrainInProgress(): boolean {
-  return shutdownInProgress
-}
-
 export function startShutdownRequestDrain(
   logger: ShutdownRequestLogger = console
 ): void {

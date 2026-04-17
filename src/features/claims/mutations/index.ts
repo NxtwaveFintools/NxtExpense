@@ -6,6 +6,7 @@ type ClaimPayload = {
   employeeId: string
   claimDateIso: string
   workLocationId: string | null
+  expenseLocationId: string | null
   baseLocationDayTypeCode: string | null
   ownVehicleUsed: boolean | null
   hasIntercityTravel: boolean
@@ -43,6 +44,7 @@ export async function insertClaim(
     employee_id: input.employeeId,
     claim_date: input.claimDateIso,
     work_location_id: input.workLocationId,
+    expense_location_id: input.expenseLocationId,
     base_location_day_type_code: input.baseLocationDayTypeCode,
     own_vehicle_used: input.ownVehicleUsed,
     has_intercity_travel: input.hasIntercityTravel,

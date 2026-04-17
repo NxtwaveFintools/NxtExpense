@@ -29,6 +29,7 @@ async function handleExportRequest(request: Request) {
     const pageSize = normalizeCursorPageSize(searchParams.get('pageSize'))
 
     const filters = normalizeFinanceFilters({
+      employeeId: searchParams.get('employeeId') ?? undefined,
       employeeName: searchParams.get('employeeName') ?? undefined,
       claimNumber: searchParams.get('claimNumber') ?? undefined,
       ownerDesignation: searchParams.get('ownerDesignation') ?? undefined,

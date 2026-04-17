@@ -79,6 +79,14 @@ export function ClaimDetail({
         </div>
         <div className="space-y-1 rounded-md border border-border bg-background p-4">
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Expense Location
+          </dt>
+          <dd className="font-medium">
+            {claim.expense_location_name ?? 'N/A'}
+          </dd>
+        </div>
+        <div className="space-y-1 rounded-md border border-border bg-background p-4">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Total
           </dt>
           <dd className="font-mono text-lg font-semibold">

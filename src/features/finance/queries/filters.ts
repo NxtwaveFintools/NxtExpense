@@ -6,6 +6,7 @@ import {
   toIstDayEnd,
   toIstDayStart,
 } from '@/features/finance/utils/filters'
+import { shouldForceAllowResubmitFromActionFilter } from '@/features/finance/utils/action-filter'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 import {
@@ -15,16 +16,13 @@ import {
 } from './filter-date-resolvers'
 
 // Re-export submodules for consumers that import from this path
-export {
-  isFinanceActionDateFilterField,
-  getFinanceActionCodesForDateFilter,
-  type FinanceActionDateFilterField,
-} from './filter-date-resolvers'
-export { getFinanceFilterOptions } from './filter-options'
+export { isFinanceActionDateFilterField } from './filter-date-resolvers'
 
 type ClaimFilterScope = {
   /** Pre-fetched UUID of the status that results must be constrained to. */
   requiredStatusId?: string
+  /** Optional cap for collected claim IDs. Set to null to disable. */
+  maxClaimIds?: number | null
 }
 
 type CursorRow = {
@@ -46,10 +44,10 @@ function toLikePattern(value: string): string {
   return `%${escaped}%`
 }
 
-function assertClaimIdLimit(size: number) {
-  if (size > MAX_FILTERED_CLAIM_IDS) {
+function assertClaimIdLimit(size: number, maxClaimIds: number | null) {
+  if (maxClaimIds !== null && size > maxClaimIds) {
     throw new Error(
-      `Filter result too large (${size}). Please narrow filters to under ${MAX_FILTERED_CLAIM_IDS} claims.`
+      `Filter result too large (${size}). Please narrow filters to under ${maxClaimIds} claims.`
     )
   }
 }
@@ -58,7 +56,8 @@ async function collectActionClaimIds(
   supabase: SupabaseClient,
   actions: string[],
   dateFrom: string | null,
-  dateTo: string | null
+  dateTo: string | null,
+  maxClaimIds: number | null
 ): Promise<string[]> {
   const claimIds = new Set<string>()
   let cursor: { acted_at: string; id: string } | null = null
@@ -100,7 +99,7 @@ async function collectActionClaimIds(
       }
     }
 
-    assertClaimIdLimit(claimIds.size)
+    assertClaimIdLimit(claimIds.size, maxClaimIds)
 
     if (rows.length < FILTER_BATCH_SIZE) {
       break
@@ -116,7 +115,8 @@ async function collectActionClaimIds(
 async function collectHodClaimIds(
   supabase: SupabaseClient,
   approverEmployeeId: string,
-  financeReviewStatusId: string
+  financeReviewStatusId: string,
+  maxClaimIds: number | null
 ): Promise<string[]> {
   const claimIds = new Set<string>()
   let cursor: { acted_at: string; id: string } | null = null
@@ -151,7 +151,7 @@ async function collectHodClaimIds(
       }
     }
 
-    assertClaimIdLimit(claimIds.size)
+    assertClaimIdLimit(claimIds.size, maxClaimIds)
 
     if (rows.length < FILTER_BATCH_SIZE) {
       break
@@ -169,6 +169,9 @@ export async function getFilteredClaimIdsForFinance(
   filters: FinanceFilters,
   scope: ClaimFilterScope = {}
 ): Promise<string[] | null> {
+  const maxClaimIds =
+    scope.maxClaimIds === undefined ? MAX_FILTERED_CLAIM_IDS : scope.maxClaimIds
+
   if (!hasFinanceClaimFilters(filters)) {
     return null
   }
@@ -178,6 +181,15 @@ export async function getFilteredClaimIdsForFinance(
     supabase,
     parsedStatusFilter
   )
+  const actionFilterAllowResubmit = shouldForceAllowResubmitFromActionFilter(
+    filters.actionFilter
+  )
+
+  const effectiveAllowResubmitFilter =
+    allowResubmitFilter !== null
+      ? allowResubmitFilter
+      : actionFilterAllowResubmit
+
   const allowResubmitOnlyStatusFilter = allowResubmitFilter === true
 
   if (scope.requiredStatusId && filters.claimStatus) {
@@ -231,7 +243,8 @@ export async function getFilteredClaimIdsForFinance(
       supabase,
       dateFilterActions,
       dateFrom,
-      dateTo
+      dateTo,
+      maxClaimIds
     )
 
     if (financeDateClaimIds.length === 0) {
@@ -256,7 +269,8 @@ export async function getFilteredClaimIdsForFinance(
     hodClaimIds = await collectHodClaimIds(
       supabase,
       filters.hodApproverEmployeeId,
-      financeReviewStatus.id
+      financeReviewStatus.id,
+      maxClaimIds
     )
 
     if (hodClaimIds.length === 0) {
@@ -271,7 +285,7 @@ export async function getFilteredClaimIdsForFinance(
     let query = supabase
       .from('expense_claims')
       .select(
-        'id, created_at, employees!employee_id!inner(employee_name, designation_id)'
+        'id, created_at, employees!employee_id!inner(employee_id, employee_name, designation_id)'
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -281,12 +295,19 @@ export async function getFilteredClaimIdsForFinance(
       query = query.eq('status_id', statusId)
     }
 
+    if (filters.employeeId) {
+      query = query.ilike(
+        'employees.employee_id',
+        toLikePattern(filters.employeeId)
+      )
+    }
+
     if (dateScopedStatusIds) {
       query = query.in('status_id', dateScopedStatusIds)
     }
 
-    if (allowResubmitFilter !== null) {
-      query = query.eq('allow_resubmit', allowResubmitFilter)
+    if (effectiveAllowResubmitFilter !== null) {
+      query = query.eq('allow_resubmit', effectiveAllowResubmitFilter)
     }
 
     if (filters.employeeName) {
@@ -359,7 +380,7 @@ export async function getFilteredClaimIdsForFinance(
       }
     }
 
-    assertClaimIdLimit(claimIds.size)
+    assertClaimIdLimit(claimIds.size, maxClaimIds)
 
     if (rows.length < FILTER_BATCH_SIZE) {
       break

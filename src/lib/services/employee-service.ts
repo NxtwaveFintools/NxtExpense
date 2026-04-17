@@ -182,12 +182,18 @@ export async function hasApproverAssignments(
 
   const approverId = approverRow.id
 
-  // Check L1 and L3 (L2 is org-hierarchy only, skipped in routing)
-  const [level1, level3] = await Promise.all([
+  // Check L1, L2, and L3 assignments.
+  // L2 actors (for example ZBH) can have read-only approvals visibility.
+  const [level1, level2, level3] = await Promise.all([
     supabase
       .from('employees')
       .select('id')
       .eq('approval_employee_id_level_1', approverId)
+      .limit(1),
+    supabase
+      .from('employees')
+      .select('id')
+      .eq('approval_employee_id_level_2', approverId)
       .limit(1),
     supabase
       .from('employees')
@@ -197,7 +203,12 @@ export async function hasApproverAssignments(
   ])
 
   if (level1.error) throw new Error(level1.error.message)
+  if (level2.error) throw new Error(level2.error.message)
   if (level3.error) throw new Error(level3.error.message)
 
-  return (level1.data?.length ?? 0) > 0 || (level3.data?.length ?? 0) > 0
+  return (
+    (level1.data?.length ?? 0) > 0 ||
+    (level2.data?.length ?? 0) > 0 ||
+    (level3.data?.length ?? 0) > 0
+  )
 }
