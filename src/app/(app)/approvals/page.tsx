@@ -180,14 +180,7 @@ export default async function ApprovalsPage({
     getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
     getClaimStatusCatalog(supabase),
     getApprovalStageAnalytics(supabase, user.email ?? '', {
-      employeeName: normalizedFilters.employeeName,
-      claimStatus: normalizedFilters.claimStatus,
-      claimDateFrom: normalizedFilters.claimDateFrom,
-      claimDateTo: normalizedFilters.claimDateTo,
-      amountOperator: normalizedFilters.amountOperator,
-      amountValue: normalizedFilters.amountValue,
-      locationType: normalizedFilters.locationType,
-      claimDateSort: normalizedFilters.claimDateSort,
+      ...normalizedFilters,
     }),
     getFilteredApprovalHistoryCount(supabase, normalizedFilters),
   ])

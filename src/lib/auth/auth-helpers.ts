@@ -10,6 +10,8 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
     'Your email domain is not authorized. Please use a corporate email.',
   auth_verification_failed:
     'Unable to verify your session right now. Please try again.',
+  inactive_employee:
+    'Your employee access is inactive. Please contact your administrator.',
 }
 
 function parseBooleanEnvironmentValue(

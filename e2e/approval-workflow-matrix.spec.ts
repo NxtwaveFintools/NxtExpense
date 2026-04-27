@@ -1,10 +1,8 @@
 import { type Page } from '@playwright/test'
 import { test, expect } from './fixtures/auth'
 import {
-  ABH_TAMIL_NADU,
   BOA_KARNATAKA,
   FINANCE_1,
-  FINANCE_2,
   PM_MANSOOR,
   SBH_AP,
   SBH_KARNATAKA,
@@ -374,13 +372,13 @@ test.describe
     })
   })
 
-  test('Standard Flow 4: ABH Tamil Nadu -> SBH TN/Kerala -> Mansoor -> Finance', async ({
+  test('Direct Flow 5: SBH TN/Kerala (Hari) -> Mansoor -> Finance', async ({
     page,
     loginAs,
   }) => {
     await runWorkflowPath(page, loginAs, {
-      submitterEmail: ABH_TAMIL_NADU.email,
-      level1ApproverEmail: SBH_TN_KERALA.email,
+      submitterEmail: SBH_TN_KERALA.email,
+      level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
       financeEmail: FINANCE_1.email,
     })
@@ -394,7 +392,7 @@ test.describe
       submitterEmail: SBH_AP.email,
       level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
-      financeEmail: FINANCE_2.email,
+      financeEmail: FINANCE_1.email,
     })
   })
 
@@ -406,7 +404,7 @@ test.describe
       submitterEmail: SBH_KARNATAKA.email,
       level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
-      financeEmail: FINANCE_2.email,
+      financeEmail: FINANCE_1.email,
     })
   })
 
@@ -418,7 +416,7 @@ test.describe
       submitterEmail: ZBH_MULTI_STATE.email,
       level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
-      financeEmail: FINANCE_2.email,
+      financeEmail: FINANCE_1.email,
     })
   })
 

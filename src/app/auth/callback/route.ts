@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
-import { getEmployeeByEmail } from '@/lib/services/employee-service'
+import { getEmployeeAccessByEmail } from '@/lib/services/employee-service'
 import { sanitizeRedirectPath } from '@/lib/utils/session-utils'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -41,9 +41,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const employee = await getEmployeeByEmail(supabase, user.email)
-    if (!employee) {
+    const { accessState } = await getEmployeeAccessByEmail(supabase, user.email)
+
+    if (accessState === 'missing') {
       return NextResponse.redirect(new URL('/no-access', requestUrl.origin))
+    }
+
+    if (accessState === 'inactive') {
+      await supabase.auth.signOut()
+      return NextResponse.redirect(
+        new URL('/login?error=inactive_employee', requestUrl.origin)
+      )
     }
   } catch {
     return NextResponse.redirect(

@@ -171,6 +171,7 @@ export function buildPaymentJournalsRows({
     .sort(([firstEmployeeId], [secondEmployeeId]) =>
       firstEmployeeId.localeCompare(secondEmployeeId)
     )
+    .filter(([, totalAmount]) => toAmountString(totalAmount) !== '0.00')
     .map(([employeeId, totalAmount]) => [
       '',
       defaults.documentType,

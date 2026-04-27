@@ -31,6 +31,8 @@ export type EmployeeRole = {
   role_name: string
 }
 
+export type EmployeeAccessState = 'active' | 'inactive' | 'missing'
+
 // ────────────────────────────────────────────────────────────
 // Column selection
 // ────────────────────────────────────────────────────────────
@@ -55,7 +57,7 @@ function isTransientFetchError(message: string): boolean {
 // Core lookups
 // ────────────────────────────────────────────────────────────
 
-export async function getEmployeeByEmail(
+async function getEmployeeRecordByEmail(
   supabase: SupabaseClient,
   email: string
 ): Promise<EmployeeRow | null> {
@@ -81,6 +83,50 @@ export async function getEmployeeByEmail(
   }
 
   throw new Error('Employee lookup failed unexpectedly.')
+}
+
+export function isEmployeeActive(
+  employee: EmployeeRow | null | undefined
+): employee is EmployeeRow {
+  if (!employee) {
+    return false
+  }
+
+  return (employee.employee_statuses?.status_code ?? 'ACTIVE') === 'ACTIVE'
+}
+
+export async function getEmployeeAccessByEmail(
+  supabase: SupabaseClient,
+  email: string
+): Promise<{
+  employee: EmployeeRow | null
+  accessState: EmployeeAccessState
+}> {
+  const employee = await getEmployeeRecordByEmail(supabase, email)
+
+  if (!employee) {
+    return {
+      employee: null,
+      accessState: 'missing',
+    }
+  }
+
+  return {
+    employee,
+    accessState: isEmployeeActive(employee) ? 'active' : 'inactive',
+  }
+}
+
+export async function getEmployeeByEmail(
+  supabase: SupabaseClient,
+  email: string
+): Promise<EmployeeRow | null> {
+  const { employee, accessState } = await getEmployeeAccessByEmail(
+    supabase,
+    email
+  )
+
+  return accessState === 'active' ? employee : null
 }
 
 export async function getEmployeeById(

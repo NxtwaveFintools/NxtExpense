@@ -188,6 +188,23 @@ describe('payment journals export util', () => {
     expect(line).toBe('"alpha","x""y","value,with,comma"')
   })
 
+  it('excludes rows where payable amount is zero', () => {
+    const defaults = resolvePaymentJournalsDefaults(PROFILE)
+    const totalsByEmployeeId = new Map<string, number>([
+      ['NW0001211', 0],
+      ['NW0004546', 700],
+    ])
+
+    const rows = buildPaymentJournalsRows({
+      totalsByEmployeeId,
+      defaults,
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0][5]).toBe('NW0004546')
+    expect(rows[0][15]).toBe('700.00')
+  })
+
   it('throws when required profile fields are missing', () => {
     expect(() =>
       resolvePaymentJournalsDefaults({

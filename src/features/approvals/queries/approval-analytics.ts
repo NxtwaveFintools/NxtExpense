@@ -1,8 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { PendingApprovalsFilters } from '@/features/approvals/types'
+import type { ApprovalHistoryFilters } from '@/features/approvals/types'
 import { getPendingApprovalsSummary } from '@/features/approvals/queries/pending-summary'
-import { getLocationIdsByApprovalLocationType } from '@/features/approvals/queries/location-type'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
 import { resolveClaimAllowResubmitFilterValue } from '@/lib/services/claim-status-filter-service'
 
@@ -19,25 +18,16 @@ type ApprovalAnalytics = {
   rejectedClaims: ClaimMetricSummary
 }
 
-type ApprovalActionRow = {
-  claim_id: string
-  action: string
-  acted_at: string
+type ApprovalHistoryAnalyticsRow = {
+  approved_count: number | string | null
+  approved_amount: number | string | null
+  payment_issued_count: number | string | null
+  payment_issued_amount: number | string | null
+  rejected_count: number | string | null
+  rejected_amount: number | string | null
 }
 
-type ClaimAmountRow = {
-  id: string
-  total_amount: number | string
-  status_id: string
-  allow_resubmit: boolean
-}
-
-type ClaimStatusRow = {
-  id: string
-  is_payment_issued: boolean
-}
-
-const DEFAULT_PENDING_FILTERS: PendingApprovalsFilters = {
+const DEFAULT_APPROVAL_ANALYTICS_FILTERS: ApprovalHistoryFilters = {
   employeeName: null,
   claimStatus: null,
   claimDateFrom: null,
@@ -46,6 +36,10 @@ const DEFAULT_PENDING_FILTERS: PendingApprovalsFilters = {
   amountValue: null,
   locationType: null,
   claimDateSort: 'desc',
+  hodApprovedFrom: null,
+  hodApprovedTo: null,
+  financeApprovedFrom: null,
+  financeApprovedTo: null,
 }
 
 function createMetricSummary(): ClaimMetricSummary {
@@ -69,197 +63,92 @@ function sumMetric(metric: ClaimMetricSummary): number {
   return metric.amount
 }
 
-async function resolveLocationIds(
-  supabase: SupabaseClient,
-  locationType: PendingApprovalsFilters['locationType']
-): Promise<string[] | null> {
-  return getLocationIdsByApprovalLocationType(supabase, locationType)
-}
-
-async function getFilteredClaimsByIds(
-  supabase: SupabaseClient,
-  claimIds: string[],
-  filters: PendingApprovalsFilters,
-  scopedLocationIds: string[] | null
-): Promise<ClaimAmountRow[]> {
-  if (claimIds.length === 0) {
-    return []
+function toMetricValue(value: number | string | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
   }
 
-  let query = supabase
-    .from('expense_claims')
-    .select(
-      'id, total_amount, status_id, allow_resubmit, employees!employee_id!inner(employee_name)'
-    )
-    .in('id', claimIds)
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
 
+  return 0
+}
+
+async function getApprovalHistoryAnalyticsSummary(
+  supabase: SupabaseClient,
+  filters: ApprovalHistoryFilters
+): Promise<
+  Pick<
+    ApprovalAnalytics,
+    'approvedClaims' | 'paymentIssuedClaims' | 'rejectedClaims'
+  >
+> {
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
   const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
     supabase,
     parsedStatusFilter
   )
 
-  if (parsedStatusFilter) {
-    query = query.eq('status_id', parsedStatusFilter.statusId)
-  }
-
-  if (allowResubmitFilter !== null) {
-    query = query.eq('allow_resubmit', allowResubmitFilter)
-  }
-
-  if (filters.claimDateFrom) {
-    query = query.gte('claim_date', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    query = query.lte('claim_date', filters.claimDateTo)
-  }
-
-  if (filters.amountValue !== null) {
-    if (filters.amountOperator === 'gte') {
-      query = query.gte('total_amount', filters.amountValue)
-    } else if (filters.amountOperator === 'eq') {
-      query = query.eq('total_amount', filters.amountValue)
-    } else {
-      query = query.lte('total_amount', filters.amountValue)
-    }
-  }
-
-  const normalizedName = filters.employeeName?.trim() ?? ''
-  if (normalizedName) {
-    const escapedName = normalizedName
-      .replaceAll('%', '\\%')
-      .replaceAll('_', '\\_')
-    query = query.ilike('employees.employee_name', `%${escapedName}%`)
-  }
-
-  if (scopedLocationIds) {
-    if (scopedLocationIds.length === 0) {
-      return []
-    }
-
-    query = query.in('work_location_id', scopedLocationIds)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await supabase.rpc('get_approval_history_analytics', {
+    p_name_search: filters.employeeName,
+    p_claim_status_id: parsedStatusFilter?.statusId ?? null,
+    p_claim_allow_resubmit: allowResubmitFilter,
+    p_amount_operator: filters.amountOperator,
+    p_amount_value: filters.amountValue,
+    p_location_type: filters.locationType,
+    p_claim_date_from: filters.claimDateFrom,
+    p_claim_date_to: filters.claimDateTo,
+    p_hod_approved_from: filters.hodApprovedFrom,
+    p_hod_approved_to: filters.hodApprovedTo,
+    p_finance_approved_from: filters.financeApprovedFrom,
+    p_finance_approved_to: filters.financeApprovedTo,
+  })
 
   if (error) {
     throw new Error(error.message)
   }
 
-  return (data ?? []) as ClaimAmountRow[]
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | ApprovalHistoryAnalyticsRow
+    | null
+    | undefined
+
+  return {
+    approvedClaims: {
+      count: toMetricValue(row?.approved_count),
+      amount: toMetricValue(row?.approved_amount),
+    },
+    paymentIssuedClaims: {
+      count: toMetricValue(row?.payment_issued_count),
+      amount: toMetricValue(row?.payment_issued_amount),
+    },
+    rejectedClaims: {
+      count: toMetricValue(row?.rejected_count),
+      amount: toMetricValue(row?.rejected_amount),
+    },
+  }
 }
 
 export async function getApprovalStageAnalytics(
   supabase: SupabaseClient,
   approverEmail: string,
-  filters: PendingApprovalsFilters = DEFAULT_PENDING_FILTERS
+  filters: ApprovalHistoryFilters = DEFAULT_APPROVAL_ANALYTICS_FILTERS
 ): Promise<ApprovalAnalytics> {
   const analytics = createEmptyAnalytics()
 
-  analytics.pendingApprovals = await getPendingApprovalsSummary(
-    supabase,
-    approverEmail,
-    filters
-  )
+  const [pendingApprovals, historySummary] = await Promise.all([
+    getPendingApprovalsSummary(supabase, approverEmail, filters),
+    getApprovalHistoryAnalyticsSummary(supabase, filters),
+  ])
 
-  const { data: actorRow, error: actorError } = await supabase
-    .from('employees')
-    .select('id')
-    .eq('employee_email', approverEmail.toLowerCase())
-    .maybeSingle()
-
-  if (actorError) {
-    throw new Error(actorError.message)
-  }
-
-  if (!actorRow) {
-    analytics.total.count = analytics.pendingApprovals.count
-    analytics.total.amount = analytics.pendingApprovals.amount
-    return analytics
-  }
-
-  const { data: statusRows, error: statusError } = await supabase
-    .from('claim_statuses')
-    .select('id, is_payment_issued')
-    .eq('is_active', true)
-
-  if (statusError) {
-    throw new Error(statusError.message)
-  }
-
-  const paymentIssuedStatusIds = new Set(
-    ((statusRows ?? []) as ClaimStatusRow[])
-      .filter((status) => status.is_payment_issued)
-      .map((status) => status.id)
-  )
-
-  const { data: actionRows, error: actionError } = await supabase
-    .from('approval_history')
-    .select('claim_id, action, acted_at')
-    .eq('approver_employee_id', actorRow.id)
-    .in('action', ['approved', 'rejected'])
-    .order('acted_at', { ascending: false })
-
-  if (actionError) {
-    throw new Error(actionError.message)
-  }
-
-  const latestActionByClaim = new Map<string, 'approved' | 'rejected'>()
-
-  for (const row of (actionRows ?? []) as ApprovalActionRow[]) {
-    if (!latestActionByClaim.has(row.claim_id)) {
-      if (row.action === 'approved' || row.action === 'rejected') {
-        latestActionByClaim.set(row.claim_id, row.action)
-      }
-    }
-  }
-
-  if (latestActionByClaim.size === 0) {
-    analytics.total.count = analytics.pendingApprovals.count
-    analytics.total.amount = analytics.pendingApprovals.amount
-    return analytics
-  }
-
-  const scopedLocationIds = await resolveLocationIds(
-    supabase,
-    filters.locationType
-  )
-
-  if (scopedLocationIds && scopedLocationIds.length === 0) {
-    analytics.total.count = analytics.pendingApprovals.count
-    analytics.total.amount = analytics.pendingApprovals.amount
-    return analytics
-  }
-
-  const filteredClaims = await getFilteredClaimsByIds(
-    supabase,
-    [...latestActionByClaim.keys()],
-    filters,
-    scopedLocationIds
-  )
-
-  for (const claim of filteredClaims) {
-    const action = latestActionByClaim.get(claim.id)
-    const amount = Number(claim.total_amount ?? 0)
-
-    if (action === 'approved') {
-      analytics.approvedClaims.count += 1
-      analytics.approvedClaims.amount += amount
-
-      if (paymentIssuedStatusIds.has(claim.status_id)) {
-        analytics.paymentIssuedClaims.count += 1
-        analytics.paymentIssuedClaims.amount += amount
-      }
-
-      continue
-    }
-
-    if (action === 'rejected') {
-      analytics.rejectedClaims.count += 1
-      analytics.rejectedClaims.amount += amount
-    }
-  }
+  analytics.pendingApprovals = pendingApprovals
+  analytics.approvedClaims = historySummary.approvedClaims
+  analytics.paymentIssuedClaims = historySummary.paymentIssuedClaims
+  analytics.rejectedClaims = historySummary.rejectedClaims
 
   analytics.total.count =
     analytics.pendingApprovals.count +
