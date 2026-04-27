@@ -243,6 +243,41 @@ describe('approved-history Payment Journals export route', () => {
     )
   })
 
+  it('excludes employees with zero payable amount from export rows', async () => {
+    mocks.getFinanceHistoryPaginated.mockResolvedValue({
+      data: [
+        buildHistoryRow('claim-zero', 'NW0001211', 0),
+        buildHistoryRow('claim-paid', 'NW0004546', 500),
+      ],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: 500,
+    })
+
+    mocks.createSupabaseServerClient.mockResolvedValue(
+      buildSupabaseAuthClient()
+    )
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3000/approved-history/payment-journals-export'
+      )
+    )
+
+    expect(response.status).toBe(200)
+
+    const csv = await response.text()
+    const csvLines = csv
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+
+    expect(csvLines).toHaveLength(2)
+    expect(csv).not.toContain('"NW0001211"')
+    expect(csv).toContain('"NW0004546"')
+    expect(csv).toContain('"500.00"')
+  })
+
   it('keeps applied action filter without overriding claim status', async () => {
     mocks.normalizeFinanceFilters.mockReturnValueOnce({
       employeeId: null,

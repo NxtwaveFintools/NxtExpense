@@ -3,7 +3,6 @@ import { test, expect } from './fixtures/auth'
 import {
   BOA_KARNATAKA,
   FINANCE_1,
-  FINANCE_2,
   PM_MANSOOR,
   SBH_AP,
   SBH_KARNATAKA,
@@ -393,7 +392,7 @@ test.describe
       submitterEmail: SBH_AP.email,
       level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
-      financeEmail: FINANCE_2.email,
+      financeEmail: FINANCE_1.email,
     })
   })
 
@@ -405,7 +404,7 @@ test.describe
       submitterEmail: SBH_KARNATAKA.email,
       level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
-      financeEmail: FINANCE_2.email,
+      financeEmail: FINANCE_1.email,
     })
   })
 
@@ -417,7 +416,7 @@ test.describe
       submitterEmail: ZBH_MULTI_STATE.email,
       level1ApproverEmail: null,
       level3ApproverEmail: PM_MANSOOR.email,
-      financeEmail: FINANCE_2.email,
+      financeEmail: FINANCE_1.email,
     })
   })
 
