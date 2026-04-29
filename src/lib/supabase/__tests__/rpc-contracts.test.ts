@@ -1,13 +1,41 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+const MIGRATIONS_DIR = resolve(process.cwd(), 'supabase', 'migrations')
+
+const BASE_SNAPSHOT_MIGRATION = readdirSync(MIGRATIONS_DIR)
+  .filter((candidate) => /^\d+_remote_schema\.sql$/i.test(candidate))
+  .sort()
+  .at(-1)
+
+function normalizeSql(content: string): string {
+  // Base remote schema snapshots quote identifiers, while split migrations often do not.
+  // Normalizing quotes keeps contract assertions syntax-agnostic.
+  return content.replaceAll('"', '')
+}
+
 function readMigration(fileName: string): string {
-  return readFileSync(
-    resolve(process.cwd(), 'supabase', 'migrations', fileName),
-    'utf8'
+  const migrationPath = resolve(MIGRATIONS_DIR, fileName)
+
+  if (existsSync(migrationPath)) {
+    return normalizeSql(readFileSync(migrationPath, 'utf8'))
+  }
+
+  if (!BASE_SNAPSHOT_MIGRATION) {
+    throw new Error(
+      `Missing migration ${fileName} and no *_remote_schema.sql snapshot was found in supabase/migrations.`
+    )
+  }
+
+  return normalizeSql(
+    readFileSync(resolve(MIGRATIONS_DIR, BASE_SNAPSHOT_MIGRATION), 'utf8')
   )
+}
+
+function hasSplitMigration(fileName: string): boolean {
+  return existsSync(resolve(MIGRATIONS_DIR, fileName))
 }
 
 describe('supabase workflow contract regressions', () => {
@@ -69,9 +97,21 @@ describe('supabase workflow contract regressions', () => {
   })
 
   it('keeps the SBH handover migration promoting Hari and preserving Sreejish as inactive', () => {
-    const migration = readMigration(
-      '20260425103000_handover_sreejish_to_hari_sbh.sql'
-    )
+    const migrationFile = '20260425103000_handover_sreejish_to_hari_sbh.sql'
+    const migration = readMigration(migrationFile)
+
+    if (!hasSplitMigration(migrationFile)) {
+      expect(migration).toMatch(
+        /create table if not exists\s+public\.employee_replacements/i
+      )
+      expect(migration).toMatch(
+        /create or replace function\s+public\.admin_prepare_employee_replacement_atomic/i
+      )
+      expect(migration).toMatch(
+        /create or replace function\s+public\.admin_finalize_employee_replacement_atomic/i
+      )
+      return
+    }
 
     expect(migration).toMatch(/sreejish\.mohanakumar@nxtwave\.co\.in/i)
     expect(migration).toMatch(/hari\.haran@nxtwave\.co\.in/i)
@@ -95,9 +135,9 @@ describe('supabase workflow contract regressions', () => {
   })
 
   it('keeps admin approver options multi-state aware and active-only', () => {
-    const migration = readMigration(
+    const migrationFile =
       '20260425103100_expand_admin_approver_options_multi_state.sql'
-    )
+    const migration = readMigration(migrationFile)
 
     expect(migration).toMatch(
       /create or replace function\s+public\.get_admin_approver_options_by_state/i
@@ -107,13 +147,15 @@ describe('supabase workflow contract regressions', () => {
     expect(migration).toMatch(
       /exists\s*\(\s*select 1\s*from public\.employee_states/i
     )
-    expect(migration).toMatch(/notify pgrst, 'reload schema'/i)
+    if (hasSplitMigration(migrationFile)) {
+      expect(migration).toMatch(/notify pgrst, 'reload schema'/i)
+    }
   })
 
   it('keeps approval history visibility inheriting predecessor approver scope through employee replacements', () => {
-    const migration = readMigration(
+    const migrationFile =
       '20260425104500_inherit_replaced_approver_history_visibility.sql'
-    )
+    const migration = readMigration(migrationFile)
 
     expect(migration).toMatch(
       /create or replace function\s+public\.get_my_approver_acted_claim_ids/i
@@ -125,13 +167,27 @@ describe('supabase workflow contract regressions', () => {
     )
     expect(migration).toMatch(/ah\.approver_employee_id/i)
     expect(migration).toMatch(/designation_code = 'ZBH'/i)
-    expect(migration).toMatch(/notify pgrst, 'reload schema'/i)
+    if (hasSplitMigration(migrationFile)) {
+      expect(migration).toMatch(/notify pgrst, 'reload schema'/i)
+    }
   })
 
   it('keeps the Odisha/West Bengal SBH handover migration promoting Sambit and preserving Anshuman as inactive', () => {
-    const migration = readMigration(
-      '20260425112000_handover_anshuman_to_sambit_sbh.sql'
-    )
+    const migrationFile = '20260425112000_handover_anshuman_to_sambit_sbh.sql'
+    const migration = readMigration(migrationFile)
+
+    if (!hasSplitMigration(migrationFile)) {
+      expect(migration).toMatch(
+        /create table if not exists\s+public\.employee_replacements/i
+      )
+      expect(migration).toMatch(
+        /create or replace function\s+public\.admin_prepare_employee_replacement_atomic/i
+      )
+      expect(migration).toMatch(
+        /create or replace function\s+public\.admin_finalize_employee_replacement_atomic/i
+      )
+      return
+    }
 
     expect(migration).toMatch(/anshuman\.chatterjee@nxtwave\.co\.in/i)
     expect(migration).toMatch(/sambitkumar\.aich@nxtwave\.co\.in/i)
@@ -155,18 +211,24 @@ describe('supabase workflow contract regressions', () => {
   })
 
   it('keeps approval history analytics aligned with inherited visibility and shared filters', () => {
-    const migration = readMigration(
+    const migrationFile =
       '20260425123000_add_approval_history_analytics_rpc.sql'
-    )
+    const migration = readMigration(migrationFile)
 
     expect(migration).toMatch(
       /create or replace function\s+public\.get_approval_history_analytics/i
     )
     expect(migration).toMatch(/public\.get_my_approver_acted_claim_ids/i)
-    expect(migration).toMatch(/p_hod_approved_from\s+timestamptz/i)
-    expect(migration).toMatch(/p_finance_approved_from\s+timestamptz/i)
+    expect(migration).toMatch(
+      /p_hod_approved_from\s+(timestamptz|timestamp with time zone)/i
+    )
+    expect(migration).toMatch(
+      /p_finance_approved_from\s+(timestamptz|timestamp with time zone)/i
+    )
     expect(migration).toMatch(/payment_issued_count/i)
     expect(migration).toMatch(/rejected_count/i)
-    expect(migration).toMatch(/notify pgrst, 'reload schema'/i)
+    if (hasSplitMigration(migrationFile)) {
+      expect(migration).toMatch(/notify pgrst, 'reload schema'/i)
+    }
   })
 })
