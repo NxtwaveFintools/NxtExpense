@@ -5,16 +5,16 @@ const mocks = vi.hoisted(() => ({
   resolveClaimAllowResubmitFilterValue: vi.fn(),
 }))
 
-vi.mock('@/features/approvals/queries/pending-summary', () => ({
+vi.mock('@/features/approvals/data/queries/pending-summary.query', () => ({
   getPendingApprovalsSummary: mocks.getPendingApprovalsSummary,
 }))
 
-vi.mock('@/lib/services/claim-status-filter-service', () => ({
+vi.mock('@/features/claims/data/queries', () => ({
   resolveClaimAllowResubmitFilterValue:
     mocks.resolveClaimAllowResubmitFilterValue,
 }))
 
-import { getApprovalStageAnalytics } from '@/features/approvals/queries/approval-analytics'
+import { getApprovalStageAnalytics } from '@/features/approvals/data/queries/approval-analytics.query'
 
 describe('getApprovalStageAnalytics', () => {
   const approvedStatusId = '7a0068ba-39c3-4229-b6f5-88559ace4e77'
@@ -82,10 +82,10 @@ describe('getApprovalStageAnalytics', () => {
         p_location_type: 'outstation',
         p_claim_date_from: '2026-04-01',
         p_claim_date_to: '2026-04-25',
-        p_hod_approved_from: '2026-04-10',
-        p_hod_approved_to: '2026-04-20',
-        p_finance_approved_from: '2026-04-11',
-        p_finance_approved_to: '2026-04-21',
+        p_hod_approved_from: '2026-04-10T00:00:00+05:30',
+        p_hod_approved_to: '2026-04-20T23:59:59.999+05:30',
+        p_finance_approved_from: '2026-04-11T00:00:00+05:30',
+        p_finance_approved_to: '2026-04-21T23:59:59.999+05:30',
       }
     )
     expect(analytics).toEqual({
