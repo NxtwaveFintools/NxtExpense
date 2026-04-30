@@ -283,6 +283,12 @@ describe('getLoginErrorMessage', () => {
     expect(typeof msg).toBe('string')
   })
 
+  it('returns the correct message for inactive_employee', () => {
+    const msg = getLoginErrorMessage('inactive_employee')
+    expect(msg).toBeTruthy()
+    expect(msg).toContain('inactive')
+  })
+
   it('returns a fallback message for unknown error codes', () => {
     const msg = getLoginErrorMessage('some_unknown_code')
     expect(msg).toBeTruthy()

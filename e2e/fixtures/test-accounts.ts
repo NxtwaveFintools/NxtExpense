@@ -35,13 +35,6 @@ export const BOA_KARNATAKA: TestAccount = {
   state: 'Karnataka',
 }
 
-export const ABH_TAMIL_NADU: TestAccount = {
-  email: 'hari.haran@nxtwave.co.in',
-  label: 'ABH Tamil Nadu - Hari Haran S',
-  designation: 'Area Business Head',
-  state: 'Tamil Nadu',
-}
-
 // Group 2: Direct flow submitters (Mansoor -> Finance)
 
 export const SBH_AP: TestAccount = {
@@ -72,11 +65,11 @@ export const PM_MANSOOR: TestAccount = {
   state: 'All States',
 }
 
-// Approver-only utility accounts
+// Shared approver/direct-flow accounts
 
 export const SBH_TN_KERALA: TestAccount = {
-  email: 'sreejish.mohanakumar@nxtwave.co.in',
-  label: 'SBH TN/Kerala - Sreejish Mohana Kumar',
+  email: 'hari.haran@nxtwave.co.in',
+  label: 'SBH TN/Kerala - Hari Haran S',
   designation: 'State Business Head',
   state: 'Tamil Nadu, Kerala',
 }

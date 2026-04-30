@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 
 import {
   buildOAuthRedirectUrl,
+  getLoginErrorMessage,
   hasInvalidAzureTenantPath,
   isDevelopmentAuthEnabled,
 } from '@/lib/auth/auth-helpers'
@@ -12,7 +13,7 @@ import {
   getAllowedCorporateEmailHint,
   isAllowedCorporateEmail,
 } from '@/lib/auth/allowed-email-domains'
-import { getEmployeeByEmail } from '@/lib/services/employee-service'
+import { getEmployeeAccessByEmail } from '@/lib/services/employee-service'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import {
@@ -107,9 +108,22 @@ export async function signInWithPasswordAction(
   }
 
   try {
-    const employee = await getEmployeeByEmail(supabase, validatedEmail)
-    if (!employee) {
+    const { accessState } = await getEmployeeAccessByEmail(
+      supabase,
+      validatedEmail
+    )
+
+    if (accessState === 'missing') {
       redirect('/no-access')
+    }
+
+    if (accessState === 'inactive') {
+      await signOutMutation(supabase)
+      return {
+        error:
+          getLoginErrorMessage('inactive_employee') ??
+          'Your employee access has been disabled.',
+      }
     }
   } catch {
     await signOutMutation(supabase)

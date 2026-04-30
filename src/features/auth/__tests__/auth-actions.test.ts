@@ -5,12 +5,13 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`REDIRECT:${url}`)
   }),
   buildOAuthRedirectUrl: vi.fn(),
+  getLoginErrorMessage: vi.fn(),
   hasInvalidAzureTenantPath: vi.fn(),
   isDevelopmentAuthEnabled: vi.fn(),
   appendAllowedDomainHint: vi.fn(),
   getAllowedCorporateEmailHint: vi.fn(),
   isAllowedCorporateEmail: vi.fn(),
-  getEmployeeByEmail: vi.fn(),
+  getEmployeeAccessByEmail: vi.fn(),
   createSupabaseServerClient: vi.fn(),
   signInWithOAuthMutation: vi.fn(),
   signInWithPasswordMutation: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/auth/auth-helpers', () => ({
   buildOAuthRedirectUrl: mocks.buildOAuthRedirectUrl,
+  getLoginErrorMessage: mocks.getLoginErrorMessage,
   hasInvalidAzureTenantPath: mocks.hasInvalidAzureTenantPath,
   isDevelopmentAuthEnabled: mocks.isDevelopmentAuthEnabled,
 }))
@@ -34,7 +36,7 @@ vi.mock('@/lib/auth/allowed-email-domains', () => ({
 }))
 
 vi.mock('@/lib/services/employee-service', () => ({
-  getEmployeeByEmail: mocks.getEmployeeByEmail,
+  getEmployeeAccessByEmail: mocks.getEmployeeAccessByEmail,
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -60,6 +62,13 @@ describe('auth actions', () => {
     mocks.buildOAuthRedirectUrl.mockResolvedValue(
       'http://localhost:3000/dashboard'
     )
+    mocks.getLoginErrorMessage.mockImplementation((code: string) => {
+      if (code === 'inactive_employee') {
+        return 'Your employee access is inactive. Please contact your administrator.'
+      }
+
+      return 'Authentication failed.'
+    })
     mocks.hasInvalidAzureTenantPath.mockReturnValue(false)
     mocks.isDevelopmentAuthEnabled.mockReturnValue(true)
     mocks.appendAllowedDomainHint.mockImplementation(
@@ -84,7 +93,10 @@ describe('auth actions', () => {
     })
 
     mocks.signInWithPasswordMutation.mockResolvedValue({ errorMessage: null })
-    mocks.getEmployeeByEmail.mockResolvedValue({ id: 'emp-1' })
+    mocks.getEmployeeAccessByEmail.mockResolvedValue({
+      employee: { id: 'emp-1' },
+      accessState: 'active',
+    })
     mocks.signOutMutation.mockResolvedValue(undefined)
   })
 
@@ -212,6 +224,24 @@ describe('auth actions', () => {
     await expect(
       signInWithPasswordAction({} as never, formData)
     ).rejects.toThrow('REDIRECT:/dashboard')
+  })
+
+  it('should reject inactive employees after successful password login', async () => {
+    mocks.getEmployeeAccessByEmail.mockResolvedValue({
+      employee: { id: 'emp-1' },
+      accessState: 'inactive',
+    })
+
+    const formData = new FormData()
+    formData.set('email', 'employee@nxtwave.co.in')
+    formData.set('password', 'Password@123')
+
+    const result = await signInWithPasswordAction({} as never, formData)
+
+    expect(result.error).toBe(
+      'Your employee access is inactive. Please contact your administrator.'
+    )
+    expect(mocks.signOutMutation).toHaveBeenCalledTimes(1)
   })
 
   it('should sign out and redirect to login signed_out message', async () => {

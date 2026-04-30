@@ -2,7 +2,6 @@ import { type Page } from '@playwright/test'
 
 import { test, expect } from './fixtures/auth'
 import {
-  ABH_TAMIL_NADU,
   BOA_KARNATAKA,
   FINANCE_1,
   PM_MANSOOR,
@@ -313,22 +312,16 @@ test.describe.serial('Finance Rejection Flows - Requested E2E coverage', () => {
     )
   })
 
-  test('Finance Rejection 2: Finance reject with allow reclaim enables new claim', async ({
+  test('Finance Rejection 2: Finance reject with allow reclaim enables new SBH claim', async ({
     page,
     loginAs,
   }) => {
     const claimNumber = await submitOfficeClaimAndGetClaimNumber(
       page,
       loginAs,
-      ABH_TAMIL_NADU.email
+      SBH_TN_KERALA.email
     )
 
-    await approveClaimAtCurrentLevel(
-      page,
-      loginAs,
-      SBH_TN_KERALA.email,
-      claimNumber
-    )
     await approveClaimAtCurrentLevel(
       page,
       loginAs,
@@ -348,7 +341,7 @@ test.describe.serial('Finance Rejection Flows - Requested E2E coverage', () => {
     await assertClaimTerminalBanner(
       page,
       loginAs,
-      ABH_TAMIL_NADU.email,
+      SBH_TN_KERALA.email,
       claimNumber,
       'new-claim-permitted'
     )

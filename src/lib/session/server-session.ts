@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { cache } from 'react'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
+import { getEmployeeAccessByEmail } from '@/lib/services/employee-service'
 import { isRecoverableAuthSessionError } from '@/lib/supabase/auth-errors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -26,6 +27,16 @@ export const getServerUser = cache(async (): Promise<User | null> => {
     if (error || !user) return null
 
     if (!(await isAllowedCorporateEmail(supabase, user.email))) {
+      await supabase.auth.signOut()
+      return null
+    }
+
+    const { accessState } = await getEmployeeAccessByEmail(
+      supabase,
+      user.email ?? ''
+    )
+
+    if (accessState !== 'active') {
       await supabase.auth.signOut()
       return null
     }
