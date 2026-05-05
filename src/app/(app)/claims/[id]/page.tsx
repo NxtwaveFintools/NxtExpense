@@ -50,15 +50,16 @@ export default async function ClaimDetailPage({
   params,
   searchParams,
 }: ClaimDetailPageProps) {
-  const user = await requireCurrentUser('/login')
-  const supabase = await createSupabaseServerClient()
+  const [user, supabase, { id }] = await Promise.all([
+    requireCurrentUser('/login'),
+    createSupabaseServerClient(),
+    params,
+  ])
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
   if (!employee) {
     redirect('/dashboard')
   }
-
-  const { id } = await params
   const claimWithItems = await getClaimById(supabase, id)
 
   if (!claimWithItems) {

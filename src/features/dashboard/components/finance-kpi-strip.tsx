@@ -1,5 +1,3 @@
-'use client'
-
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FinanceDashboardKPI } from '@/features/dashboard/types/finance-dashboard'

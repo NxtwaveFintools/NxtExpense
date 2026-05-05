@@ -1,6 +1,6 @@
 'use server'
 
-import { redirect } from 'next/navigation'
+import { redirect, unstable_rethrow } from 'next/navigation'
 
 import {
   buildOAuthRedirectUrl,
@@ -125,7 +125,8 @@ export async function signInWithPasswordAction(
           'Your employee access has been disabled.',
       }
     }
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error)
     await signOutMutation(supabase)
     return {
       error: 'Unable to verify your account access. Please try again.',

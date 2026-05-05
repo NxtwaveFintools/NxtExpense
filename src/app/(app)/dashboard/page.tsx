@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+
 import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
@@ -62,12 +64,15 @@ const AdminAnalyticsDashboard = nextDynamic(
   }
 )
 
+export const metadata: Metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function DashboardPage() {
-  const user = await requireCurrentUser('/login')
-  const supabase = await createSupabaseServerClient()
+  const [user, supabase] = await Promise.all([
+    requireCurrentUser('/login'),
+    createSupabaseServerClient(),
+  ])
 
   let employee = null
   try {

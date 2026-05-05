@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { AlertTriangle, ShieldCheck, UserX } from 'lucide-react'
 
@@ -6,6 +7,7 @@ import { signOutAction } from '@/features/auth/actions'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getEmployeeByEmail } from '@/lib/services/employee-service'
 
+export const metadata: Metadata = { title: 'No Access' }
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 

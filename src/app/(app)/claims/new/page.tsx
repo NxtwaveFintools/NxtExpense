@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -19,6 +20,8 @@ import {
 import { getAllExpenseLocations } from '@/lib/services/expense-location-service'
 import { getValidationRuleBoolean } from '@/lib/services/validation-rule-service'
 import type { BaseLocationDayTypeOption } from '@/features/claims/types'
+
+export const metadata: Metadata = { title: 'New Claim' }
 
 export default async function NewClaimPage() {
   const user = await requireCurrentUser('/login')

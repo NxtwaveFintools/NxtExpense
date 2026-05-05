@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { requireCurrentUser } from '@/features/auth/queries'
@@ -52,11 +53,15 @@ type ApprovedHistoryPageProps = {
   }>
 }
 
+export const metadata: Metadata = { title: 'Approved History' }
+
 export default async function ApprovedHistoryPage({
   searchParams,
 }: ApprovedHistoryPageProps) {
-  const user = await requireCurrentUser('/login')
-  const supabase = await createSupabaseServerClient()
+  const [user, supabase] = await Promise.all([
+    requireCurrentUser('/login'),
+    createSupabaseServerClient(),
+  ])
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
   if (!employee || !(await isFinanceTeamMember(supabase, employee))) {

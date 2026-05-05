@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 type PaginationUrlCleanupProps = {
   keys: string[]
 }
 
-export function PaginationUrlCleanup({ keys }: PaginationUrlCleanupProps) {
+function PaginationUrlCleanupInner({ keys }: PaginationUrlCleanupProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -36,4 +36,12 @@ export function PaginationUrlCleanup({ keys }: PaginationUrlCleanupProps) {
   }, [keys, pathname, searchParams])
 
   return null
+}
+
+export function PaginationUrlCleanup({ keys }: PaginationUrlCleanupProps) {
+  return (
+    <Suspense>
+      <PaginationUrlCleanupInner keys={keys} />
+    </Suspense>
+  )
 }

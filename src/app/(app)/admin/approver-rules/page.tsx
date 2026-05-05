@@ -1,5 +1,9 @@
+import type { Metadata } from 'next'
+
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ApproverRulesTable } from '@/features/admin/components/approver-rules-table'
+
+export const metadata: Metadata = { title: 'Admin Approver Rules' }
 
 export default async function AdminApproverRulesPage() {
   const supabase = await createSupabaseServerClient()

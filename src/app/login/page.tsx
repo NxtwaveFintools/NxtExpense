@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { AuthMessageToast } from '@/features/auth/components/auth-message-toast'
@@ -14,6 +15,8 @@ import {
 } from '@/lib/auth/allowed-email-domains'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+
+export const metadata: Metadata = { title: 'Login' }
 
 type LoginPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>

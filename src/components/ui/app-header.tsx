@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 
 import { getCurrentUser } from '@/features/auth/queries'
 import {
@@ -68,7 +69,9 @@ export async function AppHeader() {
           </Link>
           <div className="hidden sm:block w-px h-6 bg-border" />
           <div className="hidden sm:block">
-            <AppNavLinks links={navLinks} />
+            <Suspense>
+              <AppNavLinks links={navLinks} />
+            </Suspense>
           </div>
         </div>
 
@@ -99,7 +102,9 @@ export async function AppHeader() {
 
       {/* Mobile nav */}
       <div className="sm:hidden border-t border-border px-4 py-2">
-        <AppNavLinks links={navLinks} />
+        <Suspense>
+          <AppNavLinks links={navLinks} />
+        </Suspense>
       </div>
     </header>
   )

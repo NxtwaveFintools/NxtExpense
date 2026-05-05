@@ -1,4 +1,8 @@
+import type { Metadata } from 'next'
+
 import { EmployeeManagement } from '@/features/admin/components/employee-management'
+
+export const metadata: Metadata = { title: 'Admin Employees' }
 
 export default function AdminEmployeesPage() {
   return (

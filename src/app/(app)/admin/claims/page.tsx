@@ -1,4 +1,8 @@
+import type { Metadata } from 'next'
+
 import { ClaimOperations } from '@/features/admin/components/claim-operations'
+
+export const metadata: Metadata = { title: 'Admin Claims' }
 
 export default function AdminClaimsPage() {
   return (

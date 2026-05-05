@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --max-http-header-size=32768 ./node_modules/next/dist/bin/next dev",
+    "dev": "dotenv -e .env.local -- node --max-http-header-size=32768 ./node_modules/next/dist/bin/next dev",
+    "dev:prod": "dotenv -e .env.prod -- node --max-http-header-size=32768 ./node_modules/next/dist/bin/next dev",
     "dev:provision-test-accounts": "node --env-file=.env.local scripts/dev/provision-test-accounts.mjs",
     "dev:provision-test-flow-auth-users": "node --env-file=.env.local scripts/dev/provision-test-flow-auth-users.mjs",
     "build": "next build",
@@ -71,6 +72,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "@vitest/ui": "^4.1.0",
     "cross-env": "^10.1.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",

@@ -1,5 +1,3 @@
-'use client'
-
 import type { FinanceDashboardData } from '../types/finance-dashboard'
 import { Skeleton } from '@/components/ui/skeleton'
 import {

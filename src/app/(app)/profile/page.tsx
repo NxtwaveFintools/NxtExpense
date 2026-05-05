@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { UserCircle, Building2, ShieldCheck, TrendingUp } from 'lucide-react'
 import { redirect } from 'next/navigation'
 
@@ -12,6 +13,7 @@ import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import { formatDate } from '@/lib/utils/date'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 
+export const metadata: Metadata = { title: 'Profile' }
 export const dynamic = 'force-dynamic'
 
 type ClaimStats = {

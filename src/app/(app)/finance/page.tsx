@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { requireCurrentUser } from '@/features/auth/queries'
@@ -61,9 +62,13 @@ const PENDING_CLAIMS_DATE_FILTER_OPTION_SET = new Set(
   PENDING_CLAIMS_DATE_FILTER_OPTIONS
 )
 
+export const metadata: Metadata = { title: 'Finance' }
+
 export default async function FinancePage({ searchParams }: FinancePageProps) {
-  const user = await requireCurrentUser('/login')
-  const supabase = await createSupabaseServerClient()
+  const [user, supabase] = await Promise.all([
+    requireCurrentUser('/login'),
+    createSupabaseServerClient(),
+  ])
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
   if (!employee || !(await isFinanceTeamMember(supabase, employee))) {

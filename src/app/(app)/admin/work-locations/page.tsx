@@ -1,5 +1,9 @@
+import type { Metadata } from 'next'
+
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { WorkLocationTable } from '@/features/admin/components/work-location-table'
+
+export const metadata: Metadata = { title: 'Admin Work Locations' }
 
 export default async function AdminWorkLocationsPage() {
   const supabase = await createSupabaseServerClient()

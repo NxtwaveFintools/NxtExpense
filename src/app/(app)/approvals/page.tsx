@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import {
@@ -59,11 +60,15 @@ type ApprovalsPageProps = {
   }>
 }
 
+export const metadata: Metadata = { title: 'Approvals' }
+
 export default async function ApprovalsPage({
   searchParams,
 }: ApprovalsPageProps) {
-  const user = await requireCurrentUser('/login')
-  const supabase = await createSupabaseServerClient()
+  const [user, supabase] = await Promise.all([
+    requireCurrentUser('/login'),
+    createSupabaseServerClient(),
+  ])
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
   if (!employee) {

@@ -25,10 +25,11 @@ type ApprovalDetailsPageProps = {
 export default async function ApprovalDetailsPage({
   params,
 }: ApprovalDetailsPageProps) {
-  await requireCurrentUser('/login')
-  const { id } = await params
-
-  const supabase = await createSupabaseServerClient()
+  const [, { id }, supabase] = await Promise.all([
+    requireCurrentUser('/login'),
+    params,
+    createSupabaseServerClient(),
+  ])
   const claimWithItems = await getClaimById(supabase, id)
 
   if (!claimWithItems) {

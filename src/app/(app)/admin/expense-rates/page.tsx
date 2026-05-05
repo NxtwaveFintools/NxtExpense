@@ -1,9 +1,12 @@
+import type { Metadata } from 'next'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { EXPENSE_RATE_TYPES } from '@/lib/constants/claim-expense'
 import { formatDate } from '@/lib/utils/date'
 import { ExpenseRateTable } from '@/features/admin/components/expense-rate-table'
+
+export const metadata: Metadata = { title: 'Admin Expense Rates' }
 
 type ExpenseRateRow = {
   id: string

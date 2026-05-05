@@ -1,5 +1,9 @@
+import type { Metadata } from 'next'
+
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { VehicleTypeTable } from '@/features/admin/components/vehicle-type-table'
+
+export const metadata: Metadata = { title: 'Admin Vehicle Types' }
 
 export default async function AdminVehicleTypesPage() {
   const supabase = await createSupabaseServerClient()

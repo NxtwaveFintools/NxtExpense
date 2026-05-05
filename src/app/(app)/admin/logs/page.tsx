@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   buildCursorNavigationLinks,
@@ -10,6 +12,8 @@ import {
   getAdminLogFilterOptions,
   getAdminLogsPaginated,
 } from '@/features/admin/queries/admin-logs'
+
+export const metadata: Metadata = { title: 'Admin Logs' }
 
 type AdminLogsPageProps = {
   searchParams?: Promise<{

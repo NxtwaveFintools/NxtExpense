@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -5,6 +6,8 @@ import { getAdminSummary } from '@/features/admin/queries'
 import { getAdminFinanceOverview } from '@/features/admin/queries/finance-overview'
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 import { AnimatedNumber } from '@/components/ui/animated-number'
+
+export const metadata: Metadata = { title: 'Admin' }
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient()

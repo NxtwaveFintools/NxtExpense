@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+
 import { ClaimList } from '@/features/claims/ui/components/claim-list'
 import { ClaimsFiltersBar } from '@/features/claims/ui/components/claims-filters-bar'
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
@@ -33,6 +35,8 @@ import { PaginationUrlCleanup } from '@/components/ui/pagination-url-cleanup'
 
 import type { MyClaimsFilters } from '@/features/claims/types'
 
+export const metadata: Metadata = { title: 'My Claims' }
+
 type ClaimsPageProps = {
   searchParams?: Promise<{
     cursor?: string
@@ -46,8 +50,10 @@ type ClaimsPageProps = {
 }
 
 export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
-  const user = await requireCurrentUser('/login')
-  const supabase = await createSupabaseServerClient()
+  const [user, supabase] = await Promise.all([
+    requireCurrentUser('/login'),
+    createSupabaseServerClient(),
+  ])
   const employee = await getEmployeeByEmail(supabase, user.email ?? '')
 
   if (!employee || !(await canAccessEmployeeClaims(supabase, employee))) {
