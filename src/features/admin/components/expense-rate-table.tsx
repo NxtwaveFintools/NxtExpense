@@ -18,6 +18,7 @@ type ExpenseRate = {
   is_active: boolean
   designation_name: string | null
   location_name: string | null
+  state_name: string | null
 }
 
 type Props = { rates: ExpenseRate[] }
@@ -80,6 +81,9 @@ export function ExpenseRateTable({ rates }: Props) {
             <th className="px-3 py-2 text-left font-medium text-foreground/70">
               Designation
             </th>
+            <th className="px-3 py-2 text-left font-medium text-foreground/70">
+              State
+            </th>
             <th className="px-3 py-2 text-right font-medium text-foreground/70">
               Rate
             </th>
@@ -108,6 +112,9 @@ export function ExpenseRateTable({ rates }: Props) {
                 </td>
                 <td className="px-3 py-2 text-foreground/60">
                   {r.designation_name ?? 'All Designations'}
+                </td>
+                <td className="px-3 py-2 text-foreground/60">
+                  {r.state_name ?? 'All States'}
                 </td>
                 <td className="px-3 py-2 text-right">
                   {isEditing ? (

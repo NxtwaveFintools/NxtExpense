@@ -440,6 +440,77 @@ export class ClaimsPage {
     )
   }
 
+  private parseAmount(value: string): number {
+    const normalized = value.replace(/,/g, '')
+    const match = normalized.match(/(?:Rs\.|₹)\s*([0-9]+(?:\.[0-9]{1,2})?)/i)
+
+    if (!match?.[1]) {
+      throw new Error(`Unable to parse currency amount from: ${value}`)
+    }
+
+    return Number.parseFloat(match[1])
+  }
+
+  async getClaimDetailTotalAmount(): Promise<number> {
+    const totalText =
+      (await this.page
+        .locator('dt')
+        .filter({ hasText: /^Total$/i })
+        .first()
+        .locator('xpath=following-sibling::dd[1]')
+        .textContent()) ?? ''
+
+    return this.parseAmount(totalText)
+  }
+
+  async getClaimDetailFoodAllowanceAmount(): Promise<number> {
+    // Wait for claim detail to fully load
+    await this.page.waitForLoadState('networkidle')
+
+    const lineItemsHeading = this.page.getByRole('heading', {
+      name: /^Line Items$/i,
+    })
+
+    await lineItemsHeading.waitFor({ timeout: 10_000 })
+
+    const lineItemsSection = this.page
+      .locator('section')
+      .filter({ has: lineItemsHeading })
+      .first()
+
+    const foodLineItem = lineItemsSection
+      .locator('li')
+      .filter({ hasText: /food allowance/i })
+      .first()
+
+    if ((await foodLineItem.count()) === 0) {
+      return 0
+    }
+
+    const monoAmount = foodLineItem.locator('span.font-mono').first()
+    const amountParaRight = foodLineItem
+      .locator('xpath=./following-sibling::*[1][contains(text(),"Rs.")]')
+      .first()
+    const fallbackAmount = foodLineItem
+      .locator('xpath=.//*[contains(text(),"Rs.")]')
+      .last()
+
+    const amountSource =
+      (await monoAmount.count()) > 0
+        ? monoAmount
+        : (await amountParaRight.count()) > 0
+          ? amountParaRight
+          : fallbackAmount
+
+    const foodAmountText = (await amountSource.textContent()) ?? ''
+
+    if (!foodAmountText.trim()) {
+      return 0
+    }
+
+    return this.parseAmount(foodAmountText)
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────
 
   async fillBaseLocationClaim(date: string, vehicleType: string) {

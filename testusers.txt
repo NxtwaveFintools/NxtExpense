@@ -1,0 +1,73 @@
+🧭 Expense Approval Workflow Overview
+Standard Flow
+SRO / BOA / ABH → SBH → Mansoor → Finance
+Direct Flow
+SBH / ZBH / PM → Mansoor → Finance
+🧪 Test Group 1 — Standard Flow Testing
+Flow: SRO / BOA / ABH → SBH → Mansoor → Finance
+SRO (AP)
+yohan.mutluri@nxtwave.co.in
+→ nagaraju.madugula@nxtwave.co.in (SBH)
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: Baseline flow already tested.
+SRO (Kerala)
+akshay.e@nxtwave.co.in
+→ sreejish.mohanakumar@nxtwave.co.in (SBH)
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: Tests Kerala state routing.
+BOA (Karnataka)
+bhargavraj.gv@nxtwave.co.in
+→ vignesh.shenoy@nxtwave.co.in (SBH)
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: Tests BOA designation with Karnataka SBH.
+ABH (Tamil Nadu)
+hari.haran@nxtwave.co.in
+→ sreejish.mohanakumar@nxtwave.co.in (SBH)
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: Tests ABH routing via SBH.
+🧪 Test Group 2 — Direct to Mansoor Flow
+Flow: SBH / ZBH / PM → Mansoor → Finance
+SBH (AP)
+nagaraju.madugula@nxtwave.co.in
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: SBH submits directly to Mansoor.
+SBH (Karnataka)
+vignesh.shenoy@nxtwave.co.in
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: Multi-state coverage testing.
+ZBH (Multi-State)
+satyapriya.dash@nxtwave.co.in
+States: Delhi NCR, WB, Odisha, Rajasthan, UP
+→ mansoor@nxtwave.co.in
+→ Finance
+Reason: Tests ZBH multi-state and higher accommodation limits.
+PM (Direct Finance Flow)
+mansoor@nxtwave.co.in
+→ Finance
+Reason: Final approver submitting claim directly.
+ 
+SRO / BOA / ABH
+        ↓
+       SBH
+        ↓
+     Mansoor
+        ↓
+      Finance
+and
+SBH / ZBH / PM
+        ↓
+     Mansoor
+        ↓
+      Finance
+💰 Finance Test Accounts
+Finance Level Approvers:
+• finance1@nxtwave.co.in
+• finance2@nxtwave.co.in
+Default Password for Testing:
+Password@123
