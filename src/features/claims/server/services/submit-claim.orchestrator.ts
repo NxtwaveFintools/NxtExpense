@@ -4,6 +4,7 @@ import type { ClaimFormValues } from '@/features/claims/types'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   getEmployeeByEmail,
+  getEmployeePrimaryStateId,
   getEmployeeRoles,
 } from '@/lib/services/employee-service'
 import { canAccessEmployeeClaimsFromRoles } from '@/features/employees/permissions/access-from-roles'
@@ -543,12 +544,14 @@ export async function submitClaimOrchestrator(
   }
 
   let draft: ClaimDraft
+  const employeePrimaryStateId = getEmployeePrimaryStateId(employee)
 
   if (wlFlags.requires_vehicle_selection && vehicleTypeId) {
     const vt = await getVehicleTypeById(supabase, vehicleTypeId)
     draft = await calculateBaseLocationItems(supabase, {
       workLocationId,
       claimDateIso: rateLookupDateIso,
+      stateId: employeePrimaryStateId,
       vehicleType: vt,
       includeFoodAllowance:
         resolvedBaseLocationDayType?.include_food_allowance ?? true,
@@ -575,6 +578,7 @@ export async function submitClaimOrchestrator(
     draft = await calculateOutstationTravelItems(supabase, {
       workLocationId,
       claimDateIso: rateLookupDateIso,
+      stateId: input.outstationStateId ?? null,
       designationId: employee.designation_id ?? '',
       vehicleType: vt,
       hasIntercityTravel,

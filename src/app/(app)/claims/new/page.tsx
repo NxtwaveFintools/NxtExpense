@@ -6,7 +6,10 @@ import { requireCurrentUser } from '@/features/auth/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { ClaimSubmissionForm } from '@/features/claims/ui/components/claim-submission-form'
-import { getEmployeeByEmail } from '@/lib/services/employee-service'
+import {
+  getEmployeeByEmail,
+  getEmployeePrimaryStateId,
+} from '@/lib/services/employee-service'
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
 import {
   getActiveBaseLocationDayTypes,
@@ -57,6 +60,7 @@ export default async function NewClaimPage() {
     id: vt.id,
     name: vt.vehicle_name,
   }))
+  const employeePrimaryStateId = getEmployeePrimaryStateId(employee)
   const stateOptions = states.map((s) => ({ id: s.id, name: s.state_name }))
 
   if (baseDayTypes.length === 0) {
@@ -92,7 +96,8 @@ export default async function NewClaimPage() {
           baseLocationId,
           'FOOD_BASE',
           null,
-          todayIso
+          todayIso,
+          employeePrimaryStateId
         )
       : Promise.resolve(null),
     outstationLocationId
@@ -101,7 +106,8 @@ export default async function NewClaimPage() {
           outstationLocationId,
           'FOOD_OUTSTATION',
           null,
-          todayIso
+          todayIso,
+          employeePrimaryStateId
         )
       : Promise.resolve(null),
     outstationLocationId && employee.designation_id
@@ -128,7 +134,8 @@ export default async function NewClaimPage() {
               supabase,
               outstationLocationId,
               vt.vehicle_code,
-              todayIso
+              todayIso,
+              employeePrimaryStateId
             )
 
             return [vt.id, intracityRate]

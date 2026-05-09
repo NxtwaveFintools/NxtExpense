@@ -77,6 +77,7 @@ type ClaimStatus = {
 type ExpenseRate = {
   id: string
   designation_id: string | null
+  state_id: string | null
   location_id: string
   expense_type: string
   rate_amount: number
@@ -262,7 +263,7 @@ export async function getAllClaimStatuses(
 }
 
 const EXPENSE_RATE_COLUMNS =
-  'id, designation_id, location_id, expense_type, rate_amount, effective_from, effective_to, is_active'
+  'id, designation_id, state_id, location_id, expense_type, rate_amount, effective_from, effective_to, is_active'
 
 function resolveAsOfDate(asOfDateIso?: string): string {
   const normalized = (asOfDateIso ?? '').trim()
@@ -279,26 +280,51 @@ export async function getExpenseRateByType(
   locationId: string,
   expenseType: string,
   designationId?: string | null,
-  asOfDateIso?: string
+  asOfDateIso?: string,
+  stateId?: string | null
 ): Promise<ExpenseRate | null> {
   const asOfDate = resolveAsOfDate(asOfDateIso)
 
-  let query = supabase
-    .from('expense_rates')
-    .select(EXPENSE_RATE_COLUMNS)
-    .eq('location_id', locationId)
-    .eq('expense_type', expenseType)
-    .lte('effective_from', asOfDate)
-    .or(`effective_to.is.null,effective_to.gte.${asOfDate}`)
-    .eq('is_active', true)
+  const buildBaseQuery = () => {
+    let query = supabase
+      .from('expense_rates')
+      .select(EXPENSE_RATE_COLUMNS)
+      .eq('location_id', locationId)
+      .eq('expense_type', expenseType)
+      .lte('effective_from', asOfDate)
+      .or(`effective_to.is.null,effective_to.gte.${asOfDate}`)
+      .eq('is_active', true)
 
-  if (designationId) {
-    query = query.eq('designation_id', designationId)
-  } else {
-    query = query.is('designation_id', null)
+    if (designationId) {
+      query = query.eq('designation_id', designationId)
+    } else {
+      query = query.is('designation_id', null)
+    }
+
+    return query
   }
 
-  const { data, error } = await query
+  if (stateId) {
+    const { data: stateData, error: stateError } = await buildBaseQuery()
+      .eq('state_id', stateId)
+      .order('effective_from', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (stateError) {
+      throw new Error(
+        `Failed to fetch state expense rate: ${stateError.message}`
+      )
+    }
+
+    if (stateData) {
+      return stateData as ExpenseRate
+    }
+  }
+
+  const { data, error } = await buildBaseQuery()
+    .is('state_id', null)
     .order('effective_from', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
@@ -312,7 +338,8 @@ export async function getIntracityAllowanceRateByVehicle(
   supabase: SupabaseClient,
   workLocationId: string,
   vehicleCode: string,
-  asOfDateIso?: string
+  asOfDateIso?: string,
+  stateId?: string | null
 ): Promise<number> {
   const expenseType = getIntracityAllowanceRateTypeByVehicleCode(vehicleCode)
 
@@ -325,7 +352,8 @@ export async function getIntracityAllowanceRateByVehicle(
     workLocationId,
     expenseType,
     null,
-    asOfDateIso
+    asOfDateIso,
+    stateId
   )
 
   return rate ? Number(rate.rate_amount) : 0

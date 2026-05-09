@@ -19,6 +19,7 @@ export type EmployeeRow = {
   designations: { designation_name: string } | null
   employee_states: Array<{
     is_primary: boolean
+    state_id?: string
     states: { state_name: string } | null
   }> | null
 }
@@ -38,7 +39,7 @@ export type EmployeeAccessState = 'active' | 'inactive' | 'missing'
 // ────────────────────────────────────────────────────────────
 
 const EMPLOYEE_COLUMNS =
-  'id, employee_id, employee_name, employee_email, designation_id, employee_status_id, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, created_at, employee_statuses!employee_status_id(status_code), designations!designation_id(designation_name), employee_states!employee_id(is_primary, states!state_id(state_name))'
+  'id, employee_id, employee_name, employee_email, designation_id, employee_status_id, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, created_at, employee_statuses!employee_status_id(status_code), designations!designation_id(designation_name), employee_states!employee_id(is_primary, state_id, states!state_id(state_name))'
 
 const EMPLOYEE_FETCH_MAX_RETRIES = 1
 
@@ -141,6 +142,20 @@ export async function getEmployeeById(
 
   if (error) throw new Error(error.message)
   return data as EmployeeRow | null
+}
+
+export function getEmployeePrimaryStateId(
+  employee: EmployeeRow | null | undefined
+): string | null {
+  if (!employee?.employee_states || employee.employee_states.length === 0) {
+    return null
+  }
+
+  const primary =
+    employee.employee_states.find((state) => state.is_primary) ??
+    employee.employee_states[0]
+
+  return primary?.state_id ?? null
 }
 
 export async function getEmployeeNameMapByIds(

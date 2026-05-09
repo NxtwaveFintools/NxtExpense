@@ -30,14 +30,6 @@ const TEST_FLOW_USERS = [
   { email: 'finance1@nxtwave.co.in', label: 'Test Flow Finance 1' },
 ]
 
-function adminHeaders() {
-  return {
-    apikey: serviceRoleKey,
-    Authorization: `Bearer ${serviceRoleKey}`,
-    'Content-Type': 'application/json',
-  }
-}
-
 function isAlreadyRegisteredError(error) {
   const message = (error?.message ?? '').toLowerCase()
   return (
@@ -49,26 +41,34 @@ function isAlreadyRegisteredError(error) {
 
 async function findUserByEmail(email) {
   const normalizedEmail = email.toLowerCase().trim()
-  const filter = encodeURIComponent(`email.eq.${normalizedEmail}`)
-  const url = `${supabaseUrl}/auth/v1/admin/users?filter=${filter}`
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: adminHeaders(),
-  })
+  for (let page = 1; page <= 40; page += 1) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage: 50,
+    })
 
-  const payload = await response.json().catch(() => null)
+    if (error) {
+      throw new Error(
+        `Unable to query admin users by email (${normalizedEmail}): ${error.message}`
+      )
+    }
 
-  if (!response.ok) {
-    const reason = payload?.msg ?? payload?.error_description ?? payload?.error ?? response.statusText
-    throw new Error(`Unable to query admin users by email (${normalizedEmail}): ${reason}`)
+    const users = Array.isArray(data?.users) ? data.users : []
+    const existing =
+      users.find((user) => (user.email ?? '').toLowerCase() === normalizedEmail) ??
+      null
+
+    if (existing) {
+      return existing
+    }
+
+    if (users.length === 0) {
+      break
+    }
   }
 
-  const users = Array.isArray(payload?.users) ? payload.users : []
-  return (
-    users.find((user) => (user.email ?? '').toLowerCase() === normalizedEmail) ??
-    null
-  )
+  return null
 }
 
 async function upsertPasswordUser(email) {

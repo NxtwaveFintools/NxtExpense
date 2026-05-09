@@ -14,6 +14,7 @@ type ExpenseRateRow = {
   is_active: boolean
   designation_name: string | null
   location_name: string | null
+  state_name: string | null
 }
 
 async function getAllExpenseRates(
@@ -34,7 +35,8 @@ async function getAllExpenseRates(
       `
       id, expense_type, rate_amount, effective_from, effective_to, is_active,
       designations!designation_id ( designation_name ),
-      work_locations!location_id ( location_name )
+      work_locations!location_id ( location_name ),
+      states!state_id ( state_name )
     `
     )
     .eq('is_active', true)
@@ -51,6 +53,7 @@ async function getAllExpenseRates(
       designation_name: string
     } | null
     const wl = row.work_locations as unknown as { location_name: string } | null
+    const state = row.states as unknown as { state_name: string } | null
 
     return {
       id: row.id,
@@ -63,6 +66,7 @@ async function getAllExpenseRates(
       is_active: true,
       designation_name: des?.designation_name ?? null,
       location_name: wl?.location_name ?? null,
+      state_name: state?.state_name ?? null,
     }
   })
 }
