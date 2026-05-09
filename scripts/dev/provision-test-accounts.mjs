@@ -48,34 +48,57 @@ const TEST_ACCOUNTS = [
 ]
 
 async function upsertTestUser(email) {
-  // List all users and find by email
-  const { data: usersData, error: listError } = await supabase.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  })
-
-  if (listError) throw new Error(`Unable to list users: ${listError.message}`)
-
-  const existing = usersData.users.find(
-    (u) => u.email?.toLowerCase() === email.toLowerCase()
-  )
-
-  if (existing) {
-    const { error: updateError } = await supabase.auth.admin.updateUserById(
-      existing.id,
-      { password: DEFAULT_PASSWORD, email_confirm: true }
-    )
-    if (updateError) throw new Error(`Update failed for ${email}: ${updateError.message}`)
-    return { email, id: existing.id, mode: 'updated' }
-  }
-
   const { data, error: createError } = await supabase.auth.admin.createUser({
     email,
     password: DEFAULT_PASSWORD,
     email_confirm: true,
   })
-  if (createError) throw new Error(`Create failed for ${email}: ${createError.message}`)
-  return { email, id: data.user.id, mode: 'created' }
+  if (!createError) {
+    return { email, id: data.user.id, mode: 'created' }
+  }
+
+  const alreadyExists = /already\s+been\s+registered|already\s+registered|duplicate/i.test(
+    createError.message ?? ''
+  )
+
+  if (!alreadyExists) {
+    throw new Error(`Create failed for ${email}: ${createError.message}`)
+  }
+
+  // Supabase Auth can fail with large list sizes; search in small pages.
+  const normalized = email.toLowerCase()
+  let existing = null
+
+  for (let page = 1; page <= 40; page += 1) {
+    const { data: usersData, error: listError } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: 50,
+    })
+
+    if (listError) throw new Error(`Unable to list users: ${listError.message}`)
+
+    existing =
+      usersData.users.find((u) => u.email?.toLowerCase() === normalized) ?? null
+
+    if (existing || usersData.users.length === 0) {
+      break
+    }
+  }
+
+  if (!existing?.id) {
+    throw new Error(
+      `User ${email} appears to exist but could not be found via paginated admin list.`
+    )
+  }
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(
+    existing.id,
+    { password: DEFAULT_PASSWORD, email_confirm: true }
+  )
+
+  if (updateError) throw new Error(`Update failed for ${email}: ${updateError.message}`)
+
+  return { email, id: existing.id, mode: 'updated' }
 }
 
 async function main() {

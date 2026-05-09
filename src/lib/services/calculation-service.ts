@@ -26,6 +26,7 @@ type CalculatedExpenseItem = {
 type BaseLocationInput = {
   workLocationId: string
   claimDateIso: string
+  stateId?: string | null
   vehicleType: VehicleType
   includeFoodAllowance: boolean
 }
@@ -34,6 +35,7 @@ type BaseLocationInput = {
 type OutstationTravelInput = {
   workLocationId: string
   claimDateIso: string
+  stateId?: string | null
   designationId: string
   hasIntercityTravel: boolean
   hasIntracityTravel: boolean
@@ -154,7 +156,8 @@ export async function calculateBaseLocationItems(
       input.workLocationId,
       EXPENSE_RATE_TYPES.FOOD_BASE,
       null,
-      input.claimDateIso
+      input.claimDateIso,
+      input.stateId
     )
 
     if (foodRate) {
@@ -195,7 +198,8 @@ export async function calculateOutstationTravelItems(
     input.workLocationId,
     EXPENSE_RATE_TYPES.FOOD_OUTSTATION,
     null,
-    input.claimDateIso
+    input.claimDateIso,
+    input.stateId
   )
 
   if (foodRate) {
@@ -244,7 +248,8 @@ export async function calculateOutstationTravelItems(
       supabase,
       input.workLocationId,
       input.vehicleType.vehicle_code,
-      input.claimDateIso
+      input.claimDateIso,
+      input.stateId
     )
 
     const isRentalIntracityTravel =
