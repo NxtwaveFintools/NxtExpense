@@ -578,7 +578,7 @@ export async function submitClaimOrchestrator(
     draft = await calculateOutstationTravelItems(supabase, {
       workLocationId,
       claimDateIso: rateLookupDateIso,
-      stateId: input.outstationStateId ?? null,
+      stateId: employeePrimaryStateId,
       designationId: employee.designation_id ?? '',
       vehicleType: vt,
       hasIntercityTravel,
