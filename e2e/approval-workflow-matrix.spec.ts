@@ -348,7 +348,7 @@ test.describe
     })
   })
 
-  test('Standard Flow 2: SRO Kerala -> SBH TN/Kerala -> Mansoor -> Finance', async ({
+  test('Standard Flow 2: SRO Kerala -> Hari TN/Kerala L1 -> Mansoor -> Finance', async ({
     page,
     loginAs,
   }) => {
@@ -372,7 +372,7 @@ test.describe
     })
   })
 
-  test('Direct Flow 5: SBH TN/Kerala (Hari) -> Mansoor -> Finance', async ({
+  test('Direct Flow 5: Hari TN/Kerala replacement path -> Mansoor -> Finance', async ({
     page,
     loginAs,
   }) => {
