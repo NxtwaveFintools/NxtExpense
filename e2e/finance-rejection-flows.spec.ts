@@ -312,7 +312,7 @@ test.describe.serial('Finance Rejection Flows - Requested E2E coverage', () => {
     )
   })
 
-  test('Finance Rejection 2: Finance reject with allow reclaim enables new SBH claim', async ({
+  test('Finance Rejection 2: Finance reject with allow reclaim enables new TN/Kerala claim', async ({
     page,
     loginAs,
   }) => {

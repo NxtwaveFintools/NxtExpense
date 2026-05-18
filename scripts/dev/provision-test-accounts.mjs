@@ -9,9 +9,11 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import pg from 'pg'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseDbUrl = process.env.SUPABASE_DB_URL
 
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error(
@@ -22,6 +24,95 @@ if (!supabaseUrl || !serviceRoleKey) {
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
+
+const KNOWN_AUTH_USER_IDS = new Map([
+  ['yohan.mutluri@nxtwave.co.in', 'b088702a-6dd8-451a-8b40-13ca4b9b39bb'],
+  ['akshay.e@nxtwave.co.in', '6fa11099-0d97-47aa-90d7-261c20319112'],
+  ['bhargavraj.gv@nxtwave.co.in', '476e454b-d578-4676-b534-dc409268bb0a'],
+  ['hari.haran@nxtwave.co.in', '54061858-4b56-4ab2-b777-725440385564'],
+  ['nagaraju.madugula@nxtwave.co.in', 'fcf9ceb4-5431-417f-abe3-e57c55f3746d'],
+  ['vignesh.shenoy@nxtwave.co.in', 'bb8a1e7e-feab-47a2-8656-a11dff76bdf5'],
+  ['satyapriya.dash@nxtwave.co.in', 'db2fe915-0b67-4017-b8d9-ff4de2263385'],
+  ['mansoor@nxtwave.co.in', 'd85a5655-b0c3-485c-8c22-aa3cef1f7d03'],
+  ['sreejish.mohanakumar@nxtwave.co.in', '12e7aa3f-9aa3-4993-a9f1-cb4379593610'],
+  ['harisanthosh.tibirisetty@nxtwave.co.in', 'dcba4c41-8f96-4c6b-9a4d-20c0b3226011'],
+  ['finance1@nxtwave.co.in', '1663b810-ddcd-4043-97a5-4fd73b1114c8'],
+  ['finance2@nxtwave.co.in', 'fb523841-425c-437f-a5c4-8e7ce2d8459d'],
+  ['chennakesava.konda@nxtwave.co.in', '437d117b-9e28-445a-9705-e2367acdad0b'],
+])
+
+let dbClient = null
+
+async function getDbClient() {
+  if (!supabaseDbUrl) {
+    return null
+  }
+
+  if (dbClient) {
+    return dbClient
+  }
+
+  dbClient = new pg.Client({
+    connectionString: supabaseDbUrl,
+    ssl: { rejectUnauthorized: false },
+  })
+
+  await dbClient.connect()
+  return dbClient
+}
+
+async function findAuthUserIdByEmail(email) {
+  const normalizedEmail = email.toLowerCase()
+  const client = await getDbClient()
+
+  if (client) {
+    const { rows } = await client.query(
+      `
+        select id
+        from auth.users
+        where lower(email) = lower($1)
+          and deleted_at is null
+        order by created_at desc
+        limit 1
+      `,
+      [normalizedEmail]
+    )
+
+    if (rows[0]?.id) {
+      return rows[0].id
+    }
+  }
+
+  if (KNOWN_AUTH_USER_IDS.has(normalizedEmail)) {
+    return KNOWN_AUTH_USER_IDS.get(normalizedEmail) ?? null
+  }
+
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: 100,
+    })
+
+    if (error) {
+      break
+    }
+
+    const users = Array.isArray(data?.users) ? data.users : []
+    const matchedUser =
+      users.find((user) => (user.email ?? '').toLowerCase() === normalizedEmail) ??
+      null
+
+    if (matchedUser?.id) {
+      return matchedUser.id
+    }
+
+    if (users.length === 0) {
+      break
+    }
+  }
+
+  return null
+}
 
 const DEFAULT_PASSWORD = 'Password@123'
 
@@ -40,10 +131,10 @@ const TEST_ACCOUNTS = [
 
   // Group 3 — Finance Team
   { email: 'finance1@nxtwave.co.in',         label: 'Finance User 1' },
-  { email: 'finance2@nxtwave.co.in',         label: 'Finance User 2' },
+  { email: 'chennakesava.konda@nxtwave.co.in', label: 'Finance User 2 (Live)' },
 
   // Approvers needed for testing approval flows
-  { email: 'sreejish.mohanakumar@nxtwave.co.in',       label: 'SBH  | TN+Kerala   | Sreejish Mohana Kumar (L1 approver for Akshay, Hari)' },
+  { email: 'sreejish.mohanakumar@nxtwave.co.in',       label: 'SBH  | TN+Kerala   | Sreejish Mohana Kumar (legacy account)' },
   { email: 'harisanthosh.tibirisetty@nxtwave.co.in',   label: 'ZBH  | KA+MH       | Hari Santhosh Tibirisetty (L2 approver for Vignesh, Bhargav)' },
 ]
 
@@ -52,53 +143,45 @@ async function upsertTestUser(email) {
     email,
     password: DEFAULT_PASSWORD,
     email_confirm: true,
+    user_metadata: { email_verified: true },
   })
   if (!createError) {
     return { email, id: data.user.id, mode: 'created' }
   }
 
+  const errorMessage = createError.message ?? ''
   const alreadyExists = /already\s+been\s+registered|already\s+registered|duplicate/i.test(
-    createError.message ?? ''
+    errorMessage
   )
 
-  if (!alreadyExists) {
+  const retriableAuthLookupError = /database error checking email|database error finding users/i.test(
+    errorMessage
+  )
+
+  if (!alreadyExists && !retriableAuthLookupError) {
     throw new Error(`Create failed for ${email}: ${createError.message}`)
   }
 
-  // Supabase Auth can fail with large list sizes; search in small pages.
-  const normalized = email.toLowerCase()
-  let existing = null
+  const existingUserId = await findAuthUserIdByEmail(email)
 
-  for (let page = 1; page <= 40; page += 1) {
-    const { data: usersData, error: listError } = await supabase.auth.admin.listUsers({
-      page,
-      perPage: 50,
-    })
-
-    if (listError) throw new Error(`Unable to list users: ${listError.message}`)
-
-    existing =
-      usersData.users.find((u) => u.email?.toLowerCase() === normalized) ?? null
-
-    if (existing || usersData.users.length === 0) {
-      break
-    }
-  }
-
-  if (!existing?.id) {
+  if (!existingUserId) {
     throw new Error(
-      `User ${email} appears to exist but could not be found via paginated admin list.`
+      `User ${email} appears to exist but could not be found in auth.users.`
     )
   }
 
   const { error: updateError } = await supabase.auth.admin.updateUserById(
-    existing.id,
-    { password: DEFAULT_PASSWORD, email_confirm: true }
+    existingUserId,
+    {
+      password: DEFAULT_PASSWORD,
+      email_confirm: true,
+      user_metadata: { email_verified: true },
+    }
   )
 
   if (updateError) throw new Error(`Update failed for ${email}: ${updateError.message}`)
 
-  return { email, id: existing.id, mode: 'updated' }
+  return { email, id: existingUserId, mode: 'updated' }
 }
 
 async function main() {
@@ -118,6 +201,11 @@ async function main() {
 
   console.log('\n✅  Done. All accounts can now log in with:')
   console.log(`   Password: ${DEFAULT_PASSWORD}\n`)
+
+  if (dbClient) {
+    await dbClient.end()
+    dbClient = null
+  }
 }
 
 await main()

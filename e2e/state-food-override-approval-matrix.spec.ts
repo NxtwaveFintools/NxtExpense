@@ -30,8 +30,6 @@ type WorkflowScenario = {
   hasOverride: boolean
 }
 
-const EXCLUDED_EMAILS = new Set<string>([SRO_KERALA.email.toLowerCase()])
-
 const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
   {
     name: 'G1 Kerala standard flow',
@@ -50,9 +48,9 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     hasOverride: false,
   },
   {
-    name: 'G1 Tamil Nadu standard flow',
+    name: 'G1 Tamil Nadu replacement direct flow',
     submitterEmail: ABH_TAMIL_NADU.email,
-    approverEmails: [SBH_TN_KERALA.email, PM_MANSOOR.email],
+    approverEmails: [PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Tamil Nadu',
     hasOverride: false,
@@ -79,7 +77,7 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [],
     financeEmail: FINANCE_2.email,
     outstationStateName: 'Karnataka',
-    hasOverride: false,
+    hasOverride: true,
   },
   {
     name: 'G1 AP target flow',
@@ -98,6 +96,40 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     hasOverride: true,
   },
 ]
+
+const FAST_SCENARIO_NAMES = new Set<string>([
+  'G1 Kerala standard flow',
+  'G2 PM direct to finance flow',
+  'G1 AP target flow',
+])
+
+const RUN_FULL_MATRIX = process.env.PW_FULL_MATRIX === '1'
+
+function resolveActiveClaimModes(): ClaimMode[] {
+  const configuredModes = (process.env.PW_FOOD_OVERRIDE_MODES ?? '')
+    .split(',')
+    .map((mode) => mode.trim().toLowerCase())
+    .filter(Boolean)
+
+  const parsedModes = configuredModes.filter(
+    (mode): mode is ClaimMode => mode === 'base' || mode === 'outstation'
+  )
+
+  if (parsedModes.length > 0) {
+    return parsedModes
+  }
+
+  // Fast mode defaults to the heaviest branch; full mode runs both.
+  return RUN_FULL_MATRIX ? ['base', 'outstation'] : ['outstation']
+}
+
+const ACTIVE_MODES = resolveActiveClaimModes()
+const ACTIVE_SCENARIOS = RUN_FULL_MATRIX
+  ? STANDARD_FIRST_SCENARIOS
+  : STANDARD_FIRST_SCENARIOS.filter((scenario) =>
+      FAST_SCENARIO_NAMES.has(scenario.name)
+    )
+const MATRIX_TIMEOUT_MS = RUN_FULL_MATRIX ? 600_000 : 300_000
 
 function toIsoDateDaysBack(daysBack: number): string {
   const date = new Date()
@@ -143,10 +175,6 @@ async function canLogin(
   loginAs: LoginAs,
   email: string
 ): Promise<boolean> {
-  if (EXCLUDED_EMAILS.has(email.toLowerCase())) {
-    return false
-  }
-
   try {
     await loginAsFresh(page, loginAs, email)
     return true
@@ -196,12 +224,11 @@ async function submitClaimAndCaptureAmounts(
   await loginAsFresh(page, loginAs, scenario.submitterEmail)
 
   const claims = new ClaimsPage(page)
-  await claims.gotoNewClaim()
-  await claims.ensureNewClaimFormReady()
 
   const randomOffset = Math.floor(Math.random() * 1997)
+  const candidateWindow = RUN_FULL_MATRIX ? 120 : 45
   const candidateDaysBack = Array.from(
-    { length: 120 },
+    { length: candidateWindow },
     (_, i) => i + 1 + randomOffset
   )
 
@@ -336,7 +363,7 @@ async function assertClaimAmountsInFinanceAndRelease(
   await expect(historyRow).toBeVisible({ timeout: 20_000 })
 
   const historyClaimLink = historyRow.locator('a[href*="/claims/"]').first()
-  if ((await historyClaimLink.count()) > 0) {
+  if (RUN_FULL_MATRIX && (await historyClaimLink.count()) > 0) {
     await historyClaimLink.click()
     await expect(claims.getClaimDetailFoodAllowanceAmount()).resolves.toBe(
       expectedFood
@@ -364,15 +391,25 @@ async function assertClaimAmountsInFinanceAndRelease(
 }
 
 test.describe.serial('State Food Override - Approval Matrix', () => {
-  test.describe.configure({ timeout: 600_000 })
+  test.describe.configure({ timeout: MATRIX_TIMEOUT_MS })
 
-  for (const mode of ['base', 'outstation'] as const) {
-    test(`validates ${mode} claim food overrides across all approval chains`, async ({
+  test.skip(
+    ACTIVE_SCENARIOS.length === 0,
+    'No active scenarios selected for this runtime profile.'
+  )
+
+  test.skip(
+    ACTIVE_MODES.length === 0,
+    'No valid claim modes selected. Use PW_FOOD_OVERRIDE_MODES=base,outstation.'
+  )
+
+  for (const mode of ACTIVE_MODES) {
+    test(`validates ${mode} claim food overrides across active approval chains`, async ({
       page,
       loginAs,
     }) => {
       const uniqueEmails = new Set<string>()
-      for (const scenario of STANDARD_FIRST_SCENARIOS) {
+      for (const scenario of ACTIVE_SCENARIOS) {
         uniqueEmails.add(scenario.submitterEmail)
         uniqueEmails.add(scenario.financeEmail)
         for (const approverEmail of scenario.approverEmails) {
@@ -385,19 +422,17 @@ test.describe.serial('State Food Override - Approval Matrix', () => {
         loginStatusByEmail.set(email, await canLogin(page, loginAs, email))
       }
 
-      const executableScenarios = STANDARD_FIRST_SCENARIOS.filter(
-        (scenario) => {
-          const participants = [
-            scenario.submitterEmail,
-            ...scenario.approverEmails,
-            scenario.financeEmail,
-          ]
+      const executableScenarios = ACTIVE_SCENARIOS.filter((scenario) => {
+        const participants = [
+          scenario.submitterEmail,
+          ...scenario.approverEmails,
+          scenario.financeEmail,
+        ]
 
-          return participants.every(
-            (email) => loginStatusByEmail.get(email) === true
-          )
-        }
-      )
+        return participants.every(
+          (email) => loginStatusByEmail.get(email) === true
+        )
+      })
 
       test.skip(
         executableScenarios.length === 0,
