@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache'
 import type {
   ApprovalHistoryFilters,
   BulkApprovalActionResult,
-  PendingApprovalsFilters,
 } from '@/features/approvals/types'
 import {
   getApprovalEmployeeNameSuggestions,
@@ -13,7 +12,10 @@ import {
   getFilteredApprovalHistoryPaginated,
   getPendingApprovalsPaginated,
 } from '@/features/approvals/data/queries'
-import { normalizeApprovalHistoryFilters } from '@/features/approvals/utils/history-filters'
+import {
+  normalizeApprovalHistoryFilters,
+  toPendingApprovalsFilters,
+} from '@/features/approvals/utils/history-filters'
 import {
   submitApprovalWorkflow,
   submitBulkApprovalWorkflow,
@@ -34,21 +36,6 @@ import {
 type RawApprovalFilters = Partial<Record<keyof ApprovalHistoryFilters, string>>
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string }
-
-function getPendingFilters(
-  normalizedFilters: ApprovalHistoryFilters
-): PendingApprovalsFilters {
-  return {
-    employeeName: normalizedFilters.employeeName,
-    claimStatus: normalizedFilters.claimStatus,
-    claimDateFrom: normalizedFilters.claimDateFrom,
-    claimDateTo: normalizedFilters.claimDateTo,
-    amountOperator: normalizedFilters.amountOperator,
-    amountValue: normalizedFilters.amountValue,
-    locationType: normalizedFilters.locationType,
-    claimDateSort: normalizedFilters.claimDateSort,
-  }
-}
 
 function revalidateApprovalSurfaces(claimId?: string) {
   revalidatePath('/approvals')
@@ -118,7 +105,7 @@ export async function getPendingApprovalsAction(
     user.email,
     cursor,
     limit,
-    getPendingFilters(normalizedFilters)
+    toPendingApprovalsFilters(normalizedFilters)
   )
 }
 

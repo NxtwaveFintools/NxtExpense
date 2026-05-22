@@ -1,9 +1,21 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 import { getSupabasePublicEnv } from '@/lib/supabase/env'
 
-export async function createSupabaseServerClient() {
+/**
+ * Returns a Supabase client bound to the current request's cookies.
+ *
+ * Wrapped in React cache() so every caller within a single request shares one
+ * client instance. This matters because a Server Component / Server Action
+ * render context cannot persist a refreshed auth token back to cookies — if
+ * each caller created its own client, the first would consume the (single-use,
+ * rotating) refresh token and every later client would read the now-stale
+ * cookie and fail to authenticate. One shared client refreshes once and reuses
+ * the in-memory session for the rest of the request.
+ */
+export const createSupabaseServerClient = cache(async () => {
   const cookieStore = await cookies()
   const { url, publishableKey } = getSupabasePublicEnv()
 
@@ -25,4 +37,4 @@ export async function createSupabaseServerClient() {
       },
     },
   })
-}
+})

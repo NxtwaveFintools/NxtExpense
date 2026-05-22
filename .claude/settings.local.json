@@ -9,7 +9,8 @@
       "Bash(Get-Content \"C:\\\\Users\\\\Nxtwave\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Nxtwave-Documents-NxtExpense\\\\9ede9562-7b36-4297-9b6b-0dfadd9d4d32\\\\tasks\\\\bnxfqflk4.output\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object -First 100)",
       "Bash(npx tsc *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(npx vitest *)"
     ]
   }
 }

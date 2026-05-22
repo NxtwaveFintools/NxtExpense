@@ -1,20 +1,19 @@
 import { redirect } from 'next/navigation'
 
-import {
-  getApprovalHistoryAction,
-  getPendingApprovalsAction,
-} from '@/features/approvals/server/actions'
 import { ApprovalFiltersBar } from '@/features/approvals/ui/components/approval-filters-bar'
 import { ApprovalHistoryList } from '@/features/approvals/ui/components/approval-history-list'
 import { ApprovalList } from '@/features/approvals/ui/components/approval-list'
 import {
   getApprovalStageAnalytics,
   getFilteredApprovalHistoryCount,
+  getFilteredApprovalHistoryPaginated,
+  getPendingApprovalsPaginated,
 } from '@/features/approvals/data/queries'
 import { canViewApprovalHistoryAmount } from '@/features/approvals/utils/amount-visibility'
 import {
   addApprovalFiltersToParams,
   normalizeApprovalHistoryFilters,
+  toPendingApprovalsFilters,
 } from '@/features/approvals/utils/history-filters'
 import { requireCurrentUser } from '@/features/auth/queries'
 import { getClaimStatusCatalog } from '@/features/claims/data/queries'
@@ -36,7 +35,26 @@ import {
   toSortedQueryString,
 } from '@/lib/utils/search-params'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { isSessionRecoverableError } from '@/lib/supabase/auth-errors'
 import { PaginationUrlCleanup } from '@/components/ui/pagination-url-cleanup'
+
+const SESSION_RECOVERY_REDIRECT = '/login?message=session_refresh_required'
+
+/**
+ * Runs a data-loading operation, redirecting to login when it fails because
+ * the auth session expired. Without this, an expired session surfaces as a
+ * generic "Something went wrong" error boundary instead of a clean re-login.
+ */
+async function withSessionGuard<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation()
+  } catch (error) {
+    if (isSessionRecoverableError(error)) {
+      redirect(SESSION_RECOVERY_REDIRECT)
+    }
+    throw error
+  }
+}
 
 type ApprovalsPageProps = {
   searchParams?: Promise<{
@@ -64,15 +82,18 @@ export default async function ApprovalsPage({
 }: ApprovalsPageProps) {
   const user = await requireCurrentUser('/login')
   const supabase = await createSupabaseServerClient()
-  const employee = await getEmployeeByEmail(supabase, user.email ?? '')
+  const userEmail = user.email ?? ''
+
+  const employee = await withSessionGuard(() =>
+    getEmployeeByEmail(supabase, userEmail)
+  )
 
   if (!employee) {
     redirect('/dashboard')
   }
 
-  const approverAccess = await hasApproverAssignments(
-    supabase,
-    employee.employee_email
+  const approverAccess = await withSessionGuard(() =>
+    hasApproverAssignments(supabase, employee.employee_email)
   )
 
   if (!canAccessApprovals(approverAccess)) {
@@ -120,24 +141,6 @@ export default async function ApprovalsPage({
     }
   })()
 
-  const normalizedFilterParams = {
-    claimStatus: normalizedFilters.claimStatus ?? undefined,
-    employeeName: normalizedFilters.employeeName ?? undefined,
-    claimDateFrom: normalizedFilters.claimDateFrom ?? undefined,
-    claimDateTo: normalizedFilters.claimDateTo ?? undefined,
-    amountOperator: normalizedFilters.amountOperator,
-    amountValue:
-      normalizedFilters.amountValue === null
-        ? undefined
-        : String(normalizedFilters.amountValue),
-    locationType: normalizedFilters.locationType ?? undefined,
-    claimDateSort: normalizedFilters.claimDateSort,
-    hodApprovedFrom: normalizedFilters.hodApprovedFrom ?? undefined,
-    hodApprovedTo: normalizedFilters.hodApprovedTo ?? undefined,
-    financeApprovedFrom: normalizedFilters.financeApprovedFrom ?? undefined,
-    financeApprovedTo: normalizedFilters.financeApprovedTo ?? undefined,
-  }
-
   const pendingCursor = resolvedSearch?.pendingCursor ?? null
   const pendingTrail = decodeCursorTrail(resolvedSearch?.pendingTrail ?? null)
   const historyCursor = resolvedSearch?.historyCursor ?? null
@@ -177,15 +180,28 @@ export default async function ApprovalsPage({
     statusCatalog,
     approvalAnalytics,
     historyTotalCount,
-  ] = await Promise.all([
-    getPendingApprovalsAction(pendingCursor, 10, normalizedFilterParams),
-    getApprovalHistoryAction(historyCursor, 10, normalizedFilterParams),
-    getClaimStatusCatalog(supabase),
-    getApprovalStageAnalytics(supabase, user.email ?? '', {
-      ...normalizedFilters,
-    }),
-    getFilteredApprovalHistoryCount(supabase, normalizedFilters),
-  ])
+  ] = await withSessionGuard(() =>
+    Promise.all([
+      getPendingApprovalsPaginated(
+        supabase,
+        userEmail,
+        pendingCursor,
+        10,
+        toPendingApprovalsFilters(normalizedFilters)
+      ),
+      getFilteredApprovalHistoryPaginated(
+        supabase,
+        historyCursor,
+        10,
+        normalizedFilters
+      ),
+      getClaimStatusCatalog(supabase),
+      getApprovalStageAnalytics(supabase, userEmail, {
+        ...normalizedFilters,
+      }),
+      getFilteredApprovalHistoryCount(supabase, normalizedFilters),
+    ])
+  )
 
   const showHistoryAmountColumn = canViewApprovalHistoryAmount(approverAccess)
 
