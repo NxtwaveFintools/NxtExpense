@@ -74,6 +74,7 @@ describe('adminToggleActiveSchema', () => {
     const result = adminToggleActiveSchema.safeParse({
       id: VALID_UUID,
       isActive: true,
+      confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(true)
@@ -83,6 +84,7 @@ describe('adminToggleActiveSchema', () => {
     const result = adminToggleActiveSchema.safeParse({
       id: 'invalid-id',
       isActive: false,
+      confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(false)
@@ -94,6 +96,7 @@ describe('admin rate update schemas', () => {
     const result = adminUpdateRateSchema.safeParse({
       id: VALID_UUID,
       rateAmount: 0,
+      confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(true)
@@ -103,6 +106,7 @@ describe('admin rate update schemas', () => {
     const result = adminUpdateRateSchema.safeParse({
       id: VALID_UUID,
       rateAmount: -1,
+      confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(false)
@@ -114,6 +118,7 @@ describe('admin rate update schemas', () => {
       baseFuelRatePerDay: 300,
       intercityRatePerKm: 8,
       maxKmRoundTrip: 300,
+      confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(true)
@@ -125,6 +130,7 @@ describe('admin rate update schemas', () => {
       baseFuelRatePerDay: 300,
       intercityRatePerKm: 8,
       maxKmRoundTrip: 300.5,
+      confirmation: 'CONFIRM',
     })
 
     expect(result.success).toBe(false)

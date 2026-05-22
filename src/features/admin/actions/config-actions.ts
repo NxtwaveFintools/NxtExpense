@@ -13,6 +13,7 @@ type ToggleResult = { ok: boolean; error: string | null }
 export async function toggleDesignationActiveAction(payload: {
   id: string
   isActive: boolean
+  confirmation: 'CONFIRM'
 }): Promise<ToggleResult> {
   const parsed = adminToggleActiveSchema.safeParse(payload)
   if (!parsed.success)
@@ -46,6 +47,7 @@ export async function toggleDesignationActiveAction(payload: {
 export async function toggleWorkLocationActiveAction(payload: {
   id: string
   isActive: boolean
+  confirmation: 'CONFIRM'
 }): Promise<ToggleResult> {
   const parsed = adminToggleActiveSchema.safeParse(payload)
   if (!parsed.success)
@@ -79,6 +81,7 @@ export async function toggleWorkLocationActiveAction(payload: {
 export async function toggleVehicleTypeActiveAction(payload: {
   id: string
   isActive: boolean
+  confirmation: 'CONFIRM'
 }): Promise<ToggleResult> {
   const parsed = adminToggleActiveSchema.safeParse(payload)
   if (!parsed.success)
@@ -114,6 +117,7 @@ export async function updateVehicleRatesAction(payload: {
   baseFuelRatePerDay: number
   intercityRatePerKm: number
   maxKmRoundTrip: number
+  confirmation: 'CONFIRM'
 }): Promise<ToggleResult> {
   const parsed = adminUpdateVehicleRatesSchema.safeParse(payload)
   if (!parsed.success)
@@ -146,6 +150,7 @@ export async function updateVehicleRatesAction(payload: {
 export async function updateExpenseRateAction(payload: {
   id: string
   rateAmount: number
+  confirmation: 'CONFIRM'
 }): Promise<ToggleResult> {
   const parsed = adminUpdateRateSchema.safeParse(payload)
   if (!parsed.success)
@@ -179,6 +184,7 @@ export async function updateExpenseRateAction(payload: {
 export async function toggleExpenseRateActiveAction(payload: {
   id: string
   isActive: boolean
+  confirmation: 'CONFIRM'
 }): Promise<ToggleResult> {
   const parsed = adminToggleActiveSchema.safeParse(payload)
   if (!parsed.success)

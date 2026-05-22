@@ -198,6 +198,97 @@ describe('bc expense export util', () => {
     expect(rows[0][13]).toBe('')
   })
 
+  it('uses profile bal_account_no as fallback when set', () => {
+    const profileWithBalAccount = {
+      ...BC_PROFILE,
+      bal_account_no: 'PROFILE-ACC-001',
+    }
+
+    const rows = buildBcExpenseRows({
+      historyRows: [buildHistoryRow('claim-p', 'CLAIM-P', 'COMMON', 200)],
+      claimItemsByClaimId: new Map([
+        ['claim-p', [{ claim_id: 'claim-p', item_type: 'food', amount: 100 }]],
+      ]),
+      balAccountNoByItemType: new Map([['food', '503063']]),
+      postingDate: '15/04/2026',
+      exportProfile: profileWithBalAccount,
+    })
+
+    expect(rows).toHaveLength(2)
+    expect(rows[1][8]).toBe('PROFILE-ACC-001')
+  })
+
+  it('falls back to first available bal account when no fuel or food mapping exists', () => {
+    const rows = buildBcExpenseRows({
+      historyRows: [buildHistoryRow('claim-fb', 'CLAIM-FB', 'COMMON', 300)],
+      claimItemsByClaimId: new Map([
+        [
+          'claim-fb',
+          [{ claim_id: 'claim-fb', item_type: 'accommodation', amount: 100 }],
+        ],
+      ]),
+      balAccountNoByItemType: new Map([['accommodation', 'ACC-999']]),
+      postingDate: '15/04/2026',
+      exportProfile: BC_PROFILE,
+    })
+
+    expect(rows).toHaveLength(2)
+    expect(rows[1][8]).toBe('ACC-999')
+  })
+
+  it('throws when reconciliation is needed but no fallback bal account exists', () => {
+    expect(() =>
+      buildBcExpenseRows({
+        historyRows: [buildHistoryRow('claim-err', 'CLAIM-ERR', 'COMMON', 500)],
+        claimItemsByClaimId: new Map([
+          [
+            'claim-err',
+            [
+              {
+                claim_id: 'claim-err',
+                item_type: 'unmapped_type',
+                amount: 100,
+              },
+            ],
+          ],
+        ]),
+        balAccountNoByItemType: new Map(),
+        postingDate: '15/04/2026',
+        exportProfile: BC_PROFILE,
+      })
+    ).toThrow(
+      'BC export is missing an active Bal. Account mapping for claim CLAIM-ERR.'
+    )
+  })
+
+  it('handles string and null total_amount gracefully', () => {
+    const rows = buildBcExpenseRows({
+      historyRows: [
+        {
+          ...buildHistoryRow('claim-s', 'CLAIM-S', null, 0),
+          claim: {
+            ...buildHistoryRow('claim-s', 'CLAIM-S', null, 0).claim,
+            total_amount: '300' as unknown as number,
+            expense_region_code: null,
+          },
+        },
+      ],
+      claimItemsByClaimId: new Map([
+        ['claim-s', [{ claim_id: 'claim-s', item_type: 'food', amount: 100 }]],
+      ]),
+      balAccountNoByItemType: new Map([
+        ['food', '503063'],
+        ['fuel', '535002'],
+      ]),
+      postingDate: '15/04/2026',
+      exportProfile: BC_PROFILE,
+    })
+
+    expect(rows).toHaveLength(2)
+    expect(rows[1][5]).toBe('-200')
+    expect(rows[1][13]).toBe('')
+  })
+
   it('adds a reconciliation row when mapped items do not cover claim total', () => {
     const rows = buildBcExpenseRows({
       historyRows: [buildHistoryRow('claim-5', 'CLAIM-5', 'COMMON', 420)],

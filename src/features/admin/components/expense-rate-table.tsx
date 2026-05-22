@@ -8,6 +8,7 @@ import {
   toggleExpenseRateActiveAction,
   updateExpenseRateAction,
 } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 
 type ExpenseRate = {
   id: string
@@ -32,10 +33,20 @@ export function ExpenseRateTable({ rates }: Props) {
   const [draftAmount, setDraftAmount] = useState(0)
 
   async function handleToggle(id: string, currentActive: boolean) {
+    const actionLabel = currentActive ? 'deactivate' : 'activate'
+    const isConfirmed = await confirmAdminAction(
+      `${actionLabel[0]?.toUpperCase() ?? ''}${actionLabel.slice(1)} this expense rate?`
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setPending(id)
     const result = await toggleExpenseRateActiveAction({
       id,
       isActive: !currentActive,
+      confirmation: 'CONFIRM',
     })
     if (result.ok) {
       toast.success(`Rate ${currentActive ? 'deactivated' : 'activated'}.`)
@@ -52,10 +63,19 @@ export function ExpenseRateTable({ rates }: Props) {
   }
 
   async function saveRate(id: string) {
+    const isConfirmed = await confirmAdminAction(
+      'Save updated expense rate amount?'
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setPending(id)
     const result = await updateExpenseRateAction({
       id,
       rateAmount: draftAmount,
+      confirmation: 'CONFIRM',
     })
     if (result.ok) {
       toast.success('Rate updated.')

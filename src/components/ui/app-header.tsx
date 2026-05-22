@@ -10,6 +10,7 @@ import { getDashboardAccessFromRoles } from '@/features/employees/permissions/ac
 import { LogoutButton } from '@/features/auth/components/logout-button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { AppNavLinks } from '@/components/ui/app-nav-links'
+import { NetworkStatusIndicator } from '@/components/ui/network-status-indicator'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export async function AppHeader() {
@@ -93,6 +94,7 @@ export async function AppHeader() {
           </Link>
           <div className="hidden sm:block w-px h-6 bg-border" />
           <ThemeToggle />
+          <NetworkStatusIndicator />
           <LogoutButton />
         </div>
       </div>

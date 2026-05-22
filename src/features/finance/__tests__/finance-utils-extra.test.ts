@@ -7,6 +7,12 @@ import {
   toIstDayEnd,
   toIstDayStart,
 } from '@/features/finance/utils/filters'
+import {
+  getFinanceActionCodesForFilter,
+  hasRejectFinanceActionCode,
+  shouldForceAllowResubmitFromActionFilter,
+  REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
+} from '@/features/finance/utils/action-filter'
 import type { FinanceFilters } from '@/features/finance/types'
 
 const BASE_FILTERS: FinanceFilters = {
@@ -143,6 +149,44 @@ describe('buildFinanceHistoryCsv', () => {
     expect(csv).toContain('"Program Manager"')
     expect(csv).toContain('"finance rejected"')
     expect(csv).toContain('"Rs. 850.00"')
+  })
+})
+
+describe('action-filter utils', () => {
+  it('returns empty array for falsy actionFilter', () => {
+    expect(getFinanceActionCodesForFilter(null as never)).toEqual([])
+    expect(getFinanceActionCodesForFilter('' as never)).toEqual([])
+  })
+
+  it('returns reject codes for rejected_allow_reclaim filter', () => {
+    const codes = getFinanceActionCodesForFilter(
+      REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE
+    )
+    expect(codes).toContain('rejected')
+    expect(codes).toContain('finance_rejected')
+  })
+
+  it('returns single code for a regular action filter', () => {
+    const codes = getFinanceActionCodesForFilter('finance_approved')
+    expect(codes).toEqual(['finance_approved'])
+  })
+
+  it('detects reject action codes in an array', () => {
+    expect(hasRejectFinanceActionCode(['finance_rejected'])).toBe(true)
+    expect(hasRejectFinanceActionCode(['rejected'])).toBe(true)
+    expect(hasRejectFinanceActionCode(['finance_approved'])).toBe(false)
+    expect(hasRejectFinanceActionCode([])).toBe(false)
+  })
+
+  it('forces allow-resubmit only for the rejected_allow_reclaim filter', () => {
+    expect(
+      shouldForceAllowResubmitFromActionFilter(
+        REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE
+      )
+    ).toBe(true)
+    expect(shouldForceAllowResubmitFromActionFilter('finance_approved')).toBe(
+      false
+    )
   })
 })
 

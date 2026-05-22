@@ -106,16 +106,19 @@ describe('admin action branch coverage', () => {
     const designation = await toggleDesignationActiveAction({
       id: 'invalid-id',
       isActive: true,
+      confirmation: 'CONFIRM',
     } as never)
 
     const workLocation = await toggleWorkLocationActiveAction({
       id: 'invalid-id',
       isActive: true,
+      confirmation: 'CONFIRM',
     } as never)
 
     const vehicle = await toggleVehicleTypeActiveAction({
       id: 'invalid-id',
       isActive: true,
+      confirmation: 'CONFIRM',
     } as never)
 
     const vehicleRates = await updateVehicleRatesAction({
@@ -123,16 +126,19 @@ describe('admin action branch coverage', () => {
       baseFuelRatePerDay: 300,
       intercityRatePerKm: 8,
       maxKmRoundTrip: 300,
+      confirmation: 'CONFIRM',
     } as never)
 
     const expenseRate = await updateExpenseRateAction({
       id: 'invalid-id',
       rateAmount: 420,
+      confirmation: 'CONFIRM',
     } as never)
 
     const expenseToggle = await toggleExpenseRateActiveAction({
       id: 'invalid-id',
       isActive: false,
+      confirmation: 'CONFIRM',
     } as never)
 
     for (const result of [
@@ -207,6 +213,7 @@ describe('admin action branch coverage', () => {
     const result = await toggleWorkLocationActiveAction({
       id: VALID_ID,
       isActive: true,
+      confirmation: 'CONFIRM',
     })
 
     expect(result).toEqual({ ok: true, error: null })
@@ -262,6 +269,7 @@ describe('admin action branch coverage', () => {
         toggleDesignationActiveAction({
           id: VALID_ID,
           isActive: false,
+          confirmation: 'CONFIRM',
         }),
       expected: 'Failed to update designation.',
     },
@@ -271,6 +279,7 @@ describe('admin action branch coverage', () => {
         toggleWorkLocationActiveAction({
           id: VALID_ID,
           isActive: false,
+          confirmation: 'CONFIRM',
         }),
       expected: 'Failed to update work location.',
     },
@@ -280,6 +289,7 @@ describe('admin action branch coverage', () => {
         toggleVehicleTypeActiveAction({
           id: VALID_ID,
           isActive: false,
+          confirmation: 'CONFIRM',
         }),
       expected: 'Failed to update vehicle type.',
     },
@@ -291,6 +301,7 @@ describe('admin action branch coverage', () => {
           baseFuelRatePerDay: 300,
           intercityRatePerKm: 8,
           maxKmRoundTrip: 300,
+          confirmation: 'CONFIRM',
         }),
       expected: 'Failed to update vehicle rates.',
     },
@@ -300,6 +311,7 @@ describe('admin action branch coverage', () => {
         updateExpenseRateAction({
           id: VALID_ID,
           rateAmount: 420,
+          confirmation: 'CONFIRM',
         }),
       expected: 'Failed to update expense rate.',
     },
@@ -309,6 +321,7 @@ describe('admin action branch coverage', () => {
         toggleExpenseRateActiveAction({
           id: VALID_ID,
           isActive: false,
+          confirmation: 'CONFIRM',
         }),
       expected: 'Failed to update expense rate.',
     },
@@ -343,16 +356,19 @@ describe('admin action branch coverage', () => {
       baseFuelRatePerDay: 300,
       intercityRatePerKm: 8,
       maxKmRoundTrip: 300,
+      confirmation: 'CONFIRM',
     })
 
     const expenseRate = await updateExpenseRateAction({
       id: VALID_ID,
       rateAmount: 420,
+      confirmation: 'CONFIRM',
     })
 
     const expenseToggle = await toggleExpenseRateActiveAction({
       id: VALID_ID,
       isActive: false,
+      confirmation: 'CONFIRM',
     })
 
     expect(vehicleRates).toEqual({

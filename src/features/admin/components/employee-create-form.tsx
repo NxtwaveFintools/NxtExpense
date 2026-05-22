@@ -9,6 +9,7 @@ import {
   getApproverOptionsByStateAction,
   getEmployeeFormOptionsAction,
 } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 import type { AdminEmployeeFormOptions } from '@/features/admin/types'
 import { EmployeeFormFields } from './employee-form-fields'
 
@@ -208,6 +209,16 @@ export function EmployeeCreateForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setErrorMessage(null)
+
+    const isConfirmed = await confirmAdminAction(
+      replacementDraft
+        ? `Create replacement employee for "${replacementDraft.oldEmployeeName}"?`
+        : 'Create this employee record?'
+    )
+
+    if (!isConfirmed) {
+      return
+    }
 
     setIsSubmitting(true)
     const result = await createEmployeeAction({

@@ -9,6 +9,7 @@ import {
   reassignApproversAction,
   prepareEmployeeReplacementAction,
 } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 import type { AdminEmployeeRow } from '@/features/admin/queries'
 import { EmployeeCreateForm } from '@/features/admin/components/employee-create-form'
 
@@ -79,6 +80,14 @@ export function EmployeeManagement() {
       return
     }
 
+    const isConfirmed = await confirmAdminAction(
+      `Prepare replacement for "${replaceTarget.employee_name}"?\n\nThis will inactivate the employee immediately.`
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setIsPreparingReplacement(true)
 
     const result = await prepareEmployeeReplacementAction({
@@ -105,6 +114,15 @@ export function EmployeeManagement() {
 
   async function handleReassign() {
     if (!selectedEmployee || !reassignReason.trim()) return
+
+    const isConfirmed = await confirmAdminAction(
+      `Reassign approvers for "${selectedEmployee.employee_name}"?`
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setIsReassigning(true)
 
     const result = await reassignApproversAction({

@@ -106,6 +106,12 @@ export default async function AdminPage() {
           >
             Expense Rates
           </Link>
+          <Link
+            href="/admin/state-city"
+            className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            State & City Configuration
+          </Link>
         </div>
       </div>
     </div>

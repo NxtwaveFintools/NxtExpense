@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { toggleWorkLocationActiveAction } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 
 type WorkLocation = {
   id: string
@@ -23,10 +24,20 @@ export function WorkLocationTable({ workLocations }: Props) {
   const [pending, setPending] = useState<string | null>(null)
 
   async function handleToggle(id: string, currentActive: boolean) {
+    const actionLabel = currentActive ? 'deactivate' : 'activate'
+    const isConfirmed = await confirmAdminAction(
+      `${actionLabel[0]?.toUpperCase() ?? ''}${actionLabel.slice(1)} this work location?`
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setPending(id)
     const result = await toggleWorkLocationActiveAction({
       id,
       isActive: !currentActive,
+      confirmation: 'CONFIRM',
     })
     if (result.ok) {
       toast.success(

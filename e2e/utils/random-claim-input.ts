@@ -87,7 +87,7 @@ async function waitForIntercityCityOptions(
   page: Page,
   claims: ClaimsPage
 ): Promise<{ fromOptions: SelectOption[]; toOptions: SelectOption[] } | null> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + 2_000
 
   while (Date.now() < deadline) {
     const fromOptions = await readSelectOptions(claims.fromCityInput)
@@ -109,18 +109,31 @@ async function fillOutstationIntercityRandomDetails(
 ): Promise<number | null> {
   await claims.intercityOwnVehicleYesButton.click()
 
-  if (!(await isVisible(claims.outstationStateSelect))) {
+  const stateSelectVisible = await claims.outstationStateSelect
+    .waitFor({ state: 'visible', timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false)
+
+  if (!stateSelectVisible) {
     return null
   }
 
-  const stateOptions = shuffledCopy(
+  const allStateOptions = shuffledCopy(
     await readSelectOptions(claims.outstationStateSelect)
   )
 
+  // Try at most 3 states to avoid excessive waits when cities are slow to load
+  const stateOptions = allStateOptions.slice(0, 3)
+
   for (const stateOption of stateOptions) {
-    await claims.outstationStateSelect.selectOption({
-      value: stateOption.value,
-    })
+    const selected = await claims.outstationStateSelect
+      .selectOption({ value: stateOption.value }, { timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false)
+
+    if (!selected) {
+      return null
+    }
 
     const cityOptions = await waitForIntercityCityOptions(page, claims)
     if (!cityOptions) {

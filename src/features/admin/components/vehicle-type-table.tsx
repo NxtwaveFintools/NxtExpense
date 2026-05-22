@@ -8,6 +8,7 @@ import {
   toggleVehicleTypeActiveAction,
   updateVehicleRatesAction,
 } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 
 type VehicleType = {
   id: string
@@ -31,10 +32,20 @@ export function VehicleTypeTable({ vehicleTypes }: Props) {
   const [draft, setDraft] = useState({ baseFuel: 0, intercity: 0, maxKm: 0 })
 
   async function handleToggle(id: string, currentActive: boolean) {
+    const actionLabel = currentActive ? 'deactivate' : 'activate'
+    const isConfirmed = await confirmAdminAction(
+      `${actionLabel[0]?.toUpperCase() ?? ''}${actionLabel.slice(1)} this vehicle type?`
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setPending(id)
     const result = await toggleVehicleTypeActiveAction({
       id,
       isActive: !currentActive,
+      confirmation: 'CONFIRM',
     })
     if (result.ok) {
       toast.success(
@@ -57,12 +68,21 @@ export function VehicleTypeTable({ vehicleTypes }: Props) {
   }
 
   async function saveRates(id: string) {
+    const isConfirmed = await confirmAdminAction(
+      'Save updated vehicle reimbursement rates?'
+    )
+
+    if (!isConfirmed) {
+      return
+    }
+
     setPending(id)
     const result = await updateVehicleRatesAction({
       id,
       baseFuelRatePerDay: draft.baseFuel,
       intercityRatePerKm: draft.intercity,
       maxKmRoundTrip: draft.maxKm,
+      confirmation: 'CONFIRM',
     })
     if (result.ok) {
       toast.success('Vehicle rates updated.')

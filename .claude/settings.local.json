@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "Bash(npx playwright *)",
+      "Bash(PW_WORKERS=6 npx playwright test \"approval-history-visibility.spec.ts\" \"approval-rejection-flows.spec.ts\" \"approval-workflow-matrix.spec.ts\" \"approval-workflow.spec.ts\" \"state-food-override-approval-matrix.spec.ts\" \"finance-rejection-flows.spec.ts\" --reporter=line)",
+      "Bash(npm run *)",
+      "Bash(more)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Nxtwave\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Nxtwave-Documents-NxtExpense\\\\9ede9562-7b36-4297-9b6b-0dfadd9d4d32\\\\tasks\\\\bnxfqflk4.output\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 100)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)"
+    ]
+  }
+}
