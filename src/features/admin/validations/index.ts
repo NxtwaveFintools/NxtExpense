@@ -1,10 +1,15 @@
 import { z } from 'zod'
 
+const secondaryConfirmationSchema = z.literal(
+  'CONFIRM',
+  'Secondary confirmation is required.'
+)
+
 export const adminStatusChangeSchema = z.object({
   claimId: z.string().uuid('Invalid claim identifier.'),
   targetStatusId: z.string().uuid('Target status is required.'),
   reason: z.string().trim().min(1, 'Status change reason is required.'),
-  confirmation: z.literal('CONFIRM', 'Secondary confirmation is required.'),
+  confirmation: secondaryConfirmationSchema,
 })
 
 const adminEmailSchema = z
@@ -19,17 +24,19 @@ export const adminReassignApproverSchema = z.object({
   approvalLevel2: adminEmailSchema,
   approvalLevel3: adminEmailSchema,
   reason: z.string().trim().min(1, 'Reassignment reason is required.'),
-  confirmation: z.literal('CONFIRM', 'Secondary confirmation is required.'),
+  confirmation: secondaryConfirmationSchema,
 })
 
 export const adminToggleActiveSchema = z.object({
   id: z.string().uuid('Invalid identifier.'),
   isActive: z.boolean(),
+  confirmation: secondaryConfirmationSchema,
 })
 
 export const adminUpdateRateSchema = z.object({
   id: z.string().uuid('Invalid rate identifier.'),
   rateAmount: z.number().min(0, 'Rate amount must be non-negative.'),
+  confirmation: secondaryConfirmationSchema,
 })
 
 export const adminUpdateVehicleRatesSchema = z.object({
@@ -37,6 +44,64 @@ export const adminUpdateVehicleRatesSchema = z.object({
   baseFuelRatePerDay: z.number().min(0, 'Rate must be non-negative.'),
   intercityRatePerKm: z.number().min(0, 'Rate must be non-negative.'),
   maxKmRoundTrip: z.number().int().min(0, 'KM limit must be non-negative.'),
+  confirmation: secondaryConfirmationSchema,
+})
+
+export const adminUpsertApproverRuleSchema = z.object({
+  approvalLevel: z
+    .number()
+    .int()
+    .min(1, 'Approval level must be between 1 and 3.')
+    .max(3, 'Approval level must be between 1 and 3.'),
+  designationId: z.string().uuid('Invalid designation identifier.'),
+  requiresSameState: z.boolean(),
+  isActive: z.boolean(),
+  confirmation: secondaryConfirmationSchema,
+})
+
+const stateNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'State name is required.')
+  .max(120, 'State name must be 120 characters or fewer.')
+
+const cityNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'City name is required.')
+  .max(120, 'City name must be 120 characters or fewer.')
+
+export const adminCreateStateSchema = z.object({
+  stateName: stateNameSchema,
+  confirmation: secondaryConfirmationSchema,
+})
+
+export const adminUpdateStateSchema = z.object({
+  id: z.string().uuid('Invalid state identifier.'),
+  stateName: stateNameSchema,
+  confirmation: secondaryConfirmationSchema,
+})
+
+export const adminCreateCitySchema = z.object({
+  stateId: z.string().uuid('Invalid state identifier.'),
+  cityName: cityNameSchema,
+  confirmation: secondaryConfirmationSchema,
+})
+
+export const adminUpdateCitySchema = z.object({
+  id: z.string().uuid('Invalid city identifier.'),
+  cityName: cityNameSchema,
+  confirmation: secondaryConfirmationSchema,
+})
+
+export const adminBulkImportCitiesSchema = z.object({
+  stateId: z.string().uuid('Invalid state identifier.'),
+  rawInput: z
+    .string()
+    .trim()
+    .min(1, 'At least one city is required for import.')
+    .max(20_000, 'Bulk city input is too large.'),
+  confirmation: secondaryConfirmationSchema,
 })
 
 const optionalUuidSchema = z.preprocess((value) => {
@@ -111,7 +176,7 @@ export const adminPrepareReplacementSchema = z.object({
     .trim()
     .min(1, 'Replacement reason is required.')
     .max(500, 'Replacement reason cannot exceed 500 characters.'),
-  confirmation: z.literal('CONFIRM', 'Secondary confirmation is required.'),
+  confirmation: secondaryConfirmationSchema,
 })
 
 export function normalizeOptionalUuid(value?: string): string | null {

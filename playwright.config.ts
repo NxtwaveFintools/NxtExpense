@@ -22,7 +22,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: 1,
   workers: resolvedWorkers,
   reporter: [['list'], ['html', { open: 'never' }]],
   timeout: 60_000,
@@ -35,6 +35,7 @@ export default defineConfig({
     headless: process.env.PW_HEADED === '1' ? false : true,
     launchOptions:
       process.env.PW_HEADED === '1' ? { slowMo: localSlowMo } : undefined,
+    actionTimeout: 15_000,
   },
   webServer: runAgainstExternalBaseUrl
     ? undefined

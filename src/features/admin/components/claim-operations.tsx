@@ -10,6 +10,7 @@ import {
   getClaimStatusOptionsAction,
   searchClaimsAction,
 } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 import type {
   AdminClaimRow,
   AdminClaimStatusOption,
@@ -73,6 +74,17 @@ export function ClaimOperations() {
 
   async function handleStatusChange() {
     if (!selectedClaim || !targetStatusId || !statusChangeReason.trim()) {
+      return
+    }
+
+    const selectedStatus = statusOptions.find(
+      (status) => status.id === targetStatusId
+    )
+    const isConfirmed = await confirmAdminAction(
+      `Change claim ${selectedClaim.claim_number} status to "${selectedStatus?.status_name ?? 'selected status'}"?`
+    )
+
+    if (!isConfirmed) {
       return
     }
 

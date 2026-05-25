@@ -74,12 +74,15 @@ export const PM_MANSOOR: TestAccount = {
 
 // Shared approver/direct-flow accounts
 
-export const SBH_TN_KERALA: TestAccount = {
-  email: 'sreejish.mohanakumar@nxtwave.co.in',
-  label: 'SBH TN/Kerala - Sreejish Mohana Kumar',
-  designation: 'State Business Head',
+export const TN_KERALA_L1_HARI: TestAccount = {
+  email: 'hari.haran@nxtwave.co.in',
+  label: 'TN/Kerala L1 - Hari Haran S',
+  designation: 'Level 1 Approver',
   state: 'Tamil Nadu, Kerala',
 }
+
+// Backward-compatible alias used by existing specs.
+export const SBH_TN_KERALA: TestAccount = TN_KERALA_L1_HARI
 
 // Finance team
 
@@ -90,7 +93,7 @@ export const FINANCE_1: TestAccount = {
 }
 
 export const FINANCE_2: TestAccount = {
-  email: 'finance2@nxtwave.co.in',
-  label: 'Finance User 2',
+  email: 'chennakesava.konda@nxtwave.co.in',
+  label: 'Finance User 2 - Chennakesava K',
   designation: 'Finance',
 }

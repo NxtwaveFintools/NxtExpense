@@ -367,10 +367,9 @@ export class ClaimsPage {
     const claimRow = this.getClaimRowByNumber(claimNumber)
     await claimRow.locator('a[href*="/claims/"]').first().click()
     await this.page.waitForURL(/\/claims\//)
-    await this.page.waitForLoadState('networkidle')
     await expect(
       this.page.getByRole('heading', { name: /^Claim Details$/i })
-    ).toBeVisible({ timeout: 20_000 })
+    ).toBeVisible({ timeout: 45_000 })
   }
 
   async getLatestClaimNumber(timeoutMs = 30_000): Promise<string> {

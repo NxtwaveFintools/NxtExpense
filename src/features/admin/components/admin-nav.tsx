@@ -6,6 +6,7 @@ import {
   BarChart3,
   FileText,
   Users,
+  Map,
   MapPin,
   Car,
   DollarSign,
@@ -45,6 +46,11 @@ const NAV_ITEMS: NavItem[] = [
     href: '/admin/work-locations',
     label: 'Work Locations',
     icon: <MapPin className="size-4" />,
+  },
+  {
+    href: '/admin/state-city',
+    label: 'State & City',
+    icon: <Map className="size-4" />,
   },
   {
     href: '/admin/approver-rules',

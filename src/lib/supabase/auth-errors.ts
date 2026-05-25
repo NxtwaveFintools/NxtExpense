@@ -75,3 +75,40 @@ export function isMissingAuthSessionError(error: unknown): boolean {
 export function isRecoverableAuthSessionError(error: unknown): boolean {
   return isStaleRefreshTokenError(error) || isMissingAuthSessionError(error)
 }
+
+// Phrases that unambiguously indicate an expired/unusable auth session.
+// Kept JWT/refresh-token specific to avoid matching domain errors (e.g. an
+// expense-claim error mentioning "claim").
+const SESSION_RECOVERABLE_MESSAGE_HINTS = [
+  'jwt expired',
+  'invalid jwt',
+  'invalid refresh token',
+  'refresh token not found',
+  'auth session missing',
+] as const
+
+/**
+ * True when an error means the user's auth session is expired or invalid and
+ * they can recover by signing in again.
+ *
+ * Covers both Supabase AuthError objects and the plain Errors thrown by the
+ * data layer — e.g. a PostgREST 401 surfaced by a repository as
+ * `new Error('JWT expired')`, which is not an AuthError and therefore not
+ * caught by isRecoverableAuthSessionError.
+ */
+export function isSessionRecoverableError(error: unknown): boolean {
+  if (isRecoverableAuthSessionError(error)) return true
+
+  const message = normalize(
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : undefined
+  )
+
+  return (
+    message.length > 0 &&
+    includesAnyHint(message, SESSION_RECOVERABLE_MESSAGE_HINTS)
+  )
+}

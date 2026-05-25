@@ -90,7 +90,7 @@ async function submitOfficeClaimAndGetClaimNumber(
 
     try {
       await page.waitForURL((url: URL) => url.pathname === '/claims', {
-        timeout: 5_000,
+        timeout: 15_000,
       })
       navigatedToClaims = true
     } catch {

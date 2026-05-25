@@ -214,6 +214,34 @@ describe('payment journals export util', () => {
     ).toThrow('Payment Journals export profile is missing payment method code.')
   })
 
+  it('handles string total_amount and non-finite values gracefully', () => {
+    const totalsByEmployeeId = new Map<string, number>()
+
+    accumulatePaymentJournalsEmployeeTotals({
+      historyRows: [
+        {
+          ...buildHistoryRow('claim-str', 'CLAIM-STR', 0, 'NW0009001'),
+          claim: {
+            ...buildHistoryRow('claim-str', 'CLAIM-STR', 0, 'NW0009001').claim,
+            total_amount: '450.75' as unknown as number,
+          },
+        },
+        {
+          ...buildHistoryRow('claim-nan', 'CLAIM-NAN', 0, 'NW0009002'),
+          claim: {
+            ...buildHistoryRow('claim-nan', 'CLAIM-NAN', 0, 'NW0009002').claim,
+            total_amount: NaN,
+          },
+        },
+      ],
+      seenClaimIds: new Set<string>(),
+      totalsByEmployeeId,
+    })
+
+    expect(totalsByEmployeeId.get('NW0009001')).toBe(450.75)
+    expect(totalsByEmployeeId.get('NW0009002')).toBe(0)
+  })
+
   it('includes claims even when mapped claim-item rows are unavailable', () => {
     const totalsByEmployeeId = new Map<string, number>()
 
