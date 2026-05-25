@@ -50,6 +50,15 @@ export default function AppError({
             <ArrowRight className="size-4" />
           </Link>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Signed in a while ago?{' '}
+          <Link
+            href="/login"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Sign in again
+          </Link>
+        </p>
       </div>
     </div>
   )

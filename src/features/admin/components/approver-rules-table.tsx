@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { upsertApproverRuleAction } from '@/features/admin/actions'
+import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
 
 type DesignationOption = {
   id: string
@@ -44,9 +45,18 @@ export function ApproverRulesTable({ rules, designations }: Props) {
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftRule>(INITIAL_DRAFT)
 
-  async function saveRule(payload: DraftRule, key: string) {
+  async function saveRule(payload: DraftRule, key: string, message: string) {
+    const isConfirmed = await confirmAdminAction(message)
+
+    if (!isConfirmed) {
+      return
+    }
+
     setPendingKey(key)
-    const result = await upsertApproverRuleAction(payload)
+    const result = await upsertApproverRuleAction({
+      ...payload,
+      confirmation: 'CONFIRM',
+    })
 
     if (!result.ok) {
       toast.error(result.error ?? 'Failed to save approver rule.')
@@ -128,7 +138,13 @@ export function ApproverRulesTable({ rules, designations }: Props) {
           <button
             type="button"
             disabled={!draft.designationId || pendingKey === 'new-rule'}
-            onClick={() => saveRule(draft, 'new-rule')}
+            onClick={() =>
+              saveRule(
+                draft,
+                'new-rule',
+                'Save this approver rule configuration?'
+              )
+            }
             className="h-9 self-end rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
             {pendingKey === 'new-rule' ? 'Saving...' : 'Save Rule'}
@@ -180,7 +196,8 @@ export function ApproverRulesTable({ rules, designations }: Props) {
                             requiresSameState: !rule.requires_same_state,
                             isActive: rule.is_active,
                           },
-                          key
+                          key,
+                          'Update same-state restriction for this approver rule?'
                         )
                       }
                       className="rounded border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
@@ -203,7 +220,8 @@ export function ApproverRulesTable({ rules, designations }: Props) {
                             requiresSameState: rule.requires_same_state,
                             isActive: !rule.is_active,
                           },
-                          key
+                          key,
+                          `${rule.is_active ? 'Deactivate' : 'Activate'} this approver rule?`
                         )
                       }
                       className="rounded border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"

@@ -346,6 +346,7 @@ describe('admin actions integration', () => {
     const result = await toggleDesignationActiveAction({
       id: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
       isActive: false,
+      confirmation: 'CONFIRM',
     })
 
     // Assert
@@ -370,6 +371,7 @@ describe('admin actions integration', () => {
     const result = await toggleWorkLocationActiveAction({
       id: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
       isActive: true,
+      confirmation: 'CONFIRM',
     })
 
     // Assert
@@ -382,6 +384,7 @@ describe('admin actions integration', () => {
     const toggleResult = await toggleVehicleTypeActiveAction({
       id: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
       isActive: true,
+      confirmation: 'CONFIRM',
     })
 
     const ratesResult = await updateVehicleRatesAction({
@@ -389,6 +392,7 @@ describe('admin actions integration', () => {
       baseFuelRatePerDay: 300,
       intercityRatePerKm: 8,
       maxKmRoundTrip: 300,
+      confirmation: 'CONFIRM',
     })
 
     // Assert
@@ -419,11 +423,13 @@ describe('admin actions integration', () => {
     const updateResult = await updateExpenseRateAction({
       id: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
       rateAmount: 420,
+      confirmation: 'CONFIRM',
     })
 
     const toggleResult = await toggleExpenseRateActiveAction({
       id: '5db22d75-b209-4f30-b5c8-f4f27ebee9e8',
       isActive: false,
+      confirmation: 'CONFIRM',
     })
 
     // Assert

@@ -3,6 +3,7 @@ import { toCsvCell } from '@/lib/utils/csv'
 import type {
   ApprovalHistoryFilters,
   ApprovalHistoryRecord,
+  PendingApprovalsFilters,
 } from '@/features/approvals/types'
 import { approvalHistoryFiltersSchema } from '@/features/approvals/validations'
 
@@ -60,6 +61,21 @@ export function normalizeApprovalHistoryFilters(
     hodApprovedTo: value.hodApprovedTo ?? null,
     financeApprovedFrom: value.financeApprovedFrom ?? null,
     financeApprovedTo: value.financeApprovedTo ?? null,
+  }
+}
+
+export function toPendingApprovalsFilters(
+  filters: ApprovalHistoryFilters
+): PendingApprovalsFilters {
+  return {
+    employeeName: filters.employeeName,
+    claimStatus: filters.claimStatus,
+    claimDateFrom: filters.claimDateFrom,
+    claimDateTo: filters.claimDateTo,
+    amountOperator: filters.amountOperator,
+    amountValue: filters.amountValue,
+    locationType: filters.locationType,
+    claimDateSort: filters.claimDateSort,
   }
 }
 

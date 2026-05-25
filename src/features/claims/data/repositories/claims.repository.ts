@@ -492,6 +492,24 @@ export async function validateCitiesForSelectedState(
   stateId: string,
   cityIds: Array<string | undefined>
 ): Promise<string | null> {
+  const { data: selectedState, error: stateError } = await supabase
+    .from('states')
+    .select('id, is_active')
+    .eq('id', stateId)
+    .maybeSingle()
+
+  if (stateError) {
+    return 'Unable to validate selected state.'
+  }
+
+  if (!selectedState) {
+    return 'Selected state is invalid.'
+  }
+
+  if (!selectedState.is_active) {
+    return 'Selected state is inactive. Please choose an active state.'
+  }
+
   const uniqueCityIds = [...new Set(cityIds.filter(Boolean))] as string[]
 
   if (uniqueCityIds.length === 0) {
@@ -502,6 +520,7 @@ export async function validateCitiesForSelectedState(
     .from('cities')
     .select('id')
     .eq('state_id', stateId)
+    .eq('is_active', true)
     .in('id', uniqueCityIds)
 
   if (error) {
@@ -512,6 +531,6 @@ export async function validateCitiesForSelectedState(
   const hasInvalidCity = uniqueCityIds.some((cityId) => !validIds.has(cityId))
 
   return hasInvalidCity
-    ? 'Selected cities must belong to the selected state.'
+    ? 'Selected cities must be active and belong to the selected state.'
     : null
 }

@@ -44,9 +44,16 @@ vi.mock('@/features/claims/data/queries', () => ({
   getClaimAvailableActionsByClaimIds: mocks.getClaimAvailableActionsByClaimIds,
 }))
 
-vi.mock('@/features/approvals/utils/history-filters', () => ({
-  normalizeApprovalHistoryFilters: mocks.normalizeApprovalHistoryFilters,
-}))
+vi.mock('@/features/approvals/utils/history-filters', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/features/approvals/utils/history-filters')
+  >('@/features/approvals/utils/history-filters')
+
+  return {
+    ...actual,
+    normalizeApprovalHistoryFilters: mocks.normalizeApprovalHistoryFilters,
+  }
+})
 
 vi.mock('@/lib/services/system-settings-service', async () => {
   const actual = await vi.importActual<

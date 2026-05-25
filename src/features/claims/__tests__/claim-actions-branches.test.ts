@@ -176,6 +176,15 @@ describe('submitClaimAction branch coverage', () => {
       }),
     }
 
+    const statesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: 'state-tg', is_active: true },
+        error: null,
+      }),
+    }
+
     const citiesQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -197,6 +206,10 @@ describe('submitClaimAction branch coverage', () => {
       },
       rpc: rpcMock,
       from: vi.fn((table: string) => {
+        if (table === 'states') {
+          return statesQuery
+        }
+
         if (table === 'cities') {
           return citiesQuery
         }
