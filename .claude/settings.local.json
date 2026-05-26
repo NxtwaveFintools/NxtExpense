@@ -10,7 +10,8 @@
       "Bash(Select-Object -First 100)",
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "mcp__claude_ai_Supabase__execute_sql"
     ]
   }
 }
