@@ -83,24 +83,26 @@ export async function getFinanceFilterOptions(
 
   let hodEmployeeIds: string[] = []
   if (financeReviewStatus) {
-    const { data: hodRows, error: hodError } = await supabase
-      .from('approval_history')
-      .select('approver_employee_id')
-      .eq('new_status_id', financeReviewStatus.id)
-      .not('approver_employee_id', 'is', null)
-      .limit(200)
+    // Use SECURITY DEFINER RPC to bypass the expensive RLS policies on
+    // approval_history ("approver reads pending-routed claim history" calls
+    // get_claim_available_actions() — VOLATILE, 6 queries per row — for every
+    // matching row before "finance can read claim history" short-circuits it).
+    // The RPC enforces a finance/admin role check internally.
+    const { data: hodRows, error: hodError } = await supabase.rpc(
+      'get_hod_approver_employee_ids',
+      { p_new_status_id: financeReviewStatus.id }
+    )
 
     if (hodError) {
       throw new Error(hodError.message)
     }
 
-    hodEmployeeIds = [
-      ...new Set(
-        (hodRows ?? [])
-          .map((row) => row.approver_employee_id as string | null)
-          .filter((id): id is string => Boolean(id))
-      ),
-    ]
+    hodEmployeeIds = (hodRows ?? [])
+      .map(
+        (row: { approver_employee_id: string | null }) =>
+          row.approver_employee_id
+      )
+      .filter((id: string | null): id is string => Boolean(id))
   }
 
   type ClaimStatusFilterRow = {

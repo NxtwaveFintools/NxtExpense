@@ -11,7 +11,13 @@
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
       "Bash(npx vitest *)",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(python *)",
+      "mcp__claude_ai_Supabase__get_logs",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_branches",
+      "Bash(node *)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ]
   }
 }
