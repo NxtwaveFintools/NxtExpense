@@ -1,6 +1,6 @@
 import { test as base, type Page } from '@playwright/test'
 
-import { TEST_PASSWORD } from './test-accounts'
+import { getTestPassword } from './test-accounts'
 
 const LOGIN_MAX_ATTEMPTS = 2
 const LOGIN_RETRY_DELAY_MS = 600
@@ -43,7 +43,7 @@ async function loginWithPassword(page: Page, email: string): Promise<void> {
     const passwordInput = page.getByLabel('Password')
 
     await emailInput.fill(email)
-    await passwordInput.fill(TEST_PASSWORD)
+    await passwordInput.fill(getTestPassword(email))
     await page.getByRole('button', { name: /sign in/i }).click()
 
     try {

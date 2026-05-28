@@ -220,6 +220,7 @@ export async function getFilteredClaimIdsForFinance(
   let dateScopedStatusIds: string[] | null = null
   let financeDateClaimIds: string[] | null = null
   let hodClaimIds: string[] | null = null
+  let designationEmployeeIds: string[] | null = null
   const filterByHodApprovedDate =
     filters.dateFilterField === 'hod_approved_date' &&
     (filters.dateFrom || filters.dateTo)
@@ -304,6 +305,23 @@ export async function getFilteredClaimIdsForFinance(
     }
   }
 
+  if (filters.ownerDesignation) {
+    const { data: empRows, error: empError } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('designation_id', filters.ownerDesignation)
+
+    if (empError) {
+      throw new Error(empError.message)
+    }
+
+    designationEmployeeIds = (empRows ?? []).map((e: { id: string }) => e.id)
+
+    if (designationEmployeeIds.length === 0) {
+      return []
+    }
+  }
+
   const claimIds = new Set<string>()
   let cursor: { created_at: string; id: string } | null = null
 
@@ -311,7 +329,7 @@ export async function getFilteredClaimIdsForFinance(
     let query = supabase
       .from('expense_claims')
       .select(
-        'id, created_at, employees!employee_id!inner(employee_id, employee_name, designation_id)'
+        'id, created_at, employees!employee_id!inner(employee_id, employee_name)'
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -347,8 +365,8 @@ export async function getFilteredClaimIdsForFinance(
       query = query.eq('claim_number', filters.claimNumber)
     }
 
-    if (filters.ownerDesignation) {
-      query = query.eq('employees.designation_id', filters.ownerDesignation)
+    if (designationEmployeeIds) {
+      query = query.in('employee_id', designationEmployeeIds)
     }
 
     if (filters.dateFilterField === 'claim_date') {

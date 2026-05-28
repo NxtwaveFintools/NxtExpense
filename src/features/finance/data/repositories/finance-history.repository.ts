@@ -28,6 +28,8 @@ import {
   normalizeFinanceOwner,
 } from '@/features/finance/data/repositories/finance-shared.repository'
 
+const SAFE_IN_BATCH_SIZE = 150
+
 type FinanceHistoryPaginationOptions = {
   maxFilteredClaimIds?: number | null
 }
@@ -54,15 +56,6 @@ export async function getFinanceHistoryPaginated(
     }
   }
 
-  let query = supabase
-    .from('finance_actions')
-    .select(
-      'id, claim_id, actor_employee_id, action, notes, acted_at, actor:employees!actor_employee_id(employee_email, employee_name)'
-    )
-    .order('acted_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit + 1)
-
   const actionDateFilterField = isFinanceActionDateFilterField(
     filters.dateFilterField
   )
@@ -72,13 +65,14 @@ export async function getFinanceHistoryPaginated(
   const filterByFinanceActionDate =
     actionDateFilterField !== null && (filters.dateFrom || filters.dateTo)
 
+  let resolvedDateFilterActions: string[] = []
   if (filterByFinanceActionDate) {
-    const dateFilterActions = await getFinanceActionCodesForDateFilter(
+    resolvedDateFilterActions = await getFinanceActionCodesForDateFilter(
       supabase,
       actionDateFilterField
     )
 
-    if (dateFilterActions.length === 0) {
+    if (resolvedDateFilterActions.length === 0) {
       return {
         data: [],
         hasNextPage: false,
@@ -86,48 +80,83 @@ export async function getFinanceHistoryPaginated(
         limit,
       }
     }
-
-    query = query.in('action', dateFilterActions)
-  } else if (filters.actionFilter) {
-    const actionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
-
-    if (actionCodes.length > 1) {
-      query = query.in('action', actionCodes)
-    } else {
-      query = query.eq('action', actionCodes[0])
-    }
   }
 
-  if (filterByFinanceActionDate) {
-    const dateFrom = toIstDayStart(filters.dateFrom)
-    const dateTo = toIstDayEnd(filters.dateTo)
+  const buildHistoryPageQuery = (claimIdBatch: string[] | null) => {
+    let q = supabase
+      .from('finance_actions')
+      .select(
+        'id, claim_id, actor_employee_id, action, notes, acted_at, actor:employees!actor_employee_id(employee_email, employee_name)'
+      )
+      .order('acted_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit + 1)
 
-    if (dateFrom) {
-      query = query.gte('acted_at', dateFrom)
+    if (filterByFinanceActionDate) {
+      q = q.in('action', resolvedDateFilterActions)
+    } else if (filters.actionFilter) {
+      const actionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
+      if (actionCodes.length > 1) {
+        q = q.in('action', actionCodes)
+      } else {
+        q = q.eq('action', actionCodes[0])
+      }
     }
 
-    if (dateTo) {
-      query = query.lte('acted_at', dateTo)
+    if (filterByFinanceActionDate) {
+      const dateFrom = toIstDayStart(filters.dateFrom)
+      const dateTo = toIstDayEnd(filters.dateTo)
+      if (dateFrom) q = q.gte('acted_at', dateFrom)
+      if (dateTo) q = q.lte('acted_at', dateTo)
     }
+
+    if (claimIdBatch !== null) {
+      q = q.in('claim_id', claimIdBatch)
+    }
+
+    if (cursor) {
+      const decoded = decodeCursor(cursor)
+      q = q.or(
+        `acted_at.lt.${decoded.created_at},and(acted_at.eq.${decoded.created_at},id.lt.${decoded.id})`
+      )
+    }
+
+    return q
   }
 
-  if (Array.isArray(filteredClaimIds)) {
-    query = query.in('claim_id', filteredClaimIds)
-  }
+  let rawRows: unknown[]
 
-  if (cursor) {
-    const decoded = decodeCursor(cursor)
-    query = query.or(
-      `acted_at.lt.${decoded.created_at},and(acted_at.eq.${decoded.created_at},id.lt.${decoded.id})`
+  if (
+    Array.isArray(filteredClaimIds) &&
+    filteredClaimIds.length > SAFE_IN_BATCH_SIZE
+  ) {
+    const batches: string[][] = []
+    for (let i = 0; i < filteredClaimIds.length; i += SAFE_IN_BATCH_SIZE) {
+      batches.push(filteredClaimIds.slice(i, i + SAFE_IN_BATCH_SIZE))
+    }
+    const results = await Promise.all(
+      batches.map((b) => buildHistoryPageQuery(b))
     )
+    for (const { error } of results) {
+      if (error) throw new Error(error.message)
+    }
+    const merged = results.flatMap((r) => (r.data ?? []) as unknown[])
+    merged.sort((a, b) => {
+      const ra = a as { acted_at: string; id: string }
+      const rb = b as { acted_at: string; id: string }
+      if (ra.acted_at !== rb.acted_at) return rb.acted_at > ra.acted_at ? 1 : -1
+      return rb.id > ra.id ? 1 : -1
+    })
+    rawRows = merged.slice(0, limit + 1)
+  } else {
+    const { data, error } = await buildHistoryPageQuery(
+      Array.isArray(filteredClaimIds) ? filteredClaimIds : null
+    )
+    if (error) throw new Error(error.message)
+    rawRows = (data ?? []) as unknown[]
   }
 
-  const { data, error } = await query
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  const actionRows = (data ?? []) as unknown as Array<{
+  const actionRows = rawRows as unknown as Array<{
     id: string
     claim_id: string
     actor_employee_id: string
@@ -244,19 +273,32 @@ export async function getFinanceHistoryTotalCount(
     filters
   )
 
-  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
-    return 0
+  if (Array.isArray(filteredClaimIds)) {
+    if (filteredClaimIds.length === 0) return 0
+
+    const batches: string[][] = []
+    for (let i = 0; i < filteredClaimIds.length; i += SAFE_IN_BATCH_SIZE) {
+      batches.push(filteredClaimIds.slice(i, i + SAFE_IN_BATCH_SIZE))
+    }
+    const results = await Promise.all(
+      batches.map((b) =>
+        supabase
+          .from('finance_actions')
+          .select('id', { count: 'exact', head: true })
+          .in('claim_id', b)
+      )
+    )
+    let total = 0
+    for (const { count, error } of results) {
+      if (error) throw new Error(error.message)
+      total += count ?? 0
+    }
+    return total
   }
 
-  let query = supabase
+  const { count, error } = await supabase
     .from('finance_actions')
     .select('id', { count: 'exact', head: true })
-
-  if (Array.isArray(filteredClaimIds)) {
-    query = query.in('claim_id', filteredClaimIds)
-  }
-
-  const { count, error } = await query
 
   if (error) {
     throw new Error(error.message)

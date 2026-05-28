@@ -97,3 +97,11 @@ export const FINANCE_2: TestAccount = {
   label: 'Finance User 2 - Chennakesava K',
   designation: 'Finance',
 }
+
+const PASSWORD_OVERRIDES: Record<string, string> = {
+  [PM_MANSOOR.email.toLowerCase()]: 'hod@Nxtwave',
+}
+
+export function getTestPassword(email: string): string {
+  return PASSWORD_OVERRIDES[email.toLowerCase()] ?? TEST_PASSWORD
+}

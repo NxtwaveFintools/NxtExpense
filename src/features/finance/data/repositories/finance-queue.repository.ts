@@ -20,6 +20,8 @@ import {
   normalizeFinanceOwner,
 } from '@/features/finance/data/repositories/finance-shared.repository'
 
+const SAFE_IN_BATCH_SIZE = 150
+
 export async function getFinanceQueuePaginated(
   supabase: SupabaseClient,
   cursor: string | null,
@@ -55,34 +57,64 @@ export async function getFinanceQueuePaginated(
     }
   }
 
-  let query = supabase
-    .from('expense_claims')
-    .select(
-      `${CLAIM_COLUMNS}, employees!employee_id!inner(${FINANCE_OWNER_COLUMNS})`
+  const buildQueuePageQuery = (batchIds: string[] | null) => {
+    let q = supabase
+      .from('expense_claims')
+      .select(
+        `${CLAIM_COLUMNS}, employees!employee_id!inner(${FINANCE_OWNER_COLUMNS})`
+      )
+      .eq('status_id', financeStatusRow.id)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit + 1)
+
+    if (batchIds !== null) {
+      q = q.in('id', batchIds)
+    }
+
+    if (cursor) {
+      const decoded = decodeCursor(cursor)
+      q = q.or(
+        `created_at.lt.${decoded.created_at},and(created_at.eq.${decoded.created_at},id.lt.${decoded.id})`
+      )
+    }
+
+    return q
+  }
+
+  let rows: Array<ExpenseClaimWithOwnerRow>
+
+  if (
+    Array.isArray(filteredClaimIds) &&
+    filteredClaimIds.length > SAFE_IN_BATCH_SIZE
+  ) {
+    const batches: string[][] = []
+    for (let i = 0; i < filteredClaimIds.length; i += SAFE_IN_BATCH_SIZE) {
+      batches.push(filteredClaimIds.slice(i, i + SAFE_IN_BATCH_SIZE))
+    }
+    const results = await Promise.all(
+      batches.map((b) => buildQueuePageQuery(b))
     )
-    .eq('status_id', financeStatusRow.id)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit + 1)
-
-  if (Array.isArray(filteredClaimIds)) {
-    query = query.in('id', filteredClaimIds)
-  }
-
-  if (cursor) {
-    const decoded = decodeCursor(cursor)
-    query = query.or(
-      `created_at.lt.${decoded.created_at},and(created_at.eq.${decoded.created_at},id.lt.${decoded.id})`
+    for (const { error } of results) {
+      if (error) throw new Error(error.message)
+    }
+    const merged = results.flatMap(
+      (r) => (r.data ?? []) as Array<ExpenseClaimWithOwnerRow>
     )
+    merged.sort((a, b) => {
+      const ca = a.created_at as string
+      const cb = b.created_at as string
+      if (ca !== cb) return cb > ca ? 1 : -1
+      return (b.id as string) > (a.id as string) ? 1 : -1
+    })
+    rows = merged.slice(0, limit + 1)
+  } else {
+    const { data, error } = await buildQueuePageQuery(
+      Array.isArray(filteredClaimIds) ? filteredClaimIds : null
+    )
+    if (error) throw new Error(error.message)
+    rows = (data ?? []) as Array<ExpenseClaimWithOwnerRow>
   }
-
-  const { data, error } = await query
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  const rows = (data ?? []) as Array<ExpenseClaimWithOwnerRow>
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
   const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
@@ -155,16 +187,14 @@ export async function getFinanceQueueTotalCount(
     return 0
   }
 
-  let query = supabase
+  if (Array.isArray(filteredClaimIds)) {
+    return filteredClaimIds.length
+  }
+
+  const { count, error } = await supabase
     .from('expense_claims')
     .select('id', { count: 'exact', head: true })
     .eq('status_id', financeStatusRow.id)
-
-  if (Array.isArray(filteredClaimIds)) {
-    query = query.in('id', filteredClaimIds)
-  }
-
-  const { count, error } = await query
 
   if (error) {
     throw new Error(error.message)
