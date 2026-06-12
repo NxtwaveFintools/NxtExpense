@@ -64,3 +64,4 @@ supabase/migrations/20260502123000_enable_password_login_for_playwright_e2e_acco
 .DS_Store
 docs/superpowers/plans/
 docs/superpowers/specs/
+.claude
