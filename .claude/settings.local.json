@@ -18,7 +18,9 @@
       "mcp__claude_ai_Supabase__list_branches",
       "Bash(node *)",
       "mcp__claude_ai_Supabase__apply_migration",
-      "mcp__claude_ai_Supabase__list_tables"
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(sed 's/\\\\\\(KEY=\\\\\\).*/\\\\1***/')",
+      "Bash(PARITY=1 SUPABASE_URL=https://ibrvpangpuxiorspeffz.supabase.co SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlicnZwYW5ncHV4aW9yc3BlZmZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzOTcyMSwiZXhwIjoyMDkzMTE1NzIxfQ.G608oNl4hI5ayud7m1HC_1T2yKJqmTcVVD1gejsIZ1w npx vitest run src/features/finance/__tests__/finance-resolver-parity.test.ts)"
     ]
   }
 }

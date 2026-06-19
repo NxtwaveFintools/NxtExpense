@@ -35,6 +35,12 @@ type ActionCursorRow = {
 
 const FILTER_BATCH_SIZE = 500
 const MAX_FILTERED_CLAIM_IDS = 10_000
+// Max number of UUIDs to inline into a single `.in('id', [...])` clause. PostgREST
+// sends these as GET query params, so a large list makes the request URL exceed the
+// gateway URI length limit and the request fails with a generic 400 "Bad Request".
+// ~150 UUIDs keeps every URL comfortably under that limit. Matches the batch size
+// used by the finance-queue/finance-history repositories for the same reason.
+const SAFE_IN_BATCH_SIZE = 150
 
 function toLikePattern(value: string): string {
   const escaped = value.replaceAll('%', '\\%').replaceAll('_', '\\_')
@@ -47,6 +53,49 @@ function assertClaimIdLimit(size: number, maxClaimIds: number | null) {
       `Filter result too large (${size}). Please narrow filters to under ${maxClaimIds} claims.`
     )
   }
+}
+
+type ClaimIdQueryResult = {
+  data: unknown
+  error: { message: string } | null
+}
+
+/**
+ * Runs a claim-id filter query against a bounded set of candidate IDs, splitting
+ * the candidates into chunks of {@link SAFE_IN_BATCH_SIZE} so no single request
+ * URL grows large enough to be rejected by the gateway with a 400 "Bad Request".
+ * Returns the union of matching claim IDs across all chunks.
+ */
+export async function collectClaimIdsInBatches(
+  buildBatchQuery: (batchIds: string[]) => PromiseLike<ClaimIdQueryResult>,
+  candidateIds: string[],
+  maxClaimIds: number | null
+): Promise<string[]> {
+  const batches: string[][] = []
+  for (let i = 0; i < candidateIds.length; i += SAFE_IN_BATCH_SIZE) {
+    batches.push(candidateIds.slice(i, i + SAFE_IN_BATCH_SIZE))
+  }
+
+  const results = await Promise.all(
+    batches.map((batch) => buildBatchQuery(batch))
+  )
+
+  const claimIds = new Set<string>()
+  for (const { data, error } of results) {
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    for (const row of (data ?? []) as Array<{ id: string }>) {
+      if (row.id) {
+        claimIds.add(row.id)
+      }
+    }
+  }
+
+  assertClaimIdLimit(claimIds.size, maxClaimIds)
+
+  return [...claimIds]
 }
 
 async function collectActionClaimIds(
@@ -322,10 +371,10 @@ export async function getFilteredClaimIdsForFinance(
     }
   }
 
-  const claimIds = new Set<string>()
-  let cursor: { created_at: string; id: string } | null = null
-
-  for (;;) {
+  const buildClaimQuery = (
+    batchIds: string[] | null,
+    cursor: { created_at: string; id: string } | null
+  ) => {
     let query = supabase
       .from('expense_claims')
       .select(
@@ -396,12 +445,8 @@ export async function getFilteredClaimIdsForFinance(
       query = query.eq('work_location_id', filters.workLocation)
     }
 
-    if (financeDateClaimIds) {
-      query = query.in('id', financeDateClaimIds)
-    }
-
-    if (hodClaimIds) {
-      query = query.in('id', hodClaimIds)
+    if (batchIds !== null) {
+      query = query.in('id', batchIds)
     }
 
     if (cursor) {
@@ -410,7 +455,47 @@ export async function getFilteredClaimIdsForFinance(
       )
     }
 
-    const { data, error } = await query
+    return query
+  }
+
+  // The finance action-date and HOD-approver filters resolve to a bounded set of
+  // candidate claim IDs, so the final result can only be a subset of that set.
+  // Intersect the candidate sets in memory and fetch in chunks via
+  // `collectClaimIdsInBatches`, rather than inlining hundreds of UUIDs into a
+  // single `.in('id', [...])` clause (which overflows the request URL -> 400).
+  let boundingIds: string[] | null = null
+  if (financeDateClaimIds && hodClaimIds) {
+    const hodSet = new Set(hodClaimIds)
+    boundingIds = financeDateClaimIds.filter((id) => hodSet.has(id))
+  } else if (financeDateClaimIds) {
+    boundingIds = financeDateClaimIds
+  } else if (hodClaimIds) {
+    boundingIds = hodClaimIds
+  }
+
+  if (boundingIds !== null) {
+    if (boundingIds.length === 0) {
+      return []
+    }
+
+    return collectClaimIdsInBatches(
+      async (batchIds) => {
+        const { data, error } = await buildClaimQuery(batchIds, null)
+        return { data, error }
+      },
+      boundingIds,
+      maxClaimIds
+    )
+  }
+
+  // No bounded candidate set (e.g. an employee-name-only filter): paginate over
+  // the full table with a cursor. No large `.in('id', [...])` list is involved,
+  // so the request URL stays within limits.
+  const claimIds = new Set<string>()
+  let cursor: { created_at: string; id: string } | null = null
+
+  for (;;) {
+    const { data, error } = await buildClaimQuery(null, cursor)
 
     if (error) {
       throw new Error(error.message)
