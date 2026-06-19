@@ -13,14 +13,17 @@ import type {
   PaginatedFinanceHistory,
 } from '@/features/finance/types'
 import { getFinanceActionCodesForFilter } from '@/features/finance/utils/action-filter'
-import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
+import {
+  hasFinanceClaimFilters,
+  toIstDayEnd,
+  toIstDayStart,
+} from '@/features/finance/utils/filters'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
 
 import {
   getFinanceActionCodesForDateFilter,
   isFinanceActionDateFilterField,
 } from '@/features/finance/data/repositories/filter-date-resolvers.repository'
-import { getFilteredClaimIdsForFinance } from '@/features/finance/data/repositories/finance-filters.repository'
 import {
   DEFAULT_FINANCE_FILTERS,
   FINANCE_OWNER_COLUMNS,
@@ -28,10 +31,56 @@ import {
   normalizeFinanceOwner,
 } from '@/features/finance/data/repositories/finance-shared.repository'
 
-const SAFE_IN_BATCH_SIZE = 150
-
 type FinanceHistoryPaginationOptions = {
+  // Retained for caller compatibility (the export routes pass it). With server-side
+  // keyset pagination no claim-ID array is collected in Node, so there is no in-memory
+  // cap to govern and this value is no longer consulted. Removed when the export routes
+  // are rewired in Phase 4.
   maxFilteredClaimIds?: number | null
+}
+
+type ActionRow = {
+  id: string
+  claim_id: string
+  actor_employee_id: string
+  actor:
+    | { employee_email: string; employee_name: string }
+    | { employee_email: string; employee_name: string }[]
+    | null
+  action: string
+  notes: string | null
+  acted_at: string
+}
+
+// Date fields whose bounds the resolver expects as IST day-boundary timestamptz
+// (claim_date is compared as a plain date). Mirrors finance-resolver-parity's
+// usesIstBoundary.
+function usesIstBoundary(field: FinanceFilters['dateFilterField']): boolean {
+  return (
+    field === 'payment_released_date' ||
+    field === 'finance_approved_date' ||
+    field === 'submitted_at' ||
+    field === 'hod_approved_date'
+  )
+}
+
+function buildHistoryResolverArgs(
+  filters: FinanceFilters
+): Record<string, unknown> {
+  const useIst = usesIstBoundary(filters.dateFilterField)
+  return {
+    p_employee_id: filters.employeeId,
+    p_employee_name: filters.employeeName,
+    p_claim_number: filters.claimNumber,
+    p_owner_designation: filters.ownerDesignation,
+    p_hod_approver_emp: filters.hodApproverEmployeeId,
+    p_claim_status: filters.claimStatus,
+    p_work_location: filters.workLocation,
+    p_action_filter: filters.actionFilter,
+    p_date_field: filters.dateFilterField,
+    p_date_from: useIst ? toIstDayStart(filters.dateFrom) : filters.dateFrom,
+    p_date_to: useIst ? toIstDayEnd(filters.dateTo) : filters.dateTo,
+  }
 }
 
 export async function getFinanceHistoryPaginated(
@@ -39,23 +88,8 @@ export async function getFinanceHistoryPaginated(
   cursor: string | null,
   limit = 10,
   filters: FinanceFilters = DEFAULT_FINANCE_FILTERS,
-  options: FinanceHistoryPaginationOptions = {}
+  _options: FinanceHistoryPaginationOptions = {}
 ): Promise<PaginatedFinanceHistory> {
-  const filteredClaimIds = await getFilteredClaimIdsForFinance(
-    supabase,
-    filters,
-    { maxClaimIds: options.maxFilteredClaimIds }
-  )
-
-  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
-    return {
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit,
-    }
-  }
-
   const actionDateFilterField = isFinanceActionDateFilterField(
     filters.dateFilterField
   )
@@ -63,125 +97,87 @@ export async function getFinanceHistoryPaginated(
     : null
 
   const filterByFinanceActionDate =
-    actionDateFilterField !== null && (filters.dateFrom || filters.dateTo)
+    actionDateFilterField !== null &&
+    Boolean(filters.dateFrom || filters.dateTo)
 
-  let resolvedDateFilterActions: string[] = []
+  // Bounded feed-row action filter, computed exactly as the legacy path did:
+  // action-date filters resolve to their action codes; otherwise an explicit
+  // actionFilter expands to its codes. Independent of hasFinanceClaimFilters so a
+  // plain actionFilter still scopes the feed rows even when the resolver is skipped.
+  let feedActionCodes: string[] | null = null
   if (filterByFinanceActionDate) {
-    resolvedDateFilterActions = await getFinanceActionCodesForDateFilter(
+    const resolvedDateFilterActions = await getFinanceActionCodesForDateFilter(
       supabase,
       actionDateFilterField
     )
-
     if (resolvedDateFilterActions.length === 0) {
-      return {
-        data: [],
-        hasNextPage: false,
-        nextCursor: null,
-        limit,
-      }
+      return { data: [], hasNextPage: false, nextCursor: null, limit }
     }
+    feedActionCodes = resolvedDateFilterActions
+  } else if (filters.actionFilter) {
+    feedActionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
   }
 
-  const buildHistoryPageQuery = (claimIdBatch: string[] | null) => {
-    let q = supabase
-      .from('finance_actions')
-      .select(
-        'id, claim_id, actor_employee_id, action, notes, acted_at, actor:employees!actor_employee_id(employee_email, employee_name)'
-      )
-      .order('acted_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(limit + 1)
-
-    if (filterByFinanceActionDate) {
-      q = q.in('action', resolvedDateFilterActions)
-    } else if (filters.actionFilter) {
-      const actionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
-      if (actionCodes.length > 1) {
-        q = q.in('action', actionCodes)
-      } else {
-        q = q.eq('action', actionCodes[0])
-      }
+  // SQL keyset ID-page: filtering + pagination happen in Postgres. At most
+  // limit + 1 finance_actions ids ever return to Node.
+  const decoded = cursor ? decodeCursor(cursor) : null
+  const { data: pageRows, error: pageError } = await supabase.rpc(
+    'get_finance_history_page',
+    {
+      p_has_filters: hasFinanceClaimFilters(filters),
+      ...buildHistoryResolverArgs(filters),
+      p_feed_action_codes: feedActionCodes,
+      p_feed_from: filterByFinanceActionDate
+        ? toIstDayStart(filters.dateFrom)
+        : null,
+      p_feed_to: filterByFinanceActionDate ? toIstDayEnd(filters.dateTo) : null,
+      // The existing cursor encodes acted_at under the created_at key.
+      p_cursor_acted_at: decoded?.created_at ?? null,
+      p_cursor_id: decoded?.id ?? null,
+      p_limit: limit,
     }
+  )
 
-    if (filterByFinanceActionDate) {
-      const dateFrom = toIstDayStart(filters.dateFrom)
-      const dateTo = toIstDayEnd(filters.dateTo)
-      if (dateFrom) q = q.gte('acted_at', dateFrom)
-      if (dateTo) q = q.lte('acted_at', dateTo)
-    }
-
-    if (claimIdBatch !== null) {
-      q = q.in('claim_id', claimIdBatch)
-    }
-
-    if (cursor) {
-      const decoded = decodeCursor(cursor)
-      q = q.or(
-        `acted_at.lt.${decoded.created_at},and(acted_at.eq.${decoded.created_at},id.lt.${decoded.id})`
-      )
-    }
-
-    return q
+  if (pageError) {
+    throw new Error(pageError.message)
   }
 
-  let rawRows: unknown[]
-
-  if (
-    Array.isArray(filteredClaimIds) &&
-    filteredClaimIds.length > SAFE_IN_BATCH_SIZE
-  ) {
-    const batches: string[][] = []
-    for (let i = 0; i < filteredClaimIds.length; i += SAFE_IN_BATCH_SIZE) {
-      batches.push(filteredClaimIds.slice(i, i + SAFE_IN_BATCH_SIZE))
-    }
-    const results = await Promise.all(
-      batches.map((b) => buildHistoryPageQuery(b))
-    )
-    for (const { error } of results) {
-      if (error) throw new Error(error.message)
-    }
-    const merged = results.flatMap((r) => (r.data ?? []) as unknown[])
-    merged.sort((a, b) => {
-      const ra = a as { acted_at: string; id: string }
-      const rb = b as { acted_at: string; id: string }
-      if (ra.acted_at !== rb.acted_at) return rb.acted_at > ra.acted_at ? 1 : -1
-      return rb.id > ra.id ? 1 : -1
-    })
-    rawRows = merged.slice(0, limit + 1)
-  } else {
-    const { data, error } = await buildHistoryPageQuery(
-      Array.isArray(filteredClaimIds) ? filteredClaimIds : null
-    )
-    if (error) throw new Error(error.message)
-    rawRows = (data ?? []) as unknown[]
-  }
-
-  const actionRows = rawRows as unknown as Array<{
+  const idRows = (pageRows ?? []) as Array<{
     id: string
     claim_id: string
-    actor_employee_id: string
-    actor:
-      | { employee_email: string; employee_name: string }
-      | { employee_email: string; employee_name: string }[]
-      | null
-    action: string
-    notes: string | null
     acted_at: string
   }>
+  const hasNextPage = idRows.length > limit
+  const pageRowsBounded = hasNextPage ? idRows.slice(0, limit) : idRows
+  const actionIds = pageRowsBounded.map((row) => row.id)
 
-  const hasNextPage = actionRows.length > limit
-  const pageData = hasNextPage ? actionRows.slice(0, limit) : actionRows
-
-  if (pageData.length === 0) {
-    return {
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit,
-    }
+  if (actionIds.length === 0) {
+    return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  const claimIds = [...new Set(pageData.map((row) => row.claim_id))]
+  // Bounded fetch of the action rows (<= limit) with the actor embed.
+  const { data: actionRowsData, error: actionError } = await supabase
+    .from('finance_actions')
+    .select(
+      'id, claim_id, actor_employee_id, action, notes, acted_at, actor:employees!actor_employee_id(employee_email, employee_name)'
+    )
+    .in('id', actionIds)
+
+  if (actionError) {
+    throw new Error(actionError.message)
+  }
+
+  const actionRowById = new Map(
+    ((actionRowsData ?? []) as ActionRow[]).map((row) => [row.id, row])
+  )
+
+  // Preserve the keyset order from the page RPC (.in does not guarantee order).
+  const orderedActions = actionIds
+    .map((id) => actionRowById.get(id))
+    .filter((row): row is ActionRow => row !== undefined)
+
+  const claimIds = [...new Set(orderedActions.map((row) => row.claim_id))]
+
   const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
     supabase,
     claimIds
@@ -220,7 +216,7 @@ export async function getFinanceHistoryPaginated(
     })
   }
 
-  const history: FinanceHistoryItem[] = pageData
+  const history: FinanceHistoryItem[] = orderedActions
     .map((action) => {
       const claim = claimMap.get(action.claim_id)
       if (!claim) {
@@ -247,7 +243,7 @@ export async function getFinanceHistoryPaginated(
     })
     .filter((row): row is FinanceHistoryItem => row !== null)
 
-  const lastRecord = pageData.at(-1)
+  const lastRecord = pageRowsBounded.at(-1)
   const nextCursor =
     hasNextPage && lastRecord
       ? encodeCursor({
@@ -268,41 +264,14 @@ export async function getFinanceHistoryTotalCount(
   supabase: SupabaseClient,
   filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
 ): Promise<number> {
-  const filteredClaimIds = await getFilteredClaimIdsForFinance(
-    supabase,
-    filters
-  )
-
-  if (Array.isArray(filteredClaimIds)) {
-    if (filteredClaimIds.length === 0) return 0
-
-    const batches: string[][] = []
-    for (let i = 0; i < filteredClaimIds.length; i += SAFE_IN_BATCH_SIZE) {
-      batches.push(filteredClaimIds.slice(i, i + SAFE_IN_BATCH_SIZE))
-    }
-    const results = await Promise.all(
-      batches.map((b) =>
-        supabase
-          .from('finance_actions')
-          .select('id', { count: 'exact', head: true })
-          .in('claim_id', b)
-      )
-    )
-    let total = 0
-    for (const { count, error } of results) {
-      if (error) throw new Error(error.message)
-      total += count ?? 0
-    }
-    return total
-  }
-
-  const { count, error } = await supabase
-    .from('finance_actions')
-    .select('id', { count: 'exact', head: true })
+  const { data, error } = await supabase.rpc('get_finance_history_count', {
+    p_has_filters: hasFinanceClaimFilters(filters),
+    ...buildHistoryResolverArgs(filters),
+  })
 
   if (error) {
     throw new Error(error.message)
   }
 
-  return count ?? 0
+  return Number(data ?? 0)
 }
