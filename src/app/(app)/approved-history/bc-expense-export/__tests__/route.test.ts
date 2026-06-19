@@ -188,8 +188,7 @@ describe('approved-history BC expense export route', () => {
       500,
       expect.objectContaining({
         claimStatus: null,
-      }),
-      { maxFilteredClaimIds: null }
+      })
     )
   })
 
@@ -318,8 +317,7 @@ describe('approved-history BC expense export route', () => {
       expect.objectContaining({
         claimStatus: null,
         actionFilter: 'payment_released',
-      }),
-      { maxFilteredClaimIds: null }
+      })
     )
   })
 
@@ -363,8 +361,7 @@ describe('approved-history BC expense export route', () => {
       expect.objectContaining({
         claimStatus: null,
         actionFilter: 'finance_rejected',
-      }),
-      { maxFilteredClaimIds: null }
+      })
     )
   })
 
@@ -417,8 +414,7 @@ describe('approved-history BC expense export route', () => {
         dateFrom: '2026-04-10',
         dateTo: '2026-04-16',
         claimStatus: null,
-      }),
-      { maxFilteredClaimIds: null }
+      })
     )
   })
 

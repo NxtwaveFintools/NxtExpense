@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
   getEmployeeByEmail: vi.fn(),
   isFinanceTeamMember: vi.fn(),
-  getFinanceHistoryPaginated: vi.fn(),
+  getFinancePaymentJournalTotals: vi.fn(),
   normalizeFinanceFilters: vi.fn(),
   getFinanceExportProfileByCode: vi.fn(),
 }))
@@ -22,7 +22,7 @@ vi.mock('@/features/finance/permissions', () => ({
 }))
 
 vi.mock('@/features/finance/data/queries', () => ({
-  getFinanceHistoryPaginated: mocks.getFinanceHistoryPaginated,
+  getFinancePaymentJournalTotals: mocks.getFinancePaymentJournalTotals,
 }))
 
 vi.mock('@/features/finance/utils/filters', () => ({
@@ -57,65 +57,6 @@ const PAYMENT_PROFILE = {
   is_active: true,
 }
 
-function buildHistoryRow(
-  claimId: string,
-  employeeId: string,
-  totalAmount: number
-) {
-  return {
-    claim: {
-      id: claimId,
-      claim_number: `CLAIM-${claimId}`,
-      employee_id: 'owner-id',
-      claim_date: '2026-04-12',
-      work_location: 'Office / WFH',
-      own_vehicle_used: null,
-      vehicle_type: null,
-      outstation_city_name: null,
-      from_city_name: null,
-      to_city_name: null,
-      km_travelled: null,
-      total_amount: totalAmount,
-      statusName: 'Payment Issued',
-      statusDisplayColor: 'green',
-      status_id: 'status-payment-issued',
-      is_terminal: true,
-      is_rejection: false,
-      allow_resubmit: false,
-      is_superseded: false,
-      current_approval_level: 4,
-      submitted_at: '2026-04-12T10:00:00Z',
-      created_at: '2026-04-12T10:00:00Z',
-      updated_at: '2026-04-12T10:00:00Z',
-      resubmission_count: 0,
-      last_rejection_notes: null,
-      last_rejected_at: null,
-      accommodation_nights: null,
-      food_with_principals_amount: null,
-    },
-    owner: {
-      id: 'owner-id',
-      employee_id: employeeId,
-      employee_name: 'Owner Name',
-      employee_email: 'owner@nxtwave.co.in',
-      designation_id: 'des-1',
-      designations: {
-        designation_name: 'State Business Head',
-      },
-    },
-    action: {
-      id: `action-${claimId}`,
-      claim_id: claimId,
-      actor_email: 'finance@nxtwave.co.in',
-      actor_name: 'Finance User',
-      action: 'issued',
-      notes: null,
-      acted_at: '2026-04-12T10:00:00Z',
-    },
-    availableActions: [],
-  }
-}
-
 function buildSupabaseAuthClient() {
   return {
     auth: {
@@ -147,35 +88,21 @@ describe('approved-history Payment Journals export route', () => {
     mocks.getEmployeeByEmail.mockResolvedValue({ id: 'finance-1' })
     mocks.isFinanceTeamMember.mockResolvedValue(true)
     mocks.getFinanceExportProfileByCode.mockResolvedValue(PAYMENT_PROFILE)
+    mocks.getFinancePaymentJournalTotals.mockResolvedValue(
+      new Map<string, number>()
+    )
 
     mocks.createSupabaseServerClient.mockResolvedValue(
       buildSupabaseAuthClient()
     )
   })
 
-  it('streams one row per employee with strict defaults and summed amount', async () => {
-    mocks.getFinanceHistoryPaginated
-      .mockResolvedValueOnce({
-        data: [
-          buildHistoryRow('claim-1', 'NW0004545', 1000),
-          buildHistoryRow('claim-1', 'NW0004545', 1000),
-        ],
-        hasNextPage: true,
-        nextCursor: 'cursor-2',
-        limit: 500,
-      })
-      .mockResolvedValueOnce({
-        data: [
-          buildHistoryRow('claim-2', 'NW0004545', 2450.5),
-          buildHistoryRow('claim-3', 'NW0004546', 500),
-        ],
-        hasNextPage: false,
-        nextCursor: null,
-        limit: 500,
-      })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
+  it('streams one row per employee from the DB-aggregated totals', async () => {
+    mocks.getFinancePaymentJournalTotals.mockResolvedValue(
+      new Map<string, number>([
+        ['NW0004545', 3450.5],
+        ['NW0004546', 500],
+      ])
     )
 
     const response = await GET(
@@ -205,57 +132,19 @@ describe('approved-history Payment Journals export route', () => {
       '"","Payment","","","Employee","NW0004546","0","0","ADVANCE","Petty cash & Reimbursements","100% Payment after Service / Goods delivery","","0","Reimbursements","IMPS","500.00","Bank Account","IDFC 2012","NIAT","NIAT362","PRE-SALES","PRE-SALES"'
     )
 
-    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledTimes(2)
-    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+    expect(mocks.getFinancePaymentJournalTotals).toHaveBeenCalledTimes(1)
+    expect(mocks.getFinancePaymentJournalTotals).toHaveBeenCalledWith(
       expect.anything(),
-      null,
-      500,
-      expect.objectContaining({
-        claimStatus: null,
-      }),
-      { maxFilteredClaimIds: null }
-    )
-  })
-
-  it('includes KM intercity travel amounts in employee totals', async () => {
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [buildHistoryRow('claim-km', 'NW0000282', 480)],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
-
-    const response = await GET(
-      new Request(
-        'http://localhost:3000/approved-history/payment-journals-export'
-      )
-    )
-
-    expect(response.status).toBe(200)
-
-    const csv = await response.text()
-    expect(csv).toContain(
-      '"","Payment","","","Employee","NW0000282","0","0","ADVANCE","Petty cash & Reimbursements","100% Payment after Service / Goods delivery","","0","Reimbursements","IMPS","480.00","Bank Account","IDFC 2012","NIAT","NIAT362","PRE-SALES","PRE-SALES"'
+      expect.objectContaining({ claimStatus: null })
     )
   })
 
   it('excludes employees with zero payable amount from export rows', async () => {
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [
-        buildHistoryRow('claim-zero', 'NW0001211', 0),
-        buildHistoryRow('claim-paid', 'NW0004546', 500),
-      ],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
+    mocks.getFinancePaymentJournalTotals.mockResolvedValue(
+      new Map<string, number>([
+        ['NW0001211', 0],
+        ['NW0004546', 500],
+      ])
     )
 
     const response = await GET(
@@ -293,17 +182,6 @@ describe('approved-history Payment Journals export route', () => {
       dateTo: null,
     })
 
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
-
     const response = await GET(
       new Request(
         'http://localhost:3000/approved-history/payment-journals-export?actionFilter=payment_released'
@@ -311,15 +189,12 @@ describe('approved-history Payment Journals export route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+    expect(mocks.getFinancePaymentJournalTotals).toHaveBeenCalledWith(
       expect.anything(),
-      null,
-      500,
       expect.objectContaining({
         claimStatus: null,
         actionFilter: 'payment_released',
-      }),
-      { maxFilteredClaimIds: null }
+      })
     )
   })
 
@@ -338,17 +213,6 @@ describe('approved-history Payment Journals export route', () => {
       dateTo: null,
     })
 
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
-
     const response = await GET(
       new Request(
         'http://localhost:3000/approved-history/payment-journals-export?actionFilter=finance_rejected'
@@ -356,19 +220,16 @@ describe('approved-history Payment Journals export route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+    expect(mocks.getFinancePaymentJournalTotals).toHaveBeenCalledWith(
       expect.anything(),
-      null,
-      500,
       expect.objectContaining({
         claimStatus: null,
         actionFilter: 'finance_rejected',
-      }),
-      { maxFilteredClaimIds: null }
+      })
     )
   })
 
-  it('forwards applied employee and date filters to history query', async () => {
+  it('forwards applied employee and date filters to the totals query', async () => {
     mocks.normalizeFinanceFilters.mockReturnValueOnce({
       employeeId: 'NW0000282',
       employeeName: null,
@@ -382,17 +243,6 @@ describe('approved-history Payment Journals export route', () => {
       dateFrom: '2026-04-10',
       dateTo: '2026-04-16',
     })
-
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
 
     const response = await GET(
       new Request(
@@ -408,56 +258,19 @@ describe('approved-history Payment Journals export route', () => {
         dateTo: '2026-04-16',
       })
     )
-    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+    expect(mocks.getFinancePaymentJournalTotals).toHaveBeenCalledWith(
       expect.anything(),
-      null,
-      500,
       expect.objectContaining({
         employeeId: 'NW0000282',
         dateFrom: '2026-04-10',
         dateTo: '2026-04-16',
         claimStatus: null,
-      }),
-      { maxFilteredClaimIds: null }
-    )
-  })
-
-  it('includes claim total rows even without mapped item rows', async () => {
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [buildHistoryRow('claim-4', 'NW0004548', 900)],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
-
-    const response = await GET(
-      new Request(
-        'http://localhost:3000/approved-history/payment-journals-export'
-      )
-    )
-
-    expect(response.status).toBe(200)
-    const csv = await response.text()
-    const csvLines = csv
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-
-    expect(csvLines).toHaveLength(2)
-    expect(csv).toContain(
-      '"","Payment","","","Employee","NW0004548","0","0","ADVANCE","Petty cash & Reimbursements","100% Payment after Service / Goods delivery","","0","Reimbursements","IMPS","900.00","Bank Account","IDFC 2012","NIAT","NIAT362","PRE-SALES","PRE-SALES"'
+      })
     )
   })
 
   it('returns 400 when export profile is missing', async () => {
     mocks.getFinanceExportProfileByCode.mockResolvedValue(null)
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
 
     const response = await GET(
       new Request(
@@ -490,17 +303,6 @@ describe('approved-history Payment Journals export route', () => {
   })
 
   it('supports POST requests', async () => {
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 500,
-    })
-
-    mocks.createSupabaseServerClient.mockResolvedValue(
-      buildSupabaseAuthClient()
-    )
-
     const response = await POST(
       new Request(
         'http://localhost:3000/approved-history/payment-journals-export',

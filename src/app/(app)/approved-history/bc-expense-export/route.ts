@@ -145,8 +145,7 @@ async function handleExportRequest(request: Request) {
           supabase,
           cursor,
           HISTORY_CHUNK_SIZE,
-          filters,
-          { maxFilteredClaimIds: null }
+          filters
         )
 
         const claimIds = [

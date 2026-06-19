@@ -1,6 +1,6 @@
 import { getEmployeeByEmail } from '@/lib/services/employee-service'
 import { isFinanceTeamMember } from '@/features/finance/permissions'
-import { getFinanceHistoryPaginated } from '@/features/finance/data/queries'
+import { getFinancePaymentJournalTotals } from '@/features/finance/data/queries'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
@@ -8,7 +8,6 @@ import {
   type FinanceExportProfile,
 } from '@/lib/services/finance-export-config-service'
 import {
-  accumulatePaymentJournalsEmployeeTotals,
   buildPaymentJournalsRows,
   PAYMENT_JOURNALS_CSV_HEADERS,
   resolvePaymentJournalsDefaults,
@@ -21,7 +20,6 @@ import {
 } from '@/lib/utils/export-route'
 
 const PAYMENT_JOURNALS_EXPORT_PROFILE_CODE = 'PAYMENT_JOURNALS'
-const HISTORY_CHUNK_SIZE = 500
 
 type CsvRowsBuilder = () => Promise<string[][]>
 
@@ -112,37 +110,18 @@ async function handleExportRequest(request: Request) {
     ensureProfileExists(profile)
 
     const defaults = resolvePaymentJournalsDefaults(profile)
-    const seenClaimIds = new Set<string>()
-    const totalsByEmployeeId = new Map<string, number>()
     const filename = buildDatedCsvFilename('payment-journals', 'all')
 
     return createStreamingCsvResponse(
       filename,
       PAYMENT_JOURNALS_CSV_HEADERS,
       async () => {
-        let cursor: string | null = null
-
-        for (;;) {
-          const historyPage = await getFinanceHistoryPaginated(
-            supabase,
-            cursor,
-            HISTORY_CHUNK_SIZE,
-            filters,
-            { maxFilteredClaimIds: null }
-          )
-
-          accumulatePaymentJournalsEmployeeTotals({
-            historyRows: historyPage.data,
-            seenClaimIds,
-            totalsByEmployeeId,
-          })
-
-          if (!historyPage.hasNextPage || !historyPage.nextCursor) {
-            break
-          }
-
-          cursor = historyPage.nextCursor
-        }
+        // One DB-side GROUP BY produces the per-employee totals (bounded by employee
+        // count) — no paging the feed and accumulating claim IDs in Node.
+        const totalsByEmployeeId = await getFinancePaymentJournalTotals(
+          supabase,
+          filters
+        )
 
         return buildPaymentJournalsRows({
           totalsByEmployeeId,

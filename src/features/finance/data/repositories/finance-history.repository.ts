@@ -30,14 +30,7 @@ import {
   type ExpenseClaimWithOwnerRow,
   normalizeFinanceOwner,
 } from '@/features/finance/data/repositories/finance-shared.repository'
-
-type FinanceHistoryPaginationOptions = {
-  // Retained for caller compatibility (the export routes pass it). With server-side
-  // keyset pagination no claim-ID array is collected in Node, so there is no in-memory
-  // cap to govern and this value is no longer consulted. Removed when the export routes
-  // are rewired in Phase 4.
-  maxFilteredClaimIds?: number | null
-}
+import { getFinancePaymentJournalTotalsRpc } from '@/features/finance/data/rpc/finance-export.rpc'
 
 type ActionRow = {
   id: string
@@ -83,13 +76,26 @@ function buildHistoryResolverArgs(
   }
 }
 
-export async function getFinanceHistoryPaginated(
+// Feed-row scope shared by every reader of the Approved History feed (the paginated
+// list and the payment-journals export). Computes the bounded feed-row action filter
+// exactly as the legacy path did: action-date filters resolve to their action codes;
+// otherwise an explicit actionFilter expands to its codes. This is independent of
+// hasFinanceClaimFilters so a plain actionFilter still scopes the feed rows even when
+// the resolver is skipped. `isEmpty` flags an action-date filter that resolved to zero
+// action codes (the feed is then empty without touching the DB further).
+type FinanceHistoryFeedScope = {
+  pHasFilters: boolean
+  resolverArgs: Record<string, unknown>
+  feedActionCodes: string[] | null
+  feedFrom: string | null
+  feedTo: string | null
+  isEmpty: boolean
+}
+
+async function buildFinanceHistoryFeedScope(
   supabase: SupabaseClient,
-  cursor: string | null,
-  limit = 10,
-  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS,
-  _options: FinanceHistoryPaginationOptions = {}
-): Promise<PaginatedFinanceHistory> {
+  filters: FinanceFilters
+): Promise<FinanceHistoryFeedScope> {
   const actionDateFilterField = isFinanceActionDateFilterField(
     filters.dateFilterField
   )
@@ -100,10 +106,11 @@ export async function getFinanceHistoryPaginated(
     actionDateFilterField !== null &&
     Boolean(filters.dateFrom || filters.dateTo)
 
-  // Bounded feed-row action filter, computed exactly as the legacy path did:
-  // action-date filters resolve to their action codes; otherwise an explicit
-  // actionFilter expands to its codes. Independent of hasFinanceClaimFilters so a
-  // plain actionFilter still scopes the feed rows even when the resolver is skipped.
+  const baseScope = {
+    pHasFilters: hasFinanceClaimFilters(filters),
+    resolverArgs: buildHistoryResolverArgs(filters),
+  }
+
   let feedActionCodes: string[] | null = null
   if (filterByFinanceActionDate) {
     const resolvedDateFilterActions = await getFinanceActionCodesForDateFilter(
@@ -111,11 +118,40 @@ export async function getFinanceHistoryPaginated(
       actionDateFilterField
     )
     if (resolvedDateFilterActions.length === 0) {
-      return { data: [], hasNextPage: false, nextCursor: null, limit }
+      return {
+        ...baseScope,
+        feedActionCodes: null,
+        feedFrom: null,
+        feedTo: null,
+        isEmpty: true,
+      }
     }
     feedActionCodes = resolvedDateFilterActions
   } else if (filters.actionFilter) {
     feedActionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
+  }
+
+  return {
+    ...baseScope,
+    feedActionCodes,
+    feedFrom: filterByFinanceActionDate
+      ? toIstDayStart(filters.dateFrom)
+      : null,
+    feedTo: filterByFinanceActionDate ? toIstDayEnd(filters.dateTo) : null,
+    isEmpty: false,
+  }
+}
+
+export async function getFinanceHistoryPaginated(
+  supabase: SupabaseClient,
+  cursor: string | null,
+  limit = 10,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+): Promise<PaginatedFinanceHistory> {
+  const scope = await buildFinanceHistoryFeedScope(supabase, filters)
+
+  if (scope.isEmpty) {
+    return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
   // SQL keyset ID-page: filtering + pagination happen in Postgres. At most
@@ -124,13 +160,11 @@ export async function getFinanceHistoryPaginated(
   const { data: pageRows, error: pageError } = await supabase.rpc(
     'get_finance_history_page',
     {
-      p_has_filters: hasFinanceClaimFilters(filters),
-      ...buildHistoryResolverArgs(filters),
-      p_feed_action_codes: feedActionCodes,
-      p_feed_from: filterByFinanceActionDate
-        ? toIstDayStart(filters.dateFrom)
-        : null,
-      p_feed_to: filterByFinanceActionDate ? toIstDayEnd(filters.dateTo) : null,
+      p_has_filters: scope.pHasFilters,
+      ...scope.resolverArgs,
+      p_feed_action_codes: scope.feedActionCodes,
+      p_feed_from: scope.feedFrom,
+      p_feed_to: scope.feedTo,
       // The existing cursor encodes acted_at under the created_at key.
       p_cursor_acted_at: decoded?.created_at ?? null,
       p_cursor_id: decoded?.id ?? null,
@@ -274,4 +308,29 @@ export async function getFinanceHistoryTotalCount(
   }
 
   return Number(data ?? 0)
+}
+
+// Per-employee payment-journal totals for the export. Aggregation happens entirely in
+// Postgres (get_finance_payment_journal_totals) over the SAME feed scope the Approved
+// History list uses, so the export totals match the on-screen feed. The returned Map is
+// bounded by employee count — no claim-ID collection is materialized in Node.
+export async function getFinancePaymentJournalTotals(
+  supabase: SupabaseClient,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+): Promise<Map<string, number>> {
+  const scope = await buildFinanceHistoryFeedScope(supabase, filters)
+
+  if (scope.isEmpty) {
+    return new Map<string, number>()
+  }
+
+  const rows = await getFinancePaymentJournalTotalsRpc(supabase, {
+    p_has_filters: scope.pHasFilters,
+    ...scope.resolverArgs,
+    p_feed_action_codes: scope.feedActionCodes,
+    p_feed_from: scope.feedFrom,
+    p_feed_to: scope.feedTo,
+  })
+
+  return new Map(rows.map((row) => [row.employee_id, Number(row.total_amount)]))
 }
