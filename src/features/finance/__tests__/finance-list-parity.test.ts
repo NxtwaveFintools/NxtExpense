@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { http, passthrough } from 'msw'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { FinanceFilters } from '@/features/finance/types'
 import {
@@ -315,16 +315,28 @@ describe.skipIf(!ENABLED)(
     let supabase: SupabaseClient
     let financeStatusId: string
 
-    beforeAll(async () => {
+    // The global vitest.setup.ts resets MSW runtime handlers in afterEach, so a
+    // passthrough registered once in beforeAll is dropped after the first test —
+    // every later test would then hit onUnhandledRequest:'error'. Re-register the
+    // passthrough before EACH test (and in beforeAll, for the status-id fetch).
+    function allowSupabasePassthrough() {
       mswServer.use(
         http.all(`${process.env.SUPABASE_URL}/*`, () => passthrough())
       )
+    }
+
+    beforeAll(async () => {
+      allowSupabasePassthrough()
       supabase = createClient(
         process.env.SUPABASE_URL as string,
         process.env.SUPABASE_SERVICE_ROLE_KEY as string,
         { auth: { persistSession: false } }
       )
       financeStatusId = await getFinanceReviewStatusId(supabase)
+    })
+
+    beforeEach(() => {
+      allowSupabasePassthrough()
     })
 
     function queueArgs(filters: FinanceFilters): Record<string, unknown> {
@@ -338,8 +350,13 @@ describe.skipIf(!ENABLED)(
       filters: FinanceFilters
     ): Promise<Record<string, unknown>> {
       const { codes, actionDate } = await feedActionCodesFor(supabase, filters)
+      // get_finance_history_page has no p_required_status_id param (it embeds the
+      // resolver with that arg defaulting to null) — mirror buildHistoryResolverArgs
+      // and drop the key the shared resolverFilterArgs adds, else PostgREST 404s.
+      const resolverArgs = resolverFilterArgs(filters, null)
+      delete resolverArgs.p_required_status_id
       return {
-        ...resolverFilterArgs(filters, null),
+        ...resolverArgs,
         p_has_filters: hasFinanceClaimFilters(filters),
         p_feed_action_codes: codes,
         p_feed_from: actionDate ? toIstDayStart(filters.dateFrom) : null,
