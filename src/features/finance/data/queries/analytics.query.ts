@@ -3,8 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FinanceFilters } from '@/features/finance/types'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
-import { getFilteredClaimIdsForFinance } from '@/features/finance/data/repositories/finance-filters.repository'
-import { getClaimBucketMetricsRpc } from '@/features/finance/data/rpc/finance-metrics.rpc'
+import { getFinanceQueueMetricsFilteredRpc } from '@/features/finance/data/rpc/finance-metrics.rpc'
 
 type ClaimMetricSummary = {
   count: number
@@ -40,15 +39,6 @@ type ClaimStatusRow = {
   is_payment_issued: boolean
 }
 
-type FinanceActionClaimCursorRow = {
-  id: string
-  acted_at: string
-  claim_id: string
-}
-
-const ACTION_FILTER_BATCH_SIZE = 500
-const MAX_SCOPED_ACTION_CLAIMS = 10_000
-
 function createMetricSummary(): ClaimMetricSummary {
   return { count: 0, amount: 0 }
 }
@@ -76,86 +66,13 @@ function hasActiveAnalyticsFilters(filters: FinanceFilters): boolean {
   )
 }
 
-function intersectClaimIds(
-  scopedClaimIds: string[] | null,
-  candidateClaimIds: string[]
-): string[] {
-  const candidateSet = new Set(candidateClaimIds)
-
-  if (scopedClaimIds === null) {
-    return [...candidateSet]
-  }
-
-  return scopedClaimIds.filter((claimId) => candidateSet.has(claimId))
-}
-
 function toNumber(value: number | string | null | undefined): number {
   return Number(value ?? 0)
 }
 
-async function getActionFilteredClaimIds(
-  supabase: SupabaseClient,
-  action: string,
-  dateFrom: string | null,
-  dateTo: string | null
-): Promise<string[]> {
-  const claimIds = new Set<string>()
-  let cursor: { acted_at: string; id: string } | null = null
-
-  for (;;) {
-    let query = supabase
-      .from('finance_actions')
-      .select('id, acted_at, claim_id')
-      .eq('action', action)
-      .order('acted_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(ACTION_FILTER_BATCH_SIZE)
-
-    if (dateFrom) {
-      query = query.gte('acted_at', dateFrom)
-    }
-
-    if (dateTo) {
-      query = query.lte('acted_at', dateTo)
-    }
-
-    if (cursor) {
-      query = query.or(
-        `acted_at.lt.${cursor.acted_at},and(acted_at.eq.${cursor.acted_at},id.lt.${cursor.id})`
-      )
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    const rows = (data ?? []) as FinanceActionClaimCursorRow[]
-
-    for (const row of rows) {
-      if (row.claim_id) {
-        claimIds.add(row.claim_id)
-      }
-    }
-
-    if (claimIds.size > MAX_SCOPED_ACTION_CLAIMS) {
-      throw new Error(
-        `Finance action scope exceeded ${MAX_SCOPED_ACTION_CLAIMS} claims. Please narrow filters.`
-      )
-    }
-
-    if (rows.length < ACTION_FILTER_BATCH_SIZE) {
-      break
-    }
-
-    const last = rows[rows.length - 1]
-    cursor = { acted_at: last.acted_at, id: last.id }
-  }
-
-  return [...claimIds]
-}
-
+// Phase 2: the claim scope (and the optional action-filter intersection) are resolved
+// entirely inside get_finance_queue_metrics. The status-id derivation stays in TS
+// (it queries the tiny claim_statuses table). No claim-ID array is built here.
 export async function getFinanceQueueAnalytics(
   supabase: SupabaseClient,
   filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
@@ -193,48 +110,42 @@ export async function getFinanceQueueAnalytics(
 
   const analytics = createEmptyAnalytics()
 
-  let scopedClaimIds: string[] | null = null
+  const hasFilters = hasActiveAnalyticsFilters(filters)
   const filterByFinanceActionDate =
     (filters.dateFilterField === 'finance_approved_date' ||
       filters.dateFilterField === 'payment_released_date') &&
     (filters.dateFrom || filters.dateTo)
 
-  if (hasActiveAnalyticsFilters(filters)) {
-    const filteredClaimIds = await getFilteredClaimIdsForFinance(
-      supabase,
-      filters
-    )
+  const useActionIntersect =
+    hasFilters &&
+    !!filters.actionFilter &&
+    !filterByFinanceActionDate &&
+    filters.actionFilter !== 'rejected_allow_reclaim'
 
-    if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
-      return analytics
-    }
+  const useIst =
+    filterByFinanceActionDate ||
+    filters.dateFilterField === 'submitted_at' ||
+    filters.dateFilterField === 'hod_approved_date'
 
-    scopedClaimIds = filteredClaimIds
-
-    if (filters.actionFilter && !filterByFinanceActionDate) {
-      const dateFrom = toIstDayStart(filters.dateFrom)
-      const dateTo = toIstDayEnd(filters.dateTo)
-
-      const actionClaimIds = await getActionFilteredClaimIds(
-        supabase,
-        filters.actionFilter,
-        dateFrom,
-        dateTo
-      )
-
-      scopedClaimIds = intersectClaimIds(scopedClaimIds, actionClaimIds)
-
-      if (scopedClaimIds.length === 0) {
-        return analytics
-      }
-    }
-  }
-
-  const metrics = await getClaimBucketMetricsRpc(supabase, {
-    p_claim_ids: scopedClaimIds,
+  const metrics = await getFinanceQueueMetricsFilteredRpc(supabase, {
     p_pending_status_ids: pendingFinanceQueueStatusIds,
     p_approved_status_ids: approvedStatusIds,
     p_rejected_status_ids: rejectedStatusIds,
+    p_has_filters: hasFilters,
+    p_employee_id: filters.employeeId ?? null,
+    p_employee_name: filters.employeeName,
+    p_claim_number: filters.claimNumber,
+    p_owner_designation: filters.ownerDesignation,
+    p_hod_approver_emp: filters.hodApproverEmployeeId,
+    p_claim_status: filters.claimStatus,
+    p_work_location: filters.workLocation,
+    p_action_filter: filters.actionFilter,
+    p_date_field: filters.dateFilterField,
+    p_date_from: useIst ? toIstDayStart(filters.dateFrom) : filters.dateFrom,
+    p_date_to: useIst ? toIstDayEnd(filters.dateTo) : filters.dateTo,
+    p_action_intersect: useActionIntersect ? filters.actionFilter : null,
+    p_action_from: useActionIntersect ? toIstDayStart(filters.dateFrom) : null,
+    p_action_to: useActionIntersect ? toIstDayEnd(filters.dateTo) : null,
   })
 
   if (!metrics) {

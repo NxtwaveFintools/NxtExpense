@@ -1,17 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceFilters } from '@/features/finance/types'
-import {
-  getFinanceActionCodesForFilter,
-  REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
-} from '@/features/finance/utils/action-filter'
+import { REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE } from '@/features/finance/utils/action-filter'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
 
-import {
-  getFilteredClaimIdsForFinance,
-  isFinanceActionDateFilterField,
-} from '@/features/finance/data/repositories/finance-filters.repository'
-import { getFinanceHistoryActionMetricsRpc } from '@/features/finance/data/rpc/finance-metrics.rpc'
+import { getFinanceHistoryMetricsFilteredRpc } from '@/features/finance/data/rpc/finance-metrics.rpc'
 
 type ClaimMetricSummary = {
   count: number
@@ -40,20 +33,6 @@ const DEFAULT_FINANCE_FILTERS: FinanceFilters = {
   dateTo: null,
 }
 
-type FinanceActionTransitionRow = {
-  action_code: string
-  to_status_id: string
-}
-
-type ClaimStatusRow = {
-  id: string
-  approval_level: number | null
-  is_approval: boolean
-  is_rejection: boolean
-  is_terminal: boolean
-  is_payment_issued: boolean
-}
-
 function createMetricSummary(): ClaimMetricSummary {
   return { count: 0, amount: 0 }
 }
@@ -72,162 +51,36 @@ function toNumber(value: number | string | null | undefined): number {
   return Number(value ?? 0)
 }
 
-function normalizeFinanceHistoryActionCode(
-  actionCode: string,
-  toStatusId: string,
-  paymentIssuedStatusIds: Set<string>
-): string {
-  if (
-    paymentIssuedStatusIds.has(toStatusId) &&
-    actionCode.startsWith('finance_')
-  ) {
-    return actionCode.slice('finance_'.length)
-  }
-
-  return actionCode
-}
-
-async function getFinanceActionBuckets(supabase: SupabaseClient): Promise<{
-  financeApprovedActions: Set<string>
-  paymentReleasedActions: Set<string>
-  approvedActions: Set<string>
-  rejectedActions: Set<string>
-}> {
-  const [statusResult, transitionResult] = await Promise.all([
-    supabase
-      .from('claim_statuses')
-      .select(
-        'id, approval_level, is_approval, is_rejection, is_terminal, is_payment_issued'
-      )
-      .eq('is_active', true),
-    supabase
-      .from('claim_status_transitions')
-      .select('action_code, to_status_id')
-      .eq('is_active', true),
-  ])
-
-  if (statusResult.error) {
-    throw new Error(statusResult.error.message)
-  }
-
-  if (transitionResult.error) {
-    throw new Error(transitionResult.error.message)
-  }
-
-  const statusRows = (statusResult.data ?? []) as ClaimStatusRow[]
-  const transitionRows = (transitionResult.data ??
-    []) as FinanceActionTransitionRow[]
-
-  const paymentIssuedStatusIds = new Set(
-    statusRows.filter((row) => row.is_payment_issued).map((row) => row.id)
-  )
-  const rejectedStatusIds = new Set(
-    statusRows.filter((row) => row.is_rejection).map((row) => row.id)
-  )
-  const financeApprovedStatusIds = new Set(
-    statusRows
-      .filter(
-        (row) =>
-          row.is_approval &&
-          !row.is_rejection &&
-          !row.is_terminal &&
-          !row.is_payment_issued &&
-          row.approval_level === null
-      )
-      .map((row) => row.id)
-  )
-
-  const financeApprovedActions = new Set<string>()
-  const paymentReleasedActions = new Set<string>()
-  const approvedActions = new Set<string>()
-  const rejectedActions = new Set<string>()
-
-  for (const row of transitionRows) {
-    const normalized = normalizeFinanceHistoryActionCode(
-      row.action_code,
-      row.to_status_id,
-      paymentIssuedStatusIds
-    )
-
-    if (financeApprovedStatusIds.has(row.to_status_id)) {
-      financeApprovedActions.add(row.action_code)
-      approvedActions.add(row.action_code)
-    }
-
-    if (paymentIssuedStatusIds.has(row.to_status_id)) {
-      paymentReleasedActions.add(normalized)
-      approvedActions.add(normalized)
-    }
-
-    if (rejectedStatusIds.has(row.to_status_id)) {
-      rejectedActions.add(normalized)
-    }
-  }
-
-  return {
-    financeApprovedActions,
-    paymentReleasedActions,
-    approvedActions,
-    rejectedActions,
-  }
-}
-
+// Phase 2: the claim scope and action classification are resolved entirely inside
+// get_finance_history_metrics (Phase 1 resolver + finance_action_buckets). This
+// function only converts date-only filter values to IST day boundaries — it never
+// builds a claim-ID array in application memory.
 export async function getFinanceHistoryAnalytics(
   supabase: SupabaseClient,
   filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
 ): Promise<FinanceHistoryAnalytics> {
   const analytics = createEmptyAnalytics()
-  const filteredClaimIds = await getFilteredClaimIdsForFinance(
-    supabase,
-    filters
-  )
 
-  if (Array.isArray(filteredClaimIds) && filteredClaimIds.length === 0) {
-    return analytics
-  }
-
-  const filterByFinanceActionDate =
-    isFinanceActionDateFilterField(filters.dateFilterField) &&
-    (filters.dateFrom || filters.dateTo)
-
-  const {
-    approvedActions,
-    rejectedActions,
-    financeApprovedActions,
-    paymentReleasedActions,
-  } = await getFinanceActionBuckets(supabase)
-
-  const dateScopedActions =
+  const isActionDate =
+    filters.dateFilterField === 'payment_released_date' ||
     filters.dateFilterField === 'finance_approved_date'
-      ? financeApprovedActions
-      : paymentReleasedActions
+  const useIst =
+    isActionDate ||
+    filters.dateFilterField === 'submitted_at' ||
+    filters.dateFilterField === 'hod_approved_date'
 
-  if (filterByFinanceActionDate && dateScopedActions.size === 0) {
-    return analytics
-  }
-
-  const actionFilterCodes = filterByFinanceActionDate
-    ? [...dateScopedActions]
-    : getFinanceActionCodesForFilter(filters.actionFilter)
-
-  const actionFilterCodesOrNull =
-    actionFilterCodes.length > 0 ? actionFilterCodes : null
-
-  const actionFilterForRpc =
-    !filterByFinanceActionDate && actionFilterCodes.length === 1
-      ? actionFilterCodes[0]
-      : null
-
-  const metrics = await getFinanceHistoryActionMetricsRpc(supabase, {
-    p_claim_ids: Array.isArray(filteredClaimIds) ? filteredClaimIds : null,
-    p_action_filter: actionFilterForRpc,
-    p_date_from: filterByFinanceActionDate
-      ? toIstDayStart(filters.dateFrom)
-      : null,
-    p_date_to: filterByFinanceActionDate ? toIstDayEnd(filters.dateTo) : null,
-    p_date_scoped_actions: actionFilterCodesOrNull,
-    p_approved_actions: [...approvedActions],
-    p_rejected_actions: [...rejectedActions],
+  const metrics = await getFinanceHistoryMetricsFilteredRpc(supabase, {
+    p_employee_id: filters.employeeId,
+    p_employee_name: filters.employeeName,
+    p_claim_number: filters.claimNumber,
+    p_owner_designation: filters.ownerDesignation,
+    p_hod_approver_emp: filters.hodApproverEmployeeId,
+    p_claim_status: filters.claimStatus,
+    p_work_location: filters.workLocation,
+    p_action_filter: filters.actionFilter,
+    p_date_field: filters.dateFilterField,
+    p_date_from: useIst ? toIstDayStart(filters.dateFrom) : filters.dateFrom,
+    p_date_to: useIst ? toIstDayEnd(filters.dateTo) : filters.dateTo,
   })
 
   if (!metrics) {

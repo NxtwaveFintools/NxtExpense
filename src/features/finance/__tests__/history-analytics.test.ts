@@ -1,20 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE } from '@/features/finance/utils/action-filter'
-
-const mocks = vi.hoisted(() => ({
-  getFilteredClaimIdsForFinance: vi.fn(),
-}))
-
-vi.mock(
-  '@/features/finance/data/repositories/finance-filters.repository',
-  () => ({
-    getFilteredClaimIdsForFinance: mocks.getFilteredClaimIdsForFinance,
-    isFinanceActionDateFilterField: (field: string) =>
-      field === 'finance_approved_date' || field === 'payment_released_date',
-  })
-)
-
 import { getFinanceHistoryAnalytics } from '@/features/finance/data/queries'
 
 type MetricsRow = {
@@ -32,70 +18,10 @@ type MetricsRow = {
   other_amount: number
 }
 
+// Phase 2: getFinanceHistoryAnalytics resolves the claim scope + action buckets
+// inside the get_finance_history_metrics RPC, so the only Supabase call is the RPC.
 function createSupabaseStub(metrics: MetricsRow) {
   return {
-    from: vi.fn((tableName: string) => {
-      if (tableName === 'claim_statuses') {
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({
-            data: [
-              {
-                id: 'status-approved',
-                approval_level: null,
-                is_approval: true,
-                is_rejection: false,
-                is_terminal: false,
-                is_payment_issued: false,
-              },
-              {
-                id: 'status-rejected',
-                approval_level: null,
-                is_approval: false,
-                is_rejection: true,
-                is_terminal: true,
-                is_payment_issued: false,
-              },
-              {
-                id: 'status-payment',
-                approval_level: null,
-                is_approval: false,
-                is_rejection: false,
-                is_terminal: true,
-                is_payment_issued: true,
-              },
-            ],
-            error: null,
-          }),
-        }
-      }
-
-      if (tableName === 'claim_status_transitions') {
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({
-            data: [
-              {
-                action_code: 'finance_approved',
-                to_status_id: 'status-approved',
-              },
-              {
-                action_code: 'payment_released',
-                to_status_id: 'status-payment',
-              },
-              {
-                action_code: 'finance_rejected',
-                to_status_id: 'status-rejected',
-              },
-              { action_code: 'rejected', to_status_id: 'status-rejected' },
-            ],
-            error: null,
-          }),
-        }
-      }
-
-      throw new Error(`Unexpected table ${tableName}`)
-    }),
     rpc: vi.fn().mockResolvedValue({
       data: [metrics],
       error: null,
@@ -106,10 +32,9 @@ function createSupabaseStub(metrics: MetricsRow) {
 describe('getFinanceHistoryAnalytics', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getFilteredClaimIdsForFinance.mockResolvedValue(['claim-1'])
   })
 
-  it('passes expanded action codes for rejected-allow-reclaim filter and maps split rejection metrics', async () => {
+  it('calls get_finance_history_metrics with the filter params and maps split rejection metrics', async () => {
     const supabase = createSupabaseStub({
       total_count: 3,
       total_amount: 300,
@@ -140,10 +65,10 @@ describe('getFinanceHistoryAnalytics', () => {
     })
 
     expect(supabase.rpc).toHaveBeenCalledWith(
-      'get_finance_history_action_metrics',
+      'get_finance_history_metrics',
       expect.objectContaining({
-        p_action_filter: null,
-        p_date_scoped_actions: ['rejected', 'finance_rejected'],
+        p_action_filter: REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
+        p_date_field: 'claim_date',
       })
     )
 
@@ -151,6 +76,42 @@ describe('getFinanceHistoryAnalytics', () => {
     expect(analytics.rejected.amount).toBe(100)
     expect(analytics.rejectedAllowReclaim.count).toBe(2)
     expect(analytics.rejectedAllowReclaim.amount).toBe(200)
+  })
+
+  it('converts action-date filters to IST day boundaries', async () => {
+    const supabase = createSupabaseStub({
+      total_count: 0,
+      total_amount: 0,
+      approved_count: 0,
+      approved_amount: 0,
+      rejected_count: 0,
+      rejected_amount: 0,
+      other_count: 0,
+      other_amount: 0,
+    })
+
+    await getFinanceHistoryAnalytics(supabase as never, {
+      employeeId: null,
+      employeeName: null,
+      claimNumber: null,
+      ownerDesignation: null,
+      hodApproverEmployeeId: null,
+      claimStatus: null,
+      workLocation: null,
+      actionFilter: null,
+      dateFilterField: 'payment_released_date',
+      dateFrom: '2026-04-01',
+      dateTo: '2026-04-30',
+    })
+
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'get_finance_history_metrics',
+      expect.objectContaining({
+        p_date_field: 'payment_released_date',
+        p_date_from: '2026-04-01T00:00:00+05:30',
+        p_date_to: '2026-04-30T23:59:59.999+05:30',
+      })
+    )
   })
 
   it('falls back to legacy rejected totals when split fields are absent', async () => {
