@@ -26,37 +26,6 @@ type FinanceHistoryMetricsRow = {
   other_amount: number | string | null
 }
 
-export async function getClaimBucketMetricsRpc(
-  supabase: SupabaseClient,
-  args: Record<string, unknown>
-): Promise<ClaimBucketMetricsRow | null> {
-  const { data, error } = await supabase.rpc('get_claim_bucket_metrics', args)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (Array.isArray(data) ? data[0] : data) as ClaimBucketMetricsRow | null
-}
-
-export async function getFinanceHistoryActionMetricsRpc(
-  supabase: SupabaseClient,
-  args: Record<string, unknown>
-): Promise<FinanceHistoryMetricsRow | null> {
-  const { data, error } = await supabase.rpc(
-    'get_finance_history_action_metrics',
-    args
-  )
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (
-    Array.isArray(data) ? data[0] : data
-  ) as FinanceHistoryMetricsRow | null
-}
-
 // Phase 2 — resolver-backed analytics RPCs. These take filter parameters directly
 // (no p_claim_ids array); the claim scope is resolved server-side inside the SQL.
 export async function getFinanceHistoryMetricsFilteredRpc(

@@ -2,7 +2,6 @@ export * from '@/features/finance/data/repositories/finance-filter-options.repos
 export * from '@/features/finance/data/repositories/finance-queue.repository'
 export * from '@/features/finance/data/repositories/finance-history.repository'
 export * from '@/features/finance/data/repositories/mapped-claim-items.repository'
-export * from '@/features/finance/data/repositories/finance-filters.repository'
 export * from '@/features/finance/data/queries/analytics.query'
 export * from '@/features/finance/data/queries/history-analytics.query'
 export * from '@/features/finance/data/queries/employee-name-suggestions.query'
