@@ -17,8 +17,9 @@ import { mswServer } from '@/test/msw/server'
 
 // Live list-pagination parity gate (Phase 3a). Opt-in: requires a service-role
 // connection AND the Phase 3 migrations applied to the target DB. Run with:
-//   PARITY=1 SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx vitest run \
+//   PARITY=1 NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx vitest run \
 //     src/features/finance/__tests__/finance-list-parity.test.ts
+// SUPABASE_URL is accepted as a fallback alias for NEXT_PUBLIC_SUPABASE_URL.
 //
 // Strategy (see plan Task 5): the new page RPCs are keyset-paginated in SQL. We
 // page through ALL pages of each RPC and assert the concatenated sequence is:
@@ -30,6 +31,8 @@ import { mswServer } from '@/test/msw/server'
 // sequence — no separate ordered reference list needed. hasNextPage / nextCursor
 // progression and duplicate-timestamp (limit=1) cases are asserted explicitly.
 const ENABLED = process.env.PARITY === '1'
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
 
 const BASE: FinanceFilters = {
   employeeId: null,
@@ -320,15 +323,13 @@ describe.skipIf(!ENABLED)(
     // every later test would then hit onUnhandledRequest:'error'. Re-register the
     // passthrough before EACH test (and in beforeAll, for the status-id fetch).
     function allowSupabasePassthrough() {
-      mswServer.use(
-        http.all(`${process.env.SUPABASE_URL}/*`, () => passthrough())
-      )
+      mswServer.use(http.all(`${SUPABASE_URL}/*`, () => passthrough()))
     }
 
     beforeAll(async () => {
       allowSupabasePassthrough()
       supabase = createClient(
-        process.env.SUPABASE_URL as string,
+        SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY as string,
         { auth: { persistSession: false } }
       )

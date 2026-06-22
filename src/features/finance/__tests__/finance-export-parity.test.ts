@@ -12,8 +12,9 @@ import { mswServer } from '@/test/msw/server'
 
 // Live golden-master parity gate for the Phase 4 payment-journals export aggregation.
 // Opt-in: requires a service-role connection. Run with:
-//   PARITY=1 SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx vitest run \
+//   PARITY=1 NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx vitest run \
 //     src/features/finance/__tests__/finance-export-parity.test.ts
+// SUPABASE_URL is accepted as a fallback alias for NEXT_PUBLIC_SUPABASE_URL.
 //
 // What this proves: the new single GROUP BY RPC (get_finance_payment_journal_totals,
 // surfaced via getFinancePaymentJournalTotals) produces the SAME per-employee totals as
@@ -24,6 +25,8 @@ import { mswServer } from '@/test/msw/server'
 // precision the CSV actually emits (toFixed(2)) — JS float summation vs SQL numeric sum
 // only ever differ in float noise below that, which the export rounds away.
 const ENABLED = process.env.PARITY === '1'
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
 
 // Smaller than the route's 500 so the legacy baseline exercises MANY keyset pages
 // (the dataset has ~2.6k history actions), and so the per-page .in('id', ...) enrichment
@@ -193,17 +196,13 @@ describe.skipIf(!ENABLED)('finance payment-journals export parity', () => {
   // The global vitest.setup.ts resets MSW handlers in afterEach, so re-register the
   // Supabase passthrough before EVERY test (beforeAll alone only survives a single test).
   beforeEach(() => {
-    mswServer.use(
-      http.all(`${process.env.SUPABASE_URL}/*`, () => passthrough())
-    )
+    mswServer.use(http.all(`${SUPABASE_URL}/*`, () => passthrough()))
   })
 
   beforeAll(async () => {
-    mswServer.use(
-      http.all(`${process.env.SUPABASE_URL}/*`, () => passthrough())
-    )
+    mswServer.use(http.all(`${SUPABASE_URL}/*`, () => passthrough()))
     supabase = createClient(
-      process.env.SUPABASE_URL as string,
+      SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY as string,
       { auth: { persistSession: false } }
     )

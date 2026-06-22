@@ -21,11 +21,12 @@
       "mcp__claude_ai_Supabase__list_tables",
       "Bash(sed 's/\\\\\\(KEY=\\\\\\).*/\\\\1***/')",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40)",
-      "PowerShell(npx vitest run 2>&1 | Select-Object -Last 12)"
+      "PowerShell(npx vitest run 2>&1 | Select-Object -Last 12)",
+      "Bash(gh pr *)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "supabase"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
