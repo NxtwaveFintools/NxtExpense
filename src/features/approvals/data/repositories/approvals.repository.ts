@@ -17,20 +17,6 @@ import type {
   PendingApproval,
   PendingApprovalsFilters,
 } from '@/features/approvals/types'
-import { getPendingApprovalScopeByActor } from '@/features/approvals/data/repositories/pending-scope.repository'
-import { getLocationIdsByApprovalLocationType } from '@/features/approvals/data/queries/location-type.query'
-
-function buildClaimDateCursorFilter(
-  claimDate: string,
-  claimId: string,
-  ascending: boolean
-): string {
-  if (ascending) {
-    return `claim_date.gt.${claimDate},and(claim_date.eq.${claimDate},id.gt.${claimId})`
-  }
-
-  return `claim_date.lt.${claimDate},and(claim_date.eq.${claimDate},id.lt.${claimId})`
-}
 
 export async function getApproverActorByEmail(
   supabase: SupabaseClient,
@@ -84,162 +70,84 @@ export async function getPendingApprovalsPaginated(
     claimDateSort: 'desc',
   }
 ) {
-  const lowerEmail = approverEmail.toLowerCase()
-
-  const [actorResult, pendingStatuses] = await Promise.all([
-    getApproverActorByEmail(supabase, lowerEmail),
-    getPendingApprovalStatuses(supabase),
-  ])
-
-  if (!actorResult) {
+  if (!approverEmail) {
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  let pendingStatusIds = pendingStatuses.map((status) => status.id)
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
   const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
     supabase,
     parsedStatusFilter
   )
 
-  if (parsedStatusFilter) {
-    pendingStatusIds = pendingStatuses
-      .filter((status) => status.id === parsedStatusFilter.statusId)
-      .map((status) => status.id)
-  }
+  // Keyset ID-page resolved entirely in Postgres (get_pending_approvals): the
+  // approver's subordinate scope is computed from the caller's JWT inside the
+  // function and never leaves the DB, so the request URL stays tiny regardless
+  // of HOD/SBH/ZBH size. At most limit + 1 ids ever return to Node. Mirrors the
+  // Approval History / Finance keyset design.
+  const decoded = cursor ? decodeCursor(cursor) : null
+  const normalizedName = filters.employeeName?.trim() ?? ''
 
-  if (pendingStatusIds.length === 0) {
-    return { data: [], hasNextPage: false, nextCursor: null, limit }
-  }
-
-  const pendingScope = await getPendingApprovalScopeByActor(
-    supabase,
-    actorResult.id
+  const { data: pageRows, error: pageError } = await supabase.rpc(
+    'get_pending_approvals',
+    {
+      p_limit: limit,
+      p_cursor_claim_date: decoded?.created_at ?? null,
+      p_cursor_id: decoded?.id ?? null,
+      p_sort: filters.claimDateSort === 'asc' ? 'asc' : 'desc',
+      p_claim_status_id: parsedStatusFilter?.statusId ?? null,
+      p_allow_resubmit: allowResubmitFilter,
+      p_employee_name: normalizedName || null,
+      p_amount_operator: filters.amountOperator,
+      p_amount_value: filters.amountValue,
+      p_location_type: filters.locationType,
+      p_claim_date_from: filters.claimDateFrom,
+      p_claim_date_to: filters.claimDateTo,
+    }
   )
 
-  const level1Ids = [
-    ...new Set([
-      ...pendingScope.level1ActionEmployeeIds,
-      ...pendingScope.level1ViewOnlyEmployeeIds,
-    ]),
-  ]
-  const level2Ids = pendingScope.level2ActionEmployeeIds
-
-  const toInList = (ids: string[]) =>
-    ids.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(',')
-
-  const approvalFilters: string[] = []
-
-  if (level1Ids.length > 0) {
-    approvalFilters.push(
-      `and(current_approval_level.eq.1,employee_id.in.(${toInList(level1Ids)}))`
-    )
+  if (pageError) {
+    throw new Error(pageError.message)
   }
 
-  if (level2Ids.length > 0) {
-    approvalFilters.push(
-      `and(current_approval_level.eq.2,employee_id.in.(${toInList(level2Ids)}))`
-    )
-  }
+  const idRows = (pageRows ?? []) as Array<{ id: string; claim_date: string }>
+  const hasNextPage = idRows.length > limit
+  const pageIdRows = hasNextPage ? idRows.slice(0, limit) : idRows
+  const pageIds = pageIdRows.map((row) => row.id)
 
-  if (approvalFilters.length === 0) {
+  if (pageIds.length === 0) {
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  let query = supabase
-    .from('expense_claims')
-    .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
-    .in('status_id', pendingStatusIds)
-    .or(approvalFilters.join(','))
-    .limit(limit + 1)
-
-  if (allowResubmitFilter !== null) {
-    query = query.eq('allow_resubmit', allowResubmitFilter)
-  }
-
-  if (filters.claimDateFrom) {
-    query = query.gte('claim_date', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    query = query.lte('claim_date', filters.claimDateTo)
-  }
-
-  if (filters.amountValue !== null) {
-    if (filters.amountOperator === 'gte') {
-      query = query.gte('total_amount', filters.amountValue)
-    } else if (filters.amountOperator === 'eq') {
-      query = query.eq('total_amount', filters.amountValue)
-    } else {
-      query = query.lte('total_amount', filters.amountValue)
-    }
-  }
-
-  if (filters.locationType) {
-    const scopedLocationIds = await getLocationIdsByApprovalLocationType(
-      supabase,
-      filters.locationType
-    )
-
-    if (!scopedLocationIds || scopedLocationIds.length === 0) {
-      return { data: [], hasNextPage: false, nextCursor: null, limit }
-    }
-
-    query = query.in('work_location_id', scopedLocationIds)
-  }
-
-  const normalizedName = filters.employeeName?.trim() ?? ''
-  if (normalizedName) {
-    const escapedName = normalizedName
-      .replaceAll('%', '\\%')
-      .replaceAll('_', '\\_')
-
-    query = query.ilike('employees.employee_name', `%${escapedName}%`)
-  }
-
-  const isClaimDateAscending = filters.claimDateSort === 'asc'
-
-  query = query
-    .order('claim_date', { ascending: isClaimDateAscending })
-    .order('id', { ascending: isClaimDateAscending })
-
-  if (cursor) {
-    const decoded = decodeCursor(cursor)
-    query = query.or(
-      buildClaimDateCursorFilter(
-        decoded.created_at,
-        decoded.id,
-        isClaimDateAscending
-      )
-    )
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  const rows = (data ?? []) as Array<
-    Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
-  >
-  const hasNextPage = rows.length > limit
-  const pageData = hasNextPage ? rows.slice(0, limit) : rows
-  const claimIds = pageData.map((row) => row.id as string)
-
-  const [itemsResult, actionsByClaimId] = await Promise.all([
-    claimIds.length > 0
-      ? supabase
-          .from('expense_claim_items')
-          .select('id, claim_id, item_type, description, amount, created_at')
-          .in('claim_id', claimIds)
-      : Promise.resolve({ data: [], error: null }),
-    getClaimAvailableActionsByClaimIds(supabase, claimIds),
+  // Bounded enrichment (<= limit ids). .in('id', pageIds) does not guarantee
+  // order, so we re-apply the RPC's keyset order when mapping below.
+  const [claimResult, itemsResult, actionsByClaimId] = await Promise.all([
+    supabase
+      .from('expense_claims')
+      .select(`${CLAIM_COLUMNS}, employees!employee_id!inner(*)`)
+      .in('id', pageIds),
+    supabase
+      .from('expense_claim_items')
+      .select('id, claim_id, item_type, description, amount, created_at')
+      .in('claim_id', pageIds),
+    getClaimAvailableActionsByClaimIds(supabase, pageIds),
   ])
+
+  if (claimResult.error) {
+    throw new Error(claimResult.error.message)
+  }
 
   if (itemsResult.error) {
     throw new Error(itemsResult.error.message)
   }
+
+  const claimRowById = new Map(
+    (
+      (claimResult.data ?? []) as Array<
+        Record<string, unknown> & { employees: EmployeeRow | EmployeeRow[] }
+      >
+    ).map((row) => [row.id as string, row])
+  )
 
   const itemsByClaimId = new Map<string, ClaimItem[]>()
   for (const item of (itemsResult.data ?? []) as (ClaimItem & {
@@ -253,32 +161,36 @@ export async function getPendingApprovalsPaginated(
     }
   }
 
-  const pending: PendingApproval[] = pageData.map((row) => {
-    const owner = Array.isArray(row.employees)
-      ? row.employees[0]
-      : row.employees
+  const pending: PendingApproval[] = pageIds
+    .map((claimId) => {
+      const row = claimRowById.get(claimId)
+      if (!row) {
+        return null
+      }
 
-    if (!owner) {
-      throw new Error('Claim owner mapping not found.')
-    }
+      const owner = Array.isArray(row.employees)
+        ? row.employees[0]
+        : row.employees
 
-    const claim = mapClaimRow(row as Record<string, unknown>)
-    const claimId = row.id as string
+      if (!owner) {
+        throw new Error('Claim owner mapping not found.')
+      }
 
-    return {
-      claim: claim as Claim,
-      owner,
-      items: itemsByClaimId.get(claimId) ?? [],
-      availableActions: actionsByClaimId.get(claimId) ?? [],
-    }
-  })
+      return {
+        claim: mapClaimRow(row as Record<string, unknown>) as Claim,
+        owner,
+        items: itemsByClaimId.get(claimId) ?? [],
+        availableActions: actionsByClaimId.get(claimId) ?? [],
+      }
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
 
-  const lastRecord = pageData.at(-1)
+  const lastRecord = pageIdRows.at(-1)
   const nextCursor =
     hasNextPage && lastRecord
       ? encodeCursor({
-          created_at: lastRecord.claim_date as string,
-          id: lastRecord.id as string,
+          created_at: lastRecord.claim_date,
+          id: lastRecord.id,
         })
       : null
 

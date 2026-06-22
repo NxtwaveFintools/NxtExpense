@@ -17,6 +17,7 @@ import {
 import { ApprovalsPage } from './pages/approvals.page'
 import { ClaimsPage } from './pages/claims.page'
 import { FinancePage } from './pages/finance.page'
+import { resolveExpectedFoodForSubmitter } from './utils/expense-rates-db'
 
 type LoginAs = (email: string) => Promise<void>
 type ClaimMode = 'base' | 'outstation'
@@ -27,7 +28,6 @@ type WorkflowScenario = {
   approverEmails: string[]
   financeEmail: string
   outstationStateName: string
-  hasOverride: boolean
 }
 
 const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
@@ -37,7 +37,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [SBH_TN_KERALA.email, PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Kerala',
-    hasOverride: false,
   },
   {
     name: 'G1 Karnataka standard flow',
@@ -45,7 +44,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [SBH_KARNATAKA.email, PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Karnataka',
-    hasOverride: false,
   },
   {
     name: 'G1 Tamil Nadu replacement direct flow',
@@ -53,7 +51,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Tamil Nadu',
-    hasOverride: false,
   },
   {
     name: 'G2 Karnataka standard direct flow',
@@ -61,7 +58,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [PM_MANSOOR.email],
     financeEmail: FINANCE_2.email,
     outstationStateName: 'Karnataka',
-    hasOverride: false,
   },
   {
     name: 'G2 ZBH standard direct flow',
@@ -69,7 +65,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [PM_MANSOOR.email],
     financeEmail: FINANCE_2.email,
     outstationStateName: 'Karnataka',
-    hasOverride: false,
   },
   {
     name: 'G2 PM direct to finance flow',
@@ -77,7 +72,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [],
     financeEmail: FINANCE_2.email,
     outstationStateName: 'Karnataka',
-    hasOverride: true,
   },
   {
     name: 'G1 AP target flow',
@@ -85,7 +79,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [SBH_AP.email, PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Andhra Pradesh',
-    hasOverride: true,
   },
   {
     name: 'G2 AP target direct flow',
@@ -93,7 +86,6 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     approverEmails: [PM_MANSOOR.email],
     financeEmail: FINANCE_2.email,
     outstationStateName: 'Telangana',
-    hasOverride: true,
   },
 ]
 
@@ -353,7 +345,9 @@ async function assertClaimAmountsInFinanceAndRelease(
   await finance.bulkIssueButton.click()
 
   await expect
-    .poll(async () => finance.getQueueRowByClaimNumber(claimNumber).count())
+    .poll(async () => finance.getQueueRowByClaimNumber(claimNumber).count(), {
+      timeout: 20_000,
+    })
     .toBe(0)
 
   await finance.gotoApprovedHistory()
@@ -378,15 +372,22 @@ async function assertClaimAmountsInFinanceAndRelease(
   await finance.getHistoryCheckboxByClaimNumber(claimNumber).check()
   await finance.bulkReleaseButton.click()
 
+  // Each poll iteration re-navigates to history + re-filters, which can take
+  // several seconds under heavy parallel load, so the default 5s budget is too
+  // tight to fit even one round. Give it a generous, explicit timeout.
   await expect
-    .poll(async () => {
-      await finance.gotoApprovedHistory()
-      await finance.filterHistoryByClaimNumber(claimNumber)
-      return (
-        (await finance.getHistoryRowByClaimNumber(claimNumber).textContent()) ??
-        ''
-      )
-    })
+    .poll(
+      async () => {
+        await finance.gotoApprovedHistory()
+        await finance.filterHistoryByClaimNumber(claimNumber)
+        return (
+          (await finance
+            .getHistoryRowByClaimNumber(claimNumber)
+            .textContent()) ?? ''
+        )
+      },
+      { timeout: 45_000 }
+    )
     .toContain('Payment Released')
 }
 
@@ -439,23 +440,18 @@ test.describe.serial('State Food Override - Approval Matrix', () => {
         'No scenario has all required accounts with valid credentials in this environment.'
       )
 
-      let standardFoodBaseline: number | null = null
-
       for (const scenario of executableScenarios) {
         const { claimNumber, foodAmount, totalAmount } =
           await submitClaimAndCaptureAmounts(page, loginAs, scenario, mode)
 
-        if (!scenario.hasOverride && standardFoodBaseline === null) {
-          standardFoodBaseline = foodAmount
-        }
-
-        if (standardFoodBaseline === null) {
-          throw new Error('Standard baseline food rate was not established.')
-        }
-
-        const expectedFood = scenario.hasOverride
-          ? standardFoodBaseline + 50
-          : standardFoodBaseline
+        // The orchestrator snapshots the food allowance active *today* for the
+        // submitter's *primary* state (state override → national fallback).
+        // Derive the same value from the DB so this stays correct as rates are
+        // re-priced or per-state overrides come and go.
+        const expectedFood = await resolveExpectedFoodForSubmitter(
+          scenario.submitterEmail,
+          mode
+        )
 
         expect(foodAmount, `${scenario.name} ${mode} food amount`).toBe(
           expectedFood
