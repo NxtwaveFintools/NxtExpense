@@ -1,9 +1,11 @@
 'use client'
 
-import { useDeferredValue, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Filter } from 'lucide-react'
+
+import { useFilterNavigation } from '@/components/ui/filter-navigation'
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
@@ -52,7 +54,7 @@ export function ApprovalFiltersBar({
   exportCurrentPageHref,
   exportAllHref,
 }: ApprovalFiltersBarProps) {
-  const router = useRouter()
+  const { navigate } = useFilterNavigation()
 
   const [claimStatus, setClaimStatus] = useState(filters.claimStatus ?? '')
   const [employeeName, setEmployeeName] = useState(filters.employeeName ?? '')
@@ -73,32 +75,18 @@ export function ApprovalFiltersBar({
 
   const deferredEmployeeName = useDeferredValue(employeeName)
 
-  const employeeNameSuggestionsQuery = useQuery<string[], Error>({
-    queryKey: ['approval-employee-name-suggestions', deferredEmployeeName],
-    queryFn: async () => {
-      const result =
-        await getApprovalEmployeeNameSuggestionsAction(deferredEmployeeName)
+  const debouncedEmployeeName = useDebouncedValue(employeeName, 400)
+  const appliedEmployeeName = filters.employeeName ?? ''
+  const appliedEmployeeNameRef = useRef(appliedEmployeeName)
+  appliedEmployeeNameRef.current = appliedEmployeeName
 
-      if (!result.ok) {
-        throw new Error(result.error)
-      }
-
-      return result.data
-    },
-    enabled: deferredEmployeeName.trim().length >= 2,
-    staleTime: 30_000,
-    gcTime: 2 * 60 * 1000,
-  })
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
+  function buildHref(employeeNameValue: string): string {
     const parsedAmount = toNullable(amountValue)
     const amountAsNumber = parsedAmount === null ? null : Number(parsedAmount)
 
     const nextFilters: ApprovalHistoryFilters = {
       claimStatus: toNullable(claimStatus),
-      employeeName: toNullable(employeeName),
+      employeeName: toNullable(employeeNameValue),
       claimDateFrom: toNullable(claimDateFrom),
       claimDateTo: toNullable(claimDateTo),
       amountOperator,
@@ -119,8 +107,42 @@ export function ApprovalFiltersBar({
       nextFilters
     )
     const queryString = params.toString()
+    return queryString ? `/approvals?${queryString}` : '/approvals'
+  }
 
-    router.push(queryString ? `/approvals?${queryString}` : '/approvals')
+  useEffect(() => {
+    if (debouncedEmployeeName === appliedEmployeeNameRef.current) {
+      return
+    }
+
+    navigate(buildHref(debouncedEmployeeName))
+    // buildHref is recreated each render, so it always captures the current
+    // status/date/amount/location state when the debounce fires. This effect is
+    // intentionally scoped to the employee-name field only — other filters apply
+    // via the Apply button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedEmployeeName])
+
+  const employeeNameSuggestionsQuery = useQuery<string[], Error>({
+    queryKey: ['approval-employee-name-suggestions', deferredEmployeeName],
+    queryFn: async () => {
+      const result =
+        await getApprovalEmployeeNameSuggestionsAction(deferredEmployeeName)
+
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+
+      return result.data
+    },
+    enabled: deferredEmployeeName.trim().length >= 2,
+    staleTime: 30_000,
+    gcTime: 2 * 60 * 1000,
+  })
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    navigate(buildHref(employeeName))
   }
 
   function handleClear() {
@@ -132,7 +154,7 @@ export function ApprovalFiltersBar({
     setAmountValue('')
     setLocationType('')
     setClaimDateSort(DEFAULT_FILTERS.claimDateSort)
-    router.push('/approvals')
+    navigate('/approvals')
   }
 
   const inputCls =

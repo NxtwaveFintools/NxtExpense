@@ -24,6 +24,12 @@ import {
   normalizeFinanceFilters,
 } from '@/features/finance/utils/filters'
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
+import { FilterNavigationProvider } from '@/components/ui/filter-navigation'
+import { PendingResults } from '@/components/ui/pending-results'
+import {
+  AnalyticsCardsSkeleton,
+  TableSkeleton,
+} from '@/components/ui/results-skeletons'
 import { FinanceFiltersBar } from '@/features/finance/ui/components/finance-filters-bar'
 import { FinanceHistoryList } from '@/features/finance/ui/components/finance-history-list'
 import {
@@ -190,66 +196,80 @@ export default async function ApprovedHistoryPage({
       <PaginationUrlCleanup keys={['historyCursor', 'historyTrail']} />
       <main className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="space-y-6">
-            <FinanceFiltersBar
-              pathname="/approved-history"
-              heading="Approved History Filters"
-              filters={effectiveFilters}
-              options={filterOptions}
-              showEmployeeIdFilter
-              showHodApproverFilter={false}
-              showClaimStatusFilter={false}
-              approvedHistoryExportAllHref={exportAllHref}
-              approvedHistoryBcExpenseHref={exportBcExpenseHref}
-              approvedHistoryPaymentJournalsHref={exportPaymentJournalsHref}
-            />
-            <ClaimAnalyticsCards
-              cards={[
-                {
-                  label: 'Total History Records',
-                  count: analytics.total.count,
-                  amount: analytics.total.amount,
-                  tone: 'neutral',
-                },
-                {
-                  label: 'Approved History',
-                  count: analytics.approvedHistory.count,
-                  amount: analytics.approvedHistory.amount,
-                  tone: 'approved',
-                },
-                {
-                  label: 'Rejected In Finance',
-                  count: analytics.rejected.count,
-                  amount: analytics.rejected.amount,
-                  tone: 'rejected',
-                },
-                {
-                  label: 'Rejected & Allow Reclaim',
-                  count: analytics.rejectedAllowReclaim.count,
-                  amount: analytics.rejectedAllowReclaim.amount,
-                  tone: 'pending',
-                },
-                {
-                  label: 'Other Actions',
-                  count: analytics.other.count,
-                  amount: analytics.other.amount,
-                  tone: 'finance',
-                },
-              ]}
-            />
-            <FinanceHistoryList
-              source="approved-history"
-              history={history}
-              pagination={{
-                ...historyPagination,
-                pageSize: history.limit,
-                pageSizeOptions: [...CURSOR_PAGE_SIZE_OPTIONS],
-                pageSizeHrefByValue,
-                totalPages: historyTotalPages,
-                totalItems: historyTotalCount,
-              }}
-            />
-          </div>
+          <FilterNavigationProvider>
+            <div className="space-y-6">
+              <FinanceFiltersBar
+                pathname="/approved-history"
+                heading="Approved History Filters"
+                filters={effectiveFilters}
+                options={filterOptions}
+                showEmployeeIdFilter
+                showHodApproverFilter={false}
+                showClaimStatusFilter={false}
+                approvedHistoryExportAllHref={exportAllHref}
+                approvedHistoryBcExpenseHref={exportBcExpenseHref}
+                approvedHistoryPaymentJournalsHref={exportPaymentJournalsHref}
+              />
+              <PendingResults skeleton={<AnalyticsCardsSkeleton count={5} />}>
+                <ClaimAnalyticsCards
+                  cards={[
+                    {
+                      label: 'Total History Records',
+                      count: analytics.total.count,
+                      amount: analytics.total.amount,
+                      tone: 'neutral',
+                    },
+                    {
+                      label: 'Approved History',
+                      count: analytics.approvedHistory.count,
+                      amount: analytics.approvedHistory.amount,
+                      tone: 'approved',
+                    },
+                    {
+                      label: 'Rejected In Finance',
+                      count: analytics.rejected.count,
+                      amount: analytics.rejected.amount,
+                      tone: 'rejected',
+                    },
+                    {
+                      label: 'Rejected & Allow Reclaim',
+                      count: analytics.rejectedAllowReclaim.count,
+                      amount: analytics.rejectedAllowReclaim.amount,
+                      tone: 'pending',
+                    },
+                    {
+                      label: 'Other Actions',
+                      count: analytics.other.count,
+                      amount: analytics.other.amount,
+                      tone: 'finance',
+                    },
+                  ]}
+                />
+              </PendingResults>
+              <PendingResults
+                skeleton={
+                  <TableSkeleton
+                    columns={8}
+                    rows={5}
+                    minWidthClassName="min-w-230"
+                  />
+                }
+              >
+                <FinanceHistoryList
+                  source="approved-history"
+                  history={history}
+                  pagination={{
+                    ...historyPagination,
+                    pageSize: history.limit,
+                    pageSizeOptions: [...CURSOR_PAGE_SIZE_OPTIONS],
+                    pageSizeHrefByValue,
+                    totalPages: historyTotalPages,
+                    totalItems: historyTotalCount,
+                  }}
+                />
+              </PendingResults>
+            </div>
+          </FilterNavigationProvider>
         </div>
       </main>
     </>

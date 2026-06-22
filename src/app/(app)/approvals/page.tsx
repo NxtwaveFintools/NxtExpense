@@ -18,6 +18,12 @@ import {
 import { requireCurrentUser } from '@/features/auth/queries'
 import { getClaimStatusCatalog } from '@/features/claims/data/queries'
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
+import { FilterNavigationProvider } from '@/components/ui/filter-navigation'
+import { PendingResults } from '@/components/ui/pending-results'
+import {
+  AnalyticsCardsSkeleton,
+  TableSkeleton,
+} from '@/components/ui/results-skeletons'
 import { canAccessApprovals } from '@/features/employees/permissions'
 import {
   getEmployeeByEmail,
@@ -265,70 +271,101 @@ export default async function ApprovalsPage({
       />
       <main className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="space-y-6">
-            <ApprovalFiltersBar
-              filters={normalizedFilters}
-              statusCatalog={statusCatalog}
-              validationError={filterValidationError}
-              exportCurrentPageHref={exportCurrentPageHref}
-              exportAllHref={exportAllHref}
-            />
-            <ClaimAnalyticsCards
-              columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
-              cards={[
-                {
-                  label: 'Total Claims',
-                  count: approvalAnalytics.total.count,
-                  amount: approvalAnalytics.total.amount,
-                  tone: 'neutral',
-                },
-                {
-                  label: 'Pending Approvals',
-                  count: approvalAnalytics.pendingApprovals.count,
-                  amount: approvalAnalytics.pendingApprovals.amount,
-                  tone: 'pending',
-                },
-                {
-                  label: 'Approved Claims',
-                  count: approvalAnalytics.approvedClaims.count,
-                  amount: approvalAnalytics.approvedClaims.amount,
-                  tone: 'approved',
-                },
-                {
-                  label: 'Payment Released',
-                  count: approvalAnalytics.paymentIssuedClaims.count,
-                  amount: approvalAnalytics.paymentIssuedClaims.amount,
-                  tone: 'finance',
-                },
-                {
-                  label: 'Rejected Claims',
-                  count: approvalAnalytics.rejectedClaims.count,
-                  amount: approvalAnalytics.rejectedClaims.amount,
-                  tone: 'rejected',
-                },
-              ]}
-            />
-            <ApprovalList
-              approvals={approvals}
-              pagination={{
-                ...pendingPagination,
-                pageSize: approvals.limit,
-                totalPages: pendingTotalPages,
-                totalItems: pendingTotalCount,
-              }}
-              dateSort={normalizedFilters.claimDateSort}
-            />
-            <ApprovalHistoryList
-              history={history}
-              showAmountColumn={showHistoryAmountColumn}
-              pagination={{
-                ...historyPagination,
-                pageSize: history.limit,
-                totalPages: historyTotalPages,
-                totalItems: historyTotalCount,
-              }}
-            />
-          </div>
+          <FilterNavigationProvider>
+            <div className="space-y-6">
+              <ApprovalFiltersBar
+                filters={normalizedFilters}
+                statusCatalog={statusCatalog}
+                validationError={filterValidationError}
+                exportCurrentPageHref={exportCurrentPageHref}
+                exportAllHref={exportAllHref}
+              />
+              <PendingResults
+                skeleton={
+                  <AnalyticsCardsSkeleton
+                    count={5}
+                    columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
+                  />
+                }
+              >
+                <ClaimAnalyticsCards
+                  columnsClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
+                  cards={[
+                    {
+                      label: 'Total Claims',
+                      count: approvalAnalytics.total.count,
+                      amount: approvalAnalytics.total.amount,
+                      tone: 'neutral',
+                    },
+                    {
+                      label: 'Pending Approvals',
+                      count: approvalAnalytics.pendingApprovals.count,
+                      amount: approvalAnalytics.pendingApprovals.amount,
+                      tone: 'pending',
+                    },
+                    {
+                      label: 'Approved Claims',
+                      count: approvalAnalytics.approvedClaims.count,
+                      amount: approvalAnalytics.approvedClaims.amount,
+                      tone: 'approved',
+                    },
+                    {
+                      label: 'Payment Released',
+                      count: approvalAnalytics.paymentIssuedClaims.count,
+                      amount: approvalAnalytics.paymentIssuedClaims.amount,
+                      tone: 'finance',
+                    },
+                    {
+                      label: 'Rejected Claims',
+                      count: approvalAnalytics.rejectedClaims.count,
+                      amount: approvalAnalytics.rejectedClaims.amount,
+                      tone: 'rejected',
+                    },
+                  ]}
+                />
+              </PendingResults>
+              <PendingResults
+                skeleton={
+                  <TableSkeleton
+                    columns={9}
+                    rows={5}
+                    minWidthClassName="min-w-230"
+                  />
+                }
+              >
+                <ApprovalList
+                  approvals={approvals}
+                  pagination={{
+                    ...pendingPagination,
+                    pageSize: approvals.limit,
+                    totalPages: pendingTotalPages,
+                    totalItems: pendingTotalCount,
+                  }}
+                  dateSort={normalizedFilters.claimDateSort}
+                />
+              </PendingResults>
+              <PendingResults
+                skeleton={
+                  <TableSkeleton
+                    columns={9}
+                    rows={5}
+                    minWidthClassName="min-w-230"
+                  />
+                }
+              >
+                <ApprovalHistoryList
+                  history={history}
+                  showAmountColumn={showHistoryAmountColumn}
+                  pagination={{
+                    ...historyPagination,
+                    pageSize: history.limit,
+                    totalPages: historyTotalPages,
+                    totalItems: historyTotalCount,
+                  }}
+                />
+              </PendingResults>
+            </div>
+          </FilterNavigationProvider>
         </div>
       </main>
     </>

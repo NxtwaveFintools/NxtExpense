@@ -1,9 +1,11 @@
 'use client'
 
-import { useDeferredValue, useState } from 'react'
+import { useEffect, useDeferredValue, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
 import { Filter } from 'lucide-react'
+
+import { useFilterNavigation } from '@/components/ui/filter-navigation'
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
@@ -78,7 +80,7 @@ export function FinanceFiltersBar({
   approvedHistoryBcExpenseHref,
   approvedHistoryPaymentJournalsHref,
 }: FinanceFiltersBarProps) {
-  const router = useRouter()
+  const { navigate } = useFilterNavigation()
 
   const [employeeId, setEmployeeId] = useState(filters.employeeId ?? '')
   const [employeeName, setEmployeeName] = useState(filters.employeeName ?? '')
@@ -97,6 +99,73 @@ export function FinanceFiltersBar({
   const [dateFrom, setDateFrom] = useState(filters.dateFrom ?? '')
   const [dateTo, setDateTo] = useState(filters.dateTo ?? '')
   const deferredEmployeeName = useDeferredValue(employeeName)
+
+  const debouncedEmployeeId = useDebouncedValue(employeeId, 400)
+  const debouncedEmployeeName = useDebouncedValue(employeeName, 400)
+  const debouncedClaimNumber = useDebouncedValue(claimNumber, 400)
+
+  const appliedText = {
+    employeeId: filters.employeeId ?? '',
+    employeeName: filters.employeeName ?? '',
+    claimNumber: filters.claimNumber ?? '',
+  }
+  const appliedTextRef = useRef(appliedText)
+  appliedTextRef.current = appliedText
+
+  function buildHref(text: {
+    employeeId: string
+    employeeName: string
+    claimNumber: string
+  }): string {
+    const params = new URLSearchParams()
+    if (showEmployeeIdFilter && text.employeeId)
+      params.set('employeeId', text.employeeId)
+    if (text.employeeName) params.set('employeeName', text.employeeName)
+    if (text.claimNumber) params.set('claimNumber', text.claimNumber)
+    if (ownerDesignation) params.set('ownerDesignation', ownerDesignation)
+    if (showHodApproverFilter && hodApproverEmployeeId)
+      params.set('hodApproverEmployeeId', hodApproverEmployeeId)
+    if (showClaimStatusFilter && claimStatus) {
+      params.set('claimStatus', claimStatus)
+    }
+    if (workLocation) params.set('workLocation', workLocation)
+    if (showActionFilter && actionFilter) {
+      params.set('actionFilter', actionFilter)
+    }
+    if (showDateFilter) {
+      if (dateFilterField !== 'claim_date') {
+        params.set('dateFilterField', dateFilterField)
+      }
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
+    }
+    const qs = params.toString()
+    return `${pathname}${qs ? `?${qs}` : ''}`
+  }
+
+  useEffect(() => {
+    const applied = appliedTextRef.current
+    const changed =
+      debouncedEmployeeId !== applied.employeeId ||
+      debouncedEmployeeName !== applied.employeeName ||
+      debouncedClaimNumber !== applied.claimNumber
+
+    if (!changed) {
+      return
+    }
+
+    navigate(
+      buildHref({
+        employeeId: debouncedEmployeeId,
+        employeeName: debouncedEmployeeName,
+        claimNumber: debouncedClaimNumber,
+      })
+    )
+    // buildHref is recreated each render, so it always captures the current
+    // dropdown/date state when the debounce fires. This effect is intentionally
+    // scoped to the text fields only — dropdowns/dates apply via the Apply button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedEmployeeId, debouncedEmployeeName, debouncedClaimNumber])
 
   const employeeNameSuggestionsQuery = useQuery<string[], Error>({
     queryKey: [
@@ -120,29 +189,13 @@ export function FinanceFiltersBar({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const params = new URLSearchParams()
-    if (showEmployeeIdFilter && employeeId) params.set('employeeId', employeeId)
-    if (employeeName) params.set('employeeName', employeeName)
-    if (claimNumber) params.set('claimNumber', claimNumber)
-    if (ownerDesignation) params.set('ownerDesignation', ownerDesignation)
-    if (showHodApproverFilter && hodApproverEmployeeId)
-      params.set('hodApproverEmployeeId', hodApproverEmployeeId)
-    if (showClaimStatusFilter && claimStatus) {
-      params.set('claimStatus', claimStatus)
-    }
-    if (workLocation) params.set('workLocation', workLocation)
-    if (showActionFilter && actionFilter) {
-      params.set('actionFilter', actionFilter)
-    }
-    if (showDateFilter) {
-      if (dateFilterField !== 'claim_date') {
-        params.set('dateFilterField', dateFilterField)
-      }
-      if (dateFrom) params.set('dateFrom', dateFrom)
-      if (dateTo) params.set('dateTo', dateTo)
-    }
-    const qs = params.toString()
-    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+    navigate(
+      buildHref({
+        employeeId,
+        employeeName,
+        claimNumber,
+      })
+    )
   }
 
   function handleClear() {
@@ -157,7 +210,7 @@ export function FinanceFiltersBar({
     setDateFilterField('claim_date')
     setDateFrom('')
     setDateTo('')
-    router.push(pathname)
+    navigate(pathname)
   }
 
   const inputCls =

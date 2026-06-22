@@ -26,6 +26,12 @@ import {
   normalizeFinanceFilters,
 } from '@/features/finance/utils/filters'
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
+import { FilterNavigationProvider } from '@/components/ui/filter-navigation'
+import { PendingResults } from '@/components/ui/pending-results'
+import {
+  AnalyticsCardsSkeleton,
+  TableSkeleton,
+} from '@/components/ui/results-skeletons'
 import { FinanceFiltersBar } from '@/features/finance/ui/components/finance-filters-bar'
 import { FinanceQueue } from '@/features/finance/ui/components/finance-queue'
 import {
@@ -204,59 +210,73 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
       <PaginationUrlCleanup keys={['queueCursor', 'queueTrail']} />
       <main className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="space-y-6">
-            <FinanceFiltersBar
-              pathname="/finance"
-              heading="Pending Claims Filters"
-              filters={effectiveFilters}
-              options={filterOptions}
-              showHodApproverFilter={false}
-              showClaimStatusFilter={false}
-              showActionFilter={false}
-              dateFilterOptions={PENDING_CLAIMS_DATE_FILTER_OPTIONS}
-              exportCurrentPageHref={exportCurrentPageHref}
-              exportAllHref={exportAllHref}
-            />
-            <ClaimAnalyticsCards
-              cards={[
-                {
-                  label: 'Total Claims',
-                  count: analytics.total.count,
-                  amount: analytics.total.amount,
-                  tone: 'neutral',
-                },
-                {
-                  label: 'Pending Claims',
-                  count: analytics.pendingFinanceQueue.count,
-                  amount: analytics.pendingFinanceQueue.amount,
-                  tone: 'finance',
-                },
-                {
-                  label: 'Payment Released',
-                  count: analytics.approved.count,
-                  amount: analytics.approved.amount,
-                  tone: 'approved',
-                },
-                {
-                  label: 'Rejected',
-                  count: analytics.rejected.count,
-                  amount: analytics.rejected.amount,
-                  tone: 'rejected',
-                },
-              ]}
-            />
-            <FinanceQueue
-              queue={queue}
-              pagination={{
-                ...queuePagination,
-                pageSize: queue.limit,
-                pageSizeOptions: [...CURSOR_PAGE_SIZE_OPTIONS],
-                pageSizeHrefByValue,
-                totalPages: queueTotalPages,
-                totalItems: queueTotalCount,
-              }}
-            />
-          </div>
+          <FilterNavigationProvider>
+            <div className="space-y-6">
+              <FinanceFiltersBar
+                pathname="/finance"
+                heading="Pending Claims Filters"
+                filters={effectiveFilters}
+                options={filterOptions}
+                showHodApproverFilter={false}
+                showClaimStatusFilter={false}
+                showActionFilter={false}
+                dateFilterOptions={PENDING_CLAIMS_DATE_FILTER_OPTIONS}
+                exportCurrentPageHref={exportCurrentPageHref}
+                exportAllHref={exportAllHref}
+              />
+              <PendingResults skeleton={<AnalyticsCardsSkeleton count={4} />}>
+                <ClaimAnalyticsCards
+                  cards={[
+                    {
+                      label: 'Total Claims',
+                      count: analytics.total.count,
+                      amount: analytics.total.amount,
+                      tone: 'neutral',
+                    },
+                    {
+                      label: 'Pending Claims',
+                      count: analytics.pendingFinanceQueue.count,
+                      amount: analytics.pendingFinanceQueue.amount,
+                      tone: 'finance',
+                    },
+                    {
+                      label: 'Payment Released',
+                      count: analytics.approved.count,
+                      amount: analytics.approved.amount,
+                      tone: 'approved',
+                    },
+                    {
+                      label: 'Rejected',
+                      count: analytics.rejected.count,
+                      amount: analytics.rejected.amount,
+                      tone: 'rejected',
+                    },
+                  ]}
+                />
+              </PendingResults>
+              <PendingResults
+                skeleton={
+                  <TableSkeleton
+                    columns={8}
+                    rows={5}
+                    minWidthClassName="min-w-230"
+                  />
+                }
+              >
+                <FinanceQueue
+                  queue={queue}
+                  pagination={{
+                    ...queuePagination,
+                    pageSize: queue.limit,
+                    pageSizeOptions: [...CURSOR_PAGE_SIZE_OPTIONS],
+                    pageSizeHrefByValue,
+                    totalPages: queueTotalPages,
+                    totalItems: queueTotalCount,
+                  }}
+                />
+              </PendingResults>
+            </div>
+          </FilterNavigationProvider>
         </div>
       </main>
     </>
