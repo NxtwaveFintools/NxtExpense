@@ -2,6 +2,8 @@
 
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 
 import type {
@@ -78,8 +80,8 @@ export function FinanceDashboardFiltersBar({
       return result.data
     },
     enabled: isOpen && deferredEmployeeName.trim().length >= 2,
-    staleTime: 30_000,
-    gcTime: 2 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.REALTIME,
+    gcTime: QUERY_GC_TIME.SHORT,
   })
 
   const activeCount = [

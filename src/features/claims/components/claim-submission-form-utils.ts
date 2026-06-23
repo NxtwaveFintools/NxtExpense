@@ -1,3 +1,4 @@
+import { BASE_LOCATION_DAY_TYPE_CODES } from '@/lib/constants/claim-expense'
 import type {
   BaseLocationDayTypeOption,
   CityOption,
@@ -45,6 +46,6 @@ export function resolveDefaultBaseLocationDayTypeCode(
   return (
     baseLocationDayTypeOptions.find((option) => option.isDefault)?.code ??
     baseLocationDayTypeOptions[0]?.code ??
-    'FULL_DAY'
+    BASE_LOCATION_DAY_TYPE_CODES.FULL_DAY
   )
 }

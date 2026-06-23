@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { EMPLOYEE_STATUS_CODES } from '@/lib/constants/claim-expense'
+
 // ────────────────────────────────────────────────────────────
 // Employee types (ID-based)
 // ────────────────────────────────────────────────────────────
@@ -86,14 +88,17 @@ async function getEmployeeRecordByEmail(
   throw new Error('Employee lookup failed unexpectedly.')
 }
 
-export function isEmployeeActive(
+function isEmployeeActive(
   employee: EmployeeRow | null | undefined
 ): employee is EmployeeRow {
   if (!employee) {
     return false
   }
 
-  return (employee.employee_statuses?.status_code ?? 'ACTIVE') === 'ACTIVE'
+  return (
+    (employee.employee_statuses?.status_code ??
+      EMPLOYEE_STATUS_CODES.ACTIVE) === EMPLOYEE_STATUS_CODES.ACTIVE
+  )
 }
 
 export async function getEmployeeAccessByEmail(

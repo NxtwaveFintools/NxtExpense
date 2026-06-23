@@ -6,6 +6,7 @@ import type {
   ClaimStatusCatalogItem,
   ClaimWithItems,
   ExpenseItemType,
+  IntracityVehicleMode,
   MyClaimsFilters,
   PaginatedClaims,
 } from '@/features/claims/types'
@@ -50,7 +51,7 @@ export type ClaimPayload = {
   hasIntracityTravel: boolean
   intercityOwnVehicleUsed: boolean | null
   intracityOwnVehicleUsed: boolean | null
-  intracityVehicleMode: 'OWN_VEHICLE' | 'RENTAL_VEHICLE' | null
+  intracityVehicleMode: IntracityVehicleMode | null
   vehicleTypeId: string | null
   outstationStateId: string | null
   outstationCityId: string | null

@@ -58,7 +58,7 @@ async function getPaymentReleasedStatusIds(
   return new Set((statuses ?? []).map((row) => (row as ClaimStatusIdRow).id))
 }
 
-export async function getDateFilterTargetStatusIds(
+async function getDateFilterTargetStatusIds(
   supabase: SupabaseClient,
   dateFilterField: FinanceActionDateFilterField
 ): Promise<Set<string>> {

@@ -1,10 +1,11 @@
 import type { PaginatedResult } from '@/lib/utils/pagination'
 import type { WorkLocation as ConfigWorkLocation } from '@/lib/services/config-service'
+import type { IntracityVehicleMode } from '@/lib/constants/claim-expense'
 
 export type WorkLocation = string
 export type VehicleType = string
-export type IntracityVehicleMode = 'OWN_VEHICLE' | 'RENTAL_VEHICLE'
-export type ClaimStatusId = string
+export type { IntracityVehicleMode }
+type ClaimStatusId = string
 export type ExpenseItemType = string
 
 /** A simple { id, name } option for select dropdowns */

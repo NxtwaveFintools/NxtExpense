@@ -1,6 +1,8 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -38,7 +40,7 @@ export function ClaimOperations() {
 
       return result.data
     },
-    gcTime: 5 * 60 * 1000,
+    gcTime: QUERY_GC_TIME.MEDIUM,
   })
 
   const claimsQuery = useQuery<AdminClaimRow[], Error>({
@@ -53,8 +55,8 @@ export function ClaimOperations() {
       return result.data
     },
     enabled: submittedQuery.length > 0,
-    staleTime: 30_000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.REALTIME,
+    gcTime: QUERY_GC_TIME.MEDIUM,
   })
 
   const claims = claimsQuery.data ?? []

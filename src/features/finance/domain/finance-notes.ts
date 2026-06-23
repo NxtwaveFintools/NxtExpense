@@ -1,7 +1,7 @@
-export const REQUIRED_FINANCE_NOTES_ERROR_MESSAGE =
+const REQUIRED_FINANCE_NOTES_ERROR_MESSAGE =
   'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
 
-export function normalizeFinanceNotes(notes: string | undefined): string {
+function normalizeFinanceNotes(notes: string | undefined): string {
   return notes?.trim() ?? ''
 }
 

@@ -10,6 +10,8 @@ import {
   getEmployeeFormOptionsAction,
 } from '@/features/admin/actions'
 import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
+import { EMPLOYEE_STATUS_CODES } from '@/lib/constants/claim-expense'
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import type { AdminEmployeeFormOptions } from '@/features/admin/types'
 import { EmployeeFormFields } from './employee-form-fields'
 
@@ -96,7 +98,7 @@ export function EmployeeCreateForm({
       return result.data
     },
     enabled: shouldLoadOptions,
-    gcTime: 5 * 60 * 1000,
+    gcTime: QUERY_GC_TIME.MEDIUM,
   })
 
   const options = formOptionsQuery.data ?? null
@@ -118,8 +120,8 @@ export function EmployeeCreateForm({
       return result.data
     },
     enabled: shouldLoadOptions && Boolean(options) && Boolean(effectiveStateId),
-    staleTime: 30_000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.REALTIME,
+    gcTime: QUERY_GC_TIME.MEDIUM,
   })
 
   const approversByLevel = approversQuery.data ?? EMPTY_APPROVERS_BY_LEVEL
@@ -168,8 +170,9 @@ export function EmployeeCreateForm({
   }
 
   const replacementActiveStatusId =
-    options?.statuses.find((status) => status.status_code === 'ACTIVE')?.id ??
-    ''
+    options?.statuses.find(
+      (status) => status.status_code === EMPLOYEE_STATUS_CODES.ACTIVE
+    )?.id ?? ''
 
   const selectedDesignationId =
     form.designationId || replacementDraft?.defaultDesignationId || ''

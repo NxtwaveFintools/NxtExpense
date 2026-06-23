@@ -54,7 +54,7 @@ function todayIso(): string {
  * `getEmployeePrimaryStateId` (prefer `is_primary`, else the earliest row).
  * Returns null when the employee has no state mapping.
  */
-export async function getEmployeePrimaryStateIdByEmail(
+async function getEmployeePrimaryStateIdByEmail(
   email: string
 ): Promise<string | null> {
   const supabase = getServiceClient()
@@ -109,7 +109,7 @@ export async function getEmployeePrimaryStateIdByEmail(
  * rows for its single work location, so filtering by `expense_type` alone is
  * equivalent to the app's `location_id` filter.
  */
-export async function resolveActiveFoodAllowance(
+async function resolveActiveFoodAllowance(
   expenseType: 'FOOD_BASE' | 'FOOD_OUTSTATION',
   primaryStateId: string | null,
   asOfDateIso: string = todayIso()

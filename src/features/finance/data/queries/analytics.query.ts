@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceFilters } from '@/features/finance/types'
 import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
+import { isFinalApprovalLevel } from '@/lib/constants/approval-levels'
 
 import { getFinanceQueueMetricsFilteredRpc } from '@/features/finance/data/rpc/finance-metrics.rpc'
 
@@ -93,7 +94,7 @@ export async function getFinanceQueueAnalytics(
   const pendingFinanceQueueStatusIds = activeStatuses
     .filter(
       (status) =>
-        status.approval_level === 3 &&
+        isFinalApprovalLevel(status.approval_level) &&
         !status.is_approval &&
         !status.is_rejection &&
         !status.is_terminal

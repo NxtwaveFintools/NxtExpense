@@ -2,10 +2,13 @@
 
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { Filter } from 'lucide-react'
 
 import { useFilterNavigation } from '@/components/ui/filter-navigation'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
+import { INPUT_DEBOUNCE_MS } from '@/lib/constants/ui'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
@@ -75,7 +78,10 @@ export function ApprovalFiltersBar({
 
   const deferredEmployeeName = useDeferredValue(employeeName)
 
-  const debouncedEmployeeName = useDebouncedValue(employeeName, 400)
+  const debouncedEmployeeName = useDebouncedValue(
+    employeeName,
+    INPUT_DEBOUNCE_MS
+  )
   const appliedEmployeeName = filters.employeeName ?? ''
   const appliedEmployeeNameRef = useRef(appliedEmployeeName)
   appliedEmployeeNameRef.current = appliedEmployeeName
@@ -136,8 +142,8 @@ export function ApprovalFiltersBar({
       return result.data
     },
     enabled: deferredEmployeeName.trim().length >= 2,
-    staleTime: 30_000,
-    gcTime: 2 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.REALTIME,
+    gcTime: QUERY_GC_TIME.SHORT,
   })
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

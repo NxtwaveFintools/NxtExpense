@@ -1,12 +1,12 @@
 import { QueryClient } from '@tanstack/react-query'
 
-const QUERY_GC_TIME_MS = 5 * 60 * 1000
+import { QUERY_GC_TIME } from '@/lib/constants/query-config'
 
 function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        gcTime: QUERY_GC_TIME_MS,
+        gcTime: QUERY_GC_TIME.MEDIUM,
         retry: 1,
         refetchOnWindowFocus: false,
       },

@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { DESIGNATION_CODES } from '@/lib/constants/claim-expense'
+
 type EmployeeIdRow = {
   id: string
 }
@@ -33,7 +35,9 @@ function isZonalBusinessHeadDesignation(
     ? (designation[0] ?? null)
     : designation
 
-  return designationRow?.designation_code === 'ZBH'
+  return (
+    designationRow?.designation_code === DESIGNATION_CODES.ZONAL_BUSINESS_HEAD
+  )
 }
 
 export async function getPendingApprovalScopeByActor(

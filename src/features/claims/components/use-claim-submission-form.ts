@@ -13,6 +13,8 @@ import {
   getFallbackKmLimit,
   resolveDefaultBaseLocationDayTypeCode,
 } from '@/features/claims/components/claim-submission-form-utils'
+import { INTRACITY_VEHICLE_MODES } from '@/lib/constants/claim-expense'
+import { QUERY_STALE_TIME } from '@/lib/constants/query-config'
 
 import type { ClaimRateSnapshot } from '@/features/claims/components/claim-summary-preview'
 import type {
@@ -87,9 +89,9 @@ export function useClaimSubmissionForm({
     isEditingReturnedClaim
       ? (initialValues?.intracityVehicleMode ??
         (initialValues?.intracityOwnVehicleUsed === true
-          ? 'OWN_VEHICLE'
+          ? INTRACITY_VEHICLE_MODES.OWN_VEHICLE
           : initialValues?.hasIntracityTravel
-            ? 'RENTAL_VEHICLE'
+            ? INTRACITY_VEHICLE_MODES.RENTAL_VEHICLE
             : null))
       : null
   const [intercityOwnVehicleUsed, setIntercityOwnVehicleUsed] = useState<
@@ -127,7 +129,7 @@ export function useClaimSubmissionForm({
     queryKey: ['cities', outstationStateId],
     queryFn: () => fetchCitiesByState(outstationStateId),
     enabled: Boolean(outstationStateId),
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.MEDIUM,
   })
 
   const filteredCityOptions = citiesQuery.data ?? []
@@ -148,7 +150,8 @@ export function useClaimSubmissionForm({
     intercityOwnVehicleUsed === true || intracityTravelUsed === true
   const effectiveIntracityOwnVehicleUsed =
     hasIntercityTravel ||
-    (hasIntracityTravel && intracityVehicleMode === 'OWN_VEHICLE')
+    (hasIntracityTravel &&
+      intracityVehicleMode === INTRACITY_VEHICLE_MODES.OWN_VEHICLE)
 
   const kmValidationMessage = useMemo(() => {
     const kmValue = Number.parseFloat(kmTravelled)

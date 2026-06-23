@@ -1,4 +1,4 @@
-export type WorkflowStatus =
+type WorkflowStatus =
   | 'L1_PENDING'
   | 'L3_PENDING_FINANCE_REVIEW'
   | 'REJECTED'
@@ -12,7 +12,7 @@ type FinanceAction =
   | 'released'
   | 'finance_rejected'
 
-export type WorkflowHistoryEntry = {
+type WorkflowHistoryEntry = {
   actorEmail: string
   action: ApprovalAction | FinanceAction
   approvalLevel: 1 | 3 | null

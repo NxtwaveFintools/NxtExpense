@@ -7,6 +7,7 @@ import {
   mapClaimRow,
   resolveClaimAllowResubmitFilterValue,
 } from '@/features/claims/data/queries'
+import { INTERMEDIATE_APPROVAL_LEVELS } from '@/lib/constants/approval-levels'
 import type { EmployeeRow } from '@/lib/services/employee-service'
 import { getEmployeeById } from '@/lib/services/employee-service'
 import { parseClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
@@ -45,7 +46,7 @@ export async function getPendingApprovalStatuses(
     .eq('is_rejection', false)
     .eq('is_terminal', false)
     .eq('is_active', true)
-    .in('approval_level', [1, 2])
+    .in('approval_level', [...INTERMEDIATE_APPROVAL_LEVELS])
 
   if (error) {
     throw new Error(error.message)

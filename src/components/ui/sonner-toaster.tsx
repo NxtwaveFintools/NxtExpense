@@ -3,6 +3,9 @@
 import { Toaster } from 'sonner'
 import { CheckCircle2, Info, AlertCircle, XCircle } from 'lucide-react'
 
+// How long a toast stays on screen before auto-dismissing.
+const TOAST_DURATION_MS = 2000
+
 export function SonnerToaster() {
   return (
     <Toaster
@@ -11,7 +14,7 @@ export function SonnerToaster() {
       gap={8}
       visibleToasts={4}
       closeButton
-      duration={2000}
+      duration={TOAST_DURATION_MS}
       icons={{
         success: (
           <div className="flex size-8 items-center justify-center rounded-xl bg-emerald-500/15 dark:bg-emerald-500/20">

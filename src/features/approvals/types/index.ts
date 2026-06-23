@@ -34,7 +34,7 @@ export type ApprovalAmountOperator = 'lte' | 'gte' | 'eq'
 
 export type ApprovalLocationType = 'base' | 'outstation'
 
-export type ApprovalClaimDateSort = 'asc' | 'desc'
+type ApprovalClaimDateSort = 'asc' | 'desc'
 
 export type ApprovalHistoryFilters = {
   employeeName: string | null

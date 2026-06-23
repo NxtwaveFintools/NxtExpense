@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { ArrowRight, Shield } from 'lucide-react'
 import { useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import dynamic from 'next/dynamic'
 
 import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
@@ -107,8 +109,8 @@ export function AdminAnalyticsDashboard() {
       return result.data
     },
     placeholderData: keepPreviousData,
-    staleTime: 60_000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.SHORT,
+    gcTime: QUERY_GC_TIME.MEDIUM,
     refetchOnWindowFocus: false,
   })
 
@@ -141,8 +143,8 @@ export function AdminAnalyticsDashboard() {
       return result.data
     },
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.REALTIME,
+    gcTime: QUERY_GC_TIME.MEDIUM,
     refetchOnWindowFocus: false,
   })
 
@@ -157,8 +159,8 @@ export function AdminAnalyticsDashboard() {
 
       return result.data
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.MEDIUM,
+    gcTime: QUERY_GC_TIME.LONG,
     refetchOnWindowFocus: false,
   })
 

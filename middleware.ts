@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { isAllowedCorporateEmail } from '@/lib/auth/allowed-email-domains'
+import { isProtectedRoute, isPublicAuthRoute } from '@/lib/auth/route-access'
 import { isRecoverableAuthSessionError } from '@/lib/supabase/auth-errors'
 import { getSupabasePublicEnv } from '@/lib/supabase/env'
 import { copyResponseCookies } from '@/lib/utils/session-utils'
@@ -9,29 +10,7 @@ import {
   refreshAuthSession,
 } from '@/lib/supabase/middleware'
 
-const protectedRoutes = [
-  '/dashboard',
-  '/claims',
-  '/approvals',
-  '/finance',
-  '/approved-history',
-  '/no-access',
-  '/admin',
-]
-const publicAuthRoutes = ['/login']
 const AUTH_RETRY_PARAM = 'auth_retry'
-
-function matchesRoute(pathname: string, route: string): boolean {
-  return pathname === route || pathname.startsWith(`${route}/`)
-}
-
-function isProtectedRoute(pathname: string): boolean {
-  return protectedRoutes.some((route) => matchesRoute(pathname, route))
-}
-
-function isPublicAuthRoute(pathname: string): boolean {
-  return publicAuthRoutes.some((route) => matchesRoute(pathname, route))
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -150,6 +129,11 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+// Next.js requires `matcher` to be a statically analysable literal, so it
+// cannot be computed from the route lists at runtime. It is kept in sync with
+// `@/lib/auth/route-access` (PROTECTED_ROUTES + PUBLIC_AUTH_ROUTES) by
+// `route-access.test.ts`, which fails if this literal ever drifts from
+// `buildMiddlewareMatcher()`.
 export const config = {
   matcher: [
     '/dashboard/:path*',

@@ -64,7 +64,7 @@ export type FinanceDashboardFilters = {
   vehicleCode: string | null
 }
 
-export type FilterOption = {
+type FilterOption = {
   value: string
   label: string
 }

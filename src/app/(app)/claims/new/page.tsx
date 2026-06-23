@@ -21,6 +21,10 @@ import {
 } from '@/lib/services/config-service'
 import { getAllExpenseLocations } from '@/lib/services/expense-location-service'
 import { getValidationRuleBoolean } from '@/lib/services/validation-rule-service'
+import {
+  EMPLOYEE_STATUS_CODES,
+  WORK_LOCATION_CODES,
+} from '@/lib/constants/claim-expense'
 import type { BaseLocationDayTypeOption } from '@/features/claims/types'
 
 export default async function NewClaimPage() {
@@ -32,9 +36,10 @@ export default async function NewClaimPage() {
     redirect('/dashboard')
   }
 
-  const employeeStatusCode = employee.employee_statuses?.status_code ?? 'ACTIVE'
+  const employeeStatusCode =
+    employee.employee_statuses?.status_code ?? EMPLOYEE_STATUS_CODES.ACTIVE
 
-  if (employeeStatusCode !== 'ACTIVE') {
+  if (employeeStatusCode !== EMPLOYEE_STATUS_CODES.ACTIVE) {
     redirect('/claims')
   }
 
@@ -77,10 +82,10 @@ export default async function NewClaimPage() {
 
   // Build rate snapshot from new lookup tables
   const baseLocationId = workLocations.find(
-    (wl) => wl.location_code === 'FIELD_BASE'
+    (wl) => wl.location_code === WORK_LOCATION_CODES.FIELD_BASE
   )?.id
   const outstationLocationId = workLocations.find(
-    (wl) => wl.location_code === 'FIELD_OUTSTATION'
+    (wl) => wl.location_code === WORK_LOCATION_CODES.FIELD_OUTSTATION
   )?.id
   const todayIso = new Date().toISOString().slice(0, 10)
 

@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Wifi, WifiOff } from 'lucide-react'
 
+// How long the "Connected" confirmation stays visible after reconnecting.
+const RECONNECTED_NOTICE_DURATION_MS = 4000
+
 function subscribeToOnlineStatus(onChange: () => void) {
   window.addEventListener('online', onChange)
   window.addEventListener('offline', onChange)
@@ -30,7 +33,7 @@ export function NetworkStatusIndicator() {
       timerRef.current = setTimeout(() => {
         setShowReconnected(false)
         timerRef.current = null
-      }, 4000)
+      }, RECONNECTED_NOTICE_DURATION_MS)
     }
 
     function handleOffline() {

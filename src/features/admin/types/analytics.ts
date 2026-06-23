@@ -1,6 +1,6 @@
 export type AdminAnalyticsDateField = 'travel_date' | 'submission_date'
 
-export type AdminAnalyticsKpi = {
+type AdminAnalyticsKpi = {
   total_count: number
   total_amount: number
   avg_amount: number
@@ -16,38 +16,38 @@ export type AdminAnalyticsKpi = {
   rejected_allow_reclaim_amount?: number
 }
 
-export type AdminStatusBreakdown = {
+type AdminStatusBreakdown = {
   status_name: string
   claim_count: number
   total_amount: number
 }
 
-export type AdminDesignationBreakdown = {
+type AdminDesignationBreakdown = {
   designation_name: string
   claim_count: number
   total_amount: number
   avg_amount: number
 }
 
-export type AdminWorkLocationBreakdown = {
+type AdminWorkLocationBreakdown = {
   location_name: string
   claim_count: number
   total_amount: number
 }
 
-export type AdminStateBreakdown = {
+type AdminStateBreakdown = {
   state_name: string
   claim_count: number
   total_amount: number
 }
 
-export type AdminVehicleTypeBreakdown = {
+type AdminVehicleTypeBreakdown = {
   vehicle_name: string
   claim_count: number
   total_amount: number
 }
 
-export type AdminTopClaim = {
+type AdminTopClaim = {
   claim_id: string
   claim_number: string | null
   employee_id: string
@@ -83,7 +83,7 @@ export type AdminAnalyticsFilters = {
   pendingOnly: boolean
 }
 
-export type AdminFilterOption = {
+type AdminFilterOption = {
   value: string
   label: string
 }

@@ -3,7 +3,7 @@ import type { FinanceHistoryItem } from '@/features/finance/types'
 import { CLAIM_ITEM_TYPES } from '@/lib/constants/claim-expense'
 import { getCanonicalExportAccountItemType } from '@/features/finance/utils/export-item-type-mapping'
 
-export type ClaimExpenseItemRow = {
+type ClaimExpenseItemRow = {
   claim_id: string
   item_type: string
   amount: number

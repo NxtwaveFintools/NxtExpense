@@ -7,7 +7,7 @@ import {
   type EmployeeClaimMetricsRow,
 } from '@/features/claims/data/rpc/claim-metrics.rpc'
 
-export type ClaimMetricSummary = {
+type ClaimMetricSummary = {
   count: number
   amount: number
 }
@@ -75,7 +75,7 @@ function toMetricSummary(
   }
 }
 
-export function mapDashboardClaimStats(
+function mapDashboardClaimStats(
   metrics: EmployeeClaimMetricsRow | null
 ): DashboardClaimStats {
   return {

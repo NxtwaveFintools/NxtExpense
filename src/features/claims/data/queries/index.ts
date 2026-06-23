@@ -10,17 +10,12 @@ export {
   getClaimAvailableActions,
   getClaimAvailableActionsByClaimIds,
 } from '@/features/claims/data/rpc/claim-actions.rpc'
-export {
-  getEmployeeClaimMetrics,
-  getMyClaimsStats,
-} from '@/features/claims/data/rpc/claim-metrics.rpc'
+export { getMyClaimsStats } from '@/features/claims/data/rpc/claim-metrics.rpc'
 export {
   getDashboardClaimStats,
   getProfileClaimStats,
   getRecentClaimsForEmployee,
-  mapDashboardClaimStats,
   type DashboardClaimStats,
   type DashboardRecentClaim,
-  type ProfileClaimStats,
 } from '@/features/claims/data/queries/employee-claim-summary.query'
 export { resolveClaimAllowResubmitFilterValue } from '@/features/claims/data/queries/claim-status-filter.query'

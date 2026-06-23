@@ -3,7 +3,7 @@
  * These match real employee records in the database.
  */
 
-export const TEST_PASSWORD = 'Password@123'
+const TEST_PASSWORD = 'Password@123'
 
 type TestAccount = {
   email: string
@@ -74,7 +74,7 @@ export const PM_MANSOOR: TestAccount = {
 
 // Shared approver/direct-flow accounts
 
-export const TN_KERALA_L1_HARI: TestAccount = {
+const TN_KERALA_L1_HARI: TestAccount = {
   email: 'hari.haran@nxtwave.co.in',
   label: 'TN/Kerala L1 - Hari Haran S',
   designation: 'Level 1 Approver',

@@ -2,10 +2,13 @@
 
 import { useEffect, useDeferredValue, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { Filter } from 'lucide-react'
 
 import { useFilterNavigation } from '@/components/ui/filter-navigation'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
+import { INPUT_DEBOUNCE_MS } from '@/lib/constants/ui'
 
 import { CsvExportActions } from '@/components/ui/csv-export-actions'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
@@ -100,9 +103,12 @@ export function FinanceFiltersBar({
   const [dateTo, setDateTo] = useState(filters.dateTo ?? '')
   const deferredEmployeeName = useDeferredValue(employeeName)
 
-  const debouncedEmployeeId = useDebouncedValue(employeeId, 400)
-  const debouncedEmployeeName = useDebouncedValue(employeeName, 400)
-  const debouncedClaimNumber = useDebouncedValue(claimNumber, 400)
+  const debouncedEmployeeId = useDebouncedValue(employeeId, INPUT_DEBOUNCE_MS)
+  const debouncedEmployeeName = useDebouncedValue(
+    employeeName,
+    INPUT_DEBOUNCE_MS
+  )
+  const debouncedClaimNumber = useDebouncedValue(claimNumber, INPUT_DEBOUNCE_MS)
 
   const appliedText = {
     employeeId: filters.employeeId ?? '',
@@ -183,8 +189,8 @@ export function FinanceFiltersBar({
       return result.data
     },
     enabled: deferredEmployeeName.trim().length >= 2,
-    staleTime: 30_000,
-    gcTime: 2 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.REALTIME,
+    gcTime: QUERY_GC_TIME.SHORT,
   })
 
   function handleSubmit(e: React.FormEvent) {

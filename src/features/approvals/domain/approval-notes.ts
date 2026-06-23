@@ -1,7 +1,7 @@
 export const REQUIRED_NOTES_ERROR_MESSAGE =
   'Notes are required for Reject / Reject & Allow Reclaim actions. Please add notes and try again.'
 
-export function normalizeApprovalNotes(notes: string | undefined): string {
+function normalizeApprovalNotes(notes: string | undefined): string {
   return notes?.trim() ?? ''
 }
 

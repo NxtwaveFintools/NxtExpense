@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+
+import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -74,8 +76,8 @@ export function FinanceDashboard({ employee }: FinanceDashboardProps) {
       return result.data
     },
     placeholderData: keepPreviousData,
-    staleTime: 60_000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.SHORT,
+    gcTime: QUERY_GC_TIME.MEDIUM,
     refetchOnWindowFocus: false,
   })
 
@@ -90,8 +92,8 @@ export function FinanceDashboard({ employee }: FinanceDashboardProps) {
 
       return result.data
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: QUERY_STALE_TIME.MEDIUM,
+    gcTime: QUERY_GC_TIME.LONG,
     refetchOnWindowFocus: false,
   })
 

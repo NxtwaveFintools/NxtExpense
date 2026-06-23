@@ -1,3 +1,7 @@
+import {
+  BASE_LOCATION_DAY_TYPE_CODES,
+  INTRACITY_VEHICLE_MODES,
+} from '@/lib/constants/claim-expense'
 import type { ClaimWithItems } from '@/features/claims/types'
 
 type SubmittedField = {
@@ -8,13 +12,13 @@ type SubmittedField = {
 function formatBaseLocationDayType(dayTypeCode: string): string {
   const normalizedCode = dayTypeCode.trim().toUpperCase()
 
-  if (normalizedCode === 'FULL_DAY') {
+  if (normalizedCode === BASE_LOCATION_DAY_TYPE_CODES.FULL_DAY) {
     return 'Full Day'
   }
 
   if (
-    normalizedCode === 'HALF_DAY' ||
-    normalizedCode === 'HALF_DAY_FUEL_ONLY'
+    normalizedCode === BASE_LOCATION_DAY_TYPE_CODES.HALF_DAY ||
+    normalizedCode === BASE_LOCATION_DAY_TYPE_CODES.HALF_DAY_FUEL_ONLY
   ) {
     return 'Half Day'
   }
@@ -57,7 +61,8 @@ function getSubmittedFields(claim: ClaimWithItems['claim']): SubmittedField[] {
       ? {
           label: 'Vehicle Type Used Within The City',
           value: claim.intracity_vehicle_mode
-            ? claim.intracity_vehicle_mode === 'OWN_VEHICLE'
+            ? claim.intracity_vehicle_mode ===
+              INTRACITY_VEHICLE_MODES.OWN_VEHICLE
               ? 'Own Vehicle'
               : 'Rent Vehicle'
             : claim.intracity_own_vehicle_used

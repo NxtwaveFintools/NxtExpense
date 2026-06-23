@@ -7,7 +7,7 @@ export const REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE =
 export const REJECTED_ALLOW_RECLAIM_ACTION_FILTER_LABEL =
   'Rejected & Allow Reclaim'
 
-export function isRejectedAllowReclaimActionFilter(
+function isRejectedAllowReclaimActionFilter(
   actionFilter: FinanceActionFilter
 ): boolean {
   return actionFilter === REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE

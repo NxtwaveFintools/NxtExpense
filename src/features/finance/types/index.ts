@@ -10,7 +10,7 @@ export type FinanceDateFilterField =
   | 'finance_approved_date'
   | 'payment_released_date'
 
-export type FinanceAction = {
+type FinanceAction = {
   id: string
   claim_id: string
   actor_email: string

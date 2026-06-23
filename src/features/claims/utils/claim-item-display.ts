@@ -1,3 +1,4 @@
+import { INTRACITY_VEHICLE_MODES } from '@/lib/constants/claim-expense'
 import type { Claim, ClaimItem } from '@/features/claims/types'
 
 type ClaimItemPresentation = {
@@ -35,7 +36,7 @@ function resolveDefaultLabel(itemType: string): string {
 function resolveIntracityModeQualifier(claim: Claim): string {
   const ownVehicleMode =
     claim.has_intercity_travel === true ||
-    claim.intracity_vehicle_mode === 'OWN_VEHICLE' ||
+    claim.intracity_vehicle_mode === INTRACITY_VEHICLE_MODES.OWN_VEHICLE ||
     claim.intracity_own_vehicle_used === true
 
   return ownVehicleMode ? 'own vehicle travel' : 'rented vehicle travel'

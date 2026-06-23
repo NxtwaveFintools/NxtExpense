@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { claimDateSchema } from '@/lib/validations/claim'
 import { parseDateDDMMYYYY, toISODate } from '@/lib/utils/date'
 import { isValidClaimStatusFilterValue } from '@/lib/utils/claim-status-filter'
+import { INTRACITY_VEHICLE_MODES } from '@/lib/constants/claim-expense'
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
@@ -58,7 +59,12 @@ export const claimSubmissionSchema = z.object({
   intracityTravelUsed: z.boolean().optional(),
   intercityOwnVehicleUsed: z.boolean().optional(),
   intracityOwnVehicleUsed: z.boolean().optional(),
-  intracityVehicleMode: z.enum(['OWN_VEHICLE', 'RENTAL_VEHICLE']).optional(),
+  intracityVehicleMode: z
+    .enum([
+      INTRACITY_VEHICLE_MODES.OWN_VEHICLE,
+      INTRACITY_VEHICLE_MODES.RENTAL_VEHICLE,
+    ])
+    .optional(),
   vehicleType: optionalNonEmptyStringField(),
   outstationStateId: optionalNonEmptyStringField(),
   outstationCityId: optionalNonEmptyStringField(),

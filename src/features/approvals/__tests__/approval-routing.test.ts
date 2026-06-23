@@ -22,6 +22,7 @@ const owner: EmployeeRow = {
   approval_employee_id_level_2: null,
   approval_employee_id_level_3: 'emp-id-mansoor',
   created_at: '2026-03-06T00:00:00.000Z',
+  employee_statuses: null,
   designations: { designation_name: 'Student Relationship Officer' },
   employee_states: [{ is_primary: true, states: { state_name: 'Telangana' } }],
 }

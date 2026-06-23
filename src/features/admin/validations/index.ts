@@ -1,9 +1,17 @@
 import { z } from 'zod'
 
+import {
+  MAX_APPROVAL_LEVEL,
+  MIN_APPROVAL_LEVEL,
+} from '@/lib/constants/approval-levels'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/constants/auth'
+
 const secondaryConfirmationSchema = z.literal(
   'CONFIRM',
   'Secondary confirmation is required.'
 )
+
+const APPROVAL_LEVEL_RANGE_MESSAGE = `Approval level must be between ${MIN_APPROVAL_LEVEL} and ${MAX_APPROVAL_LEVEL}.`
 
 export const adminStatusChangeSchema = z.object({
   claimId: z.string().uuid('Invalid claim identifier.'),
@@ -51,8 +59,8 @@ export const adminUpsertApproverRuleSchema = z.object({
   approvalLevel: z
     .number()
     .int()
-    .min(1, 'Approval level must be between 1 and 3.')
-    .max(3, 'Approval level must be between 1 and 3.'),
+    .min(MIN_APPROVAL_LEVEL, APPROVAL_LEVEL_RANGE_MESSAGE)
+    .max(MAX_APPROVAL_LEVEL, APPROVAL_LEVEL_RANGE_MESSAGE),
   designationId: z.string().uuid('Invalid designation identifier.'),
   requiresSameState: z.boolean(),
   isActive: z.boolean(),
@@ -113,14 +121,27 @@ const optionalUuidSchema = z.preprocess((value) => {
   return trimmed.length === 0 ? undefined : trimmed
 }, z.string().uuid('Invalid approver selected.').optional())
 
-const optionalPasswordSchema = z.preprocess((value) => {
-  if (typeof value !== 'string') {
-    return value
-  }
+const optionalPasswordSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') {
+      return value
+    }
 
-  const trimmed = value.trim()
-  return trimmed.length === 0 ? undefined : trimmed
-}, z.string().min(6, 'Login password must be at least 6 characters.').max(72, 'Login password cannot exceed 72 characters.').optional())
+    const trimmed = value.trim()
+    return trimmed.length === 0 ? undefined : trimmed
+  },
+  z
+    .string()
+    .min(
+      MIN_PASSWORD_LENGTH,
+      `Login password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+    )
+    .max(
+      MAX_PASSWORD_LENGTH,
+      `Login password cannot exceed ${MAX_PASSWORD_LENGTH} characters.`
+    )
+    .optional()
+)
 
 export const adminCreateEmployeeSchema = z
   .object({

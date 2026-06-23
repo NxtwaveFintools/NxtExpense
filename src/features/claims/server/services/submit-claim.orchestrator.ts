@@ -3,6 +3,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ClaimFormValues } from '@/features/claims/types'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
+  EMPLOYEE_STATUS_CODES,
+  INTRACITY_VEHICLE_MODES,
+  type IntracityVehicleMode,
+} from '@/lib/constants/claim-expense'
+import {
   getEmployeeByEmail,
   getEmployeePrimaryStateId,
   getEmployeeRoles,
@@ -77,7 +82,7 @@ type PersistedClaimContext = {
   outstation: {
     hasIntercityTravel: boolean
     hasIntracityTravel: boolean
-    intracityVehicleMode: 'OWN_VEHICLE' | 'RENTAL_VEHICLE' | null
+    intracityVehicleMode: IntracityVehicleMode | null
     intercityOwnVehicleUsed: boolean
     intracityOwnVehicleUsed: boolean
     outstationStateId?: string
@@ -275,9 +280,10 @@ export async function submitClaimOrchestrator(
     return { ok: false, error: 'Employee profile not found.' }
   }
 
-  const employeeStatusCode = employee.employee_statuses?.status_code ?? 'ACTIVE'
+  const employeeStatusCode =
+    employee.employee_statuses?.status_code ?? EMPLOYEE_STATUS_CODES.ACTIVE
 
-  if (employeeStatusCode !== 'ACTIVE') {
+  if (employeeStatusCode !== EMPLOYEE_STATUS_CODES.ACTIVE) {
     return {
       ok: false,
       error: 'Inactive employees cannot submit new claims.',
@@ -373,7 +379,7 @@ export async function submitClaimOrchestrator(
 
   const intracityVehicleMode = wlFlags.requires_outstation_details
     ? hasIntercityTravel
-      ? 'OWN_VEHICLE'
+      ? INTRACITY_VEHICLE_MODES.OWN_VEHICLE
       : input.intracityTravelUsed === true
         ? (input.intracityVehicleMode ?? null)
         : null
@@ -397,7 +403,8 @@ export async function submitClaimOrchestrator(
     : false
 
   const intracityOwnVehicleUsed = wlFlags.requires_outstation_details
-    ? hasIntercityTravel || intracityVehicleMode === 'OWN_VEHICLE'
+    ? hasIntercityTravel ||
+      intracityVehicleMode === INTRACITY_VEHICLE_MODES.OWN_VEHICLE
     : false
 
   const hasIntracityTravel = wlFlags.requires_outstation_details

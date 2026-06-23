@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 
 import { submitClaimAction } from '@/features/claims/server/actions'
 import { formatDate } from '@/lib/utils/date'
+import { INTRACITY_VEHICLE_MODES } from '@/lib/constants/claim-expense'
 
 import type {
   ClaimFormValues,
@@ -131,14 +132,14 @@ export function createClaimSubmitHandler({
     const effectiveIntracityVehicleMode =
       requiresOutstationDetails && intracitySelection === true
         ? intercitySelection === true
-          ? 'OWN_VEHICLE'
+          ? INTRACITY_VEHICLE_MODES.OWN_VEHICLE
           : intracityVehicleMode
         : null
 
     const isIntercityOwnVehicle = intercitySelection === true
     const isIntracityOwnVehicle =
       intracitySelection === true &&
-      effectiveIntracityVehicleMode === 'OWN_VEHICLE'
+      effectiveIntracityVehicleMode === INTRACITY_VEHICLE_MODES.OWN_VEHICLE
     const hasOutstationOwnVehicle =
       isIntercityOwnVehicle || isIntracityOwnVehicle
 

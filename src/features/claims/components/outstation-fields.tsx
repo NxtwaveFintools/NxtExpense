@@ -1,5 +1,7 @@
 import { Car, MapPin, Route } from 'lucide-react'
 
+import { INTRACITY_VEHICLE_MODES } from '@/lib/constants/claim-expense'
+
 import type {
   IntracityVehicleMode,
   SelectOption,
@@ -115,9 +117,14 @@ export function OutstationFields(props: OutstationFieldsProps) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => props.onIntracityVehicleModeChange('OWN_VEHICLE')}
+              onClick={() =>
+                props.onIntracityVehicleModeChange(
+                  INTRACITY_VEHICLE_MODES.OWN_VEHICLE
+                )
+              }
               className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                props.intracityVehicleMode === 'OWN_VEHICLE'
+                props.intracityVehicleMode ===
+                INTRACITY_VEHICLE_MODES.OWN_VEHICLE
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-foreground hover:bg-muted'
               }`}
@@ -127,10 +134,13 @@ export function OutstationFields(props: OutstationFieldsProps) {
             <button
               type="button"
               onClick={() =>
-                props.onIntracityVehicleModeChange('RENTAL_VEHICLE')
+                props.onIntracityVehicleModeChange(
+                  INTRACITY_VEHICLE_MODES.RENTAL_VEHICLE
+                )
               }
               className={`rounded-md border px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                props.intracityVehicleMode === 'RENTAL_VEHICLE'
+                props.intracityVehicleMode ===
+                INTRACITY_VEHICLE_MODES.RENTAL_VEHICLE
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-foreground hover:bg-muted'
               }`}

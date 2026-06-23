@@ -10,6 +10,7 @@ import {
   prepareEmployeeReplacementAction,
 } from '@/features/admin/actions'
 import { confirmAdminAction } from '@/features/admin/components/confirm-admin-action'
+import { EMPLOYEE_STATUS_CODES } from '@/lib/constants/claim-expense'
 import type { AdminEmployeeRow } from '@/features/admin/queries'
 import { EmployeeCreateForm } from '@/features/admin/components/employee-create-form'
 
@@ -250,7 +251,8 @@ export function EmployeeManagement() {
                   <td className="px-4 py-3 text-xs">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
-                        emp.employee_status_code === 'ACTIVE'
+                        emp.employee_status_code ===
+                        EMPLOYEE_STATUS_CODES.ACTIVE
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-amber-100 text-amber-800'
                       }`}
@@ -277,7 +279,10 @@ export function EmployeeManagement() {
                       </button>
                       <button
                         onClick={() => startReplacement(emp)}
-                        disabled={emp.employee_status_code === 'INACTIVE'}
+                        disabled={
+                          emp.employee_status_code ===
+                          EMPLOYEE_STATUS_CODES.INACTIVE
+                        }
                         className="rounded-md border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-semibold text-amber-700 transition-all hover:bg-amber-100"
                       >
                         Replace Employee
