@@ -1,7 +1,9 @@
 'use client'
 
-import { useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+
+import { useDebouncedNavigate } from '@/lib/hooks/use-debounced-navigate'
 
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { Filter } from 'lucide-react'
@@ -82,10 +84,6 @@ export function ApprovalFiltersBar({
     employeeName,
     INPUT_DEBOUNCE_MS
   )
-  const appliedEmployeeName = filters.employeeName ?? ''
-  const appliedEmployeeNameRef = useRef(appliedEmployeeName)
-  appliedEmployeeNameRef.current = appliedEmployeeName
-
   function buildHref(employeeNameValue: string): string {
     const parsedAmount = toNullable(amountValue)
     const amountAsNumber = parsedAmount === null ? null : Number(parsedAmount)
@@ -116,18 +114,12 @@ export function ApprovalFiltersBar({
     return queryString ? `/approvals?${queryString}` : '/approvals'
   }
 
-  useEffect(() => {
-    if (debouncedEmployeeName === appliedEmployeeNameRef.current) {
-      return
-    }
-
-    navigate(buildHref(debouncedEmployeeName))
-    // buildHref is recreated each render, so it always captures the current
-    // status/date/amount/location state when the debounce fires. This effect is
-    // intentionally scoped to the employee-name field only — other filters apply
-    // via the Apply button.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedEmployeeName])
+  useDebouncedNavigate(
+    [debouncedEmployeeName],
+    [filters.employeeName ?? ''],
+    navigate,
+    () => buildHref(debouncedEmployeeName)
+  )
 
   const employeeNameSuggestionsQuery = useQuery<string[], Error>({
     queryKey: ['approval-employee-name-suggestions', deferredEmployeeName],

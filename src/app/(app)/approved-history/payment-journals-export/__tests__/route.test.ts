@@ -314,4 +314,29 @@ describe('approved-history Payment Journals export route', () => {
 
     expect(response.status).toBe(200)
   })
+
+  it('formats totals returned by the aggregate query', async () => {
+    // The totals query (getFinancePaymentJournalTotals) is responsible for including
+    // the right claim types (including KM/intercity). The route's responsibility is
+    // to faithfully format whatever totals it receives — this test verifies that contract.
+    mocks.getFinancePaymentJournalTotals.mockResolvedValue(
+      new Map<string, number>([
+        ['NW0099001', 1200.75], // represents accumulated KM intercity reimbursements
+      ])
+    )
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3000/approved-history/payment-journals-export'
+      )
+    )
+
+    expect(response.status).toBe(200)
+
+    const csv = await response.text()
+
+    expect(csv).toContain('"NW0099001"')
+    expect(csv).toContain('"1200.75"')
+    expect(mocks.getFinancePaymentJournalTotals).toHaveBeenCalledTimes(1)
+  })
 })

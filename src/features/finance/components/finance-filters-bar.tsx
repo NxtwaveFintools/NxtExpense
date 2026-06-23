@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useDeferredValue, useRef, useState } from 'react'
+import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+
+import { useDebouncedNavigate } from '@/lib/hooks/use-debounced-navigate'
 
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/constants/query-config'
 import { Filter } from 'lucide-react'
@@ -110,14 +112,6 @@ export function FinanceFiltersBar({
   )
   const debouncedClaimNumber = useDebouncedValue(claimNumber, INPUT_DEBOUNCE_MS)
 
-  const appliedText = {
-    employeeId: filters.employeeId ?? '',
-    employeeName: filters.employeeName ?? '',
-    claimNumber: filters.claimNumber ?? '',
-  }
-  const appliedTextRef = useRef(appliedText)
-  appliedTextRef.current = appliedText
-
   function buildHref(text: {
     employeeId: string
     employeeName: string
@@ -149,29 +143,21 @@ export function FinanceFiltersBar({
     return `${pathname}${qs ? `?${qs}` : ''}`
   }
 
-  useEffect(() => {
-    const applied = appliedTextRef.current
-    const changed =
-      debouncedEmployeeId !== applied.employeeId ||
-      debouncedEmployeeName !== applied.employeeName ||
-      debouncedClaimNumber !== applied.claimNumber
-
-    if (!changed) {
-      return
-    }
-
-    navigate(
+  useDebouncedNavigate(
+    [debouncedEmployeeId, debouncedEmployeeName, debouncedClaimNumber],
+    [
+      filters.employeeId ?? '',
+      filters.employeeName ?? '',
+      filters.claimNumber ?? '',
+    ],
+    navigate,
+    () =>
       buildHref({
         employeeId: debouncedEmployeeId,
         employeeName: debouncedEmployeeName,
         claimNumber: debouncedClaimNumber,
       })
-    )
-    // buildHref is recreated each render, so it always captures the current
-    // dropdown/date state when the debounce fires. This effect is intentionally
-    // scoped to the text fields only — dropdowns/dates apply via the Apply button.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedEmployeeId, debouncedEmployeeName, debouncedClaimNumber])
+  )
 
   const employeeNameSuggestionsQuery = useQuery<string[], Error>({
     queryKey: [

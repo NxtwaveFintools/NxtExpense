@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { http, passthrough } from 'msw'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
+import { MAX_APPROVAL_LEVEL } from '@/lib/constants/approval-levels'
 import type { FinanceFilters } from '@/features/finance/types'
 import {
   hasFinanceClaimFilters,
@@ -99,7 +100,7 @@ async function getFinanceReviewStatusId(
   const { data, error } = await supabase
     .from('claim_statuses')
     .select('id')
-    .eq('approval_level', 3)
+    .eq('approval_level', MAX_APPROVAL_LEVEL)
     .eq('is_rejection', false)
     .eq('is_terminal', false)
     .eq('is_approval', false)

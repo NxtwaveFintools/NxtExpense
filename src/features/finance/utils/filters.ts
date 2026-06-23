@@ -6,7 +6,6 @@ import type {
   FinanceQueueItem,
 } from '@/features/finance/types'
 import { financeFiltersSchema } from '@/features/finance/validations'
-import { shouldForceAllowResubmitFromActionFilter } from './action-filter'
 
 type FinanceFilterInput = Partial<
   Record<keyof FinanceFilters, string | undefined>
@@ -56,7 +55,7 @@ export function hasFinanceClaimFilters(filters: FinanceFilters): boolean {
     filters.ownerDesignation ||
     filters.hodApproverEmployeeId ||
     filters.claimStatus ||
-    shouldForceAllowResubmitFromActionFilter(filters.actionFilter) ||
+    (filters.actionFilter && filters.actionFilter !== 'all') ||
     filters.workLocation ||
     filters.dateFrom ||
     filters.dateTo

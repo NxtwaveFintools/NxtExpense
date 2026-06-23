@@ -186,6 +186,10 @@ export async function getPendingApprovalsPaginated(
     })
     .filter((row): row is NonNullable<typeof row> => row !== null)
 
+  if (pending.length !== pageIds.length) {
+    throw new Error('Pending approvals changed during pagination enrichment')
+  }
+
   const lastRecord = pageIdRows.at(-1)
   const nextCursor =
     hasNextPage && lastRecord

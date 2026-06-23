@@ -117,6 +117,14 @@ describe('finance filter utilities', () => {
         })
       )
     ).toBe(true)
+
+    expect(
+      hasFinanceClaimFilters(
+        normalizeFinanceFilters({
+          actionFilter: 'finance_approved',
+        })
+      )
+    ).toBe(true)
   })
 
   it('converts date-only filters into IST day boundaries for strict DB filtering', () => {
