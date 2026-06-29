@@ -29,7 +29,8 @@
     "test:e2e:rejections": "playwright test e2e/approval-rejection-flows.spec.ts e2e/finance-rejection-flows.spec.ts --project=chromium",
     "db:migrate": "node --env-file=.env.local scripts/run-migrations.mjs",
     "db:migrate:dry-run": "node --env-file=.env.local scripts/run-migrations.mjs --dry-run",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:e2e:headed": "playwright test --project=chromium --headed --workers=1"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [
