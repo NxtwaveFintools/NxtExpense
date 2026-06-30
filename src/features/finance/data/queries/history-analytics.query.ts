@@ -2,7 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { FinanceFilters } from '@/features/finance/types'
 import { REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE } from '@/features/finance/utils/action-filter'
-import { toIstDayEnd, toIstDayStart } from '@/features/finance/utils/filters'
+import {
+  hasFinanceClaimFilters,
+  toIstDayEnd,
+  toIstDayStart,
+} from '@/features/finance/utils/filters'
 
 import { getFinanceHistoryMetricsFilteredRpc } from '@/features/finance/data/rpc/finance-metrics.rpc'
 
@@ -70,6 +74,7 @@ export async function getFinanceHistoryAnalytics(
     filters.dateFilterField === 'hod_approved_date'
 
   const metrics = await getFinanceHistoryMetricsFilteredRpc(supabase, {
+    p_has_filters: hasFinanceClaimFilters(filters),
     p_employee_id: filters.employeeId,
     p_employee_name: filters.employeeName,
     p_claim_number: filters.claimNumber,

@@ -199,6 +199,12 @@ export default async function ApprovedHistoryPage({
           <FilterNavigationProvider>
             <div className="space-y-6">
               <FinanceFiltersBar
+                key={toSortedQueryString(
+                  addFinanceFiltersToParams(
+                    new URLSearchParams(),
+                    effectiveFilters
+                  )
+                )}
                 pathname="/approved-history"
                 heading="Approved History Filters"
                 filters={effectiveFilters}

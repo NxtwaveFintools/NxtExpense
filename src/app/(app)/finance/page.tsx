@@ -213,6 +213,12 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
           <FilterNavigationProvider>
             <div className="space-y-6">
               <FinanceFiltersBar
+                key={toSortedQueryString(
+                  addFinanceFiltersToParams(
+                    new URLSearchParams(),
+                    effectiveFilters
+                  )
+                )}
                 pathname="/finance"
                 heading="Pending Claims Filters"
                 filters={effectiveFilters}

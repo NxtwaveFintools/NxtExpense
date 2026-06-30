@@ -274,6 +274,12 @@ export default async function ApprovalsPage({
           <FilterNavigationProvider>
             <div className="space-y-6">
               <ApprovalFiltersBar
+                key={toSortedQueryString(
+                  addApprovalFiltersToParams(
+                    new URLSearchParams(),
+                    normalizedFilters
+                  )
+                )}
                 filters={normalizedFilters}
                 statusCatalog={statusCatalog}
                 validationError={filterValidationError}
