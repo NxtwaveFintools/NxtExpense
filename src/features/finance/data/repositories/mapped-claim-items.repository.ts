@@ -26,11 +26,17 @@ export async function getMappedClaimItemsByClaimId(
     mappedExpenseItemTypes
   )
 
-  const { data, error } = await supabase
-    .from('expense_claim_items')
-    .select('claim_id, item_type, amount')
-    .in('claim_id', claimIds)
-    .in('item_type', expandedMappedItemTypes)
+  // RPC (POST body), not `.in('claim_id', claimIds)` — that REST call's URL length
+  // scaled with claimIds.length and was exposed to the same ~350-400 id ceiling that
+  // caused the original Approved History export bug. See
+  // docs/superpowers/plans/2026-07-01-finance-history-single-rpc-hydration.md.
+  const { data, error } = await supabase.rpc(
+    'get_expense_claim_items_by_claim_ids',
+    {
+      p_claim_ids: claimIds,
+      p_item_types: expandedMappedItemTypes,
+    }
+  )
 
   if (error) {
     throw new Error(error.message)

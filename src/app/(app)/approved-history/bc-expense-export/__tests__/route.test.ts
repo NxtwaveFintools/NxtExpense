@@ -59,39 +59,22 @@ function buildSupabaseWithClaimItems(
         data: { user: { email: 'finance@nxtwave.co.in' } },
       }),
     },
-    from: vi.fn((tableName: string) => {
-      if (tableName === 'expense_claim_items') {
-        let requestedClaimIds: string[] = []
+    rpc: vi.fn((fnName: string, args: Record<string, unknown>) => {
+      if (fnName === 'get_expense_claim_items_by_claim_ids') {
+        const requestedClaimIds = args.p_claim_ids as string[]
+        const requestedItemTypes = args.p_item_types as string[]
 
-        const query = {
-          select: vi.fn().mockReturnThis(),
-          in: vi.fn().mockImplementation((column: string, values: string[]) => {
-            if (column === 'claim_id') {
-              requestedClaimIds = values
-              return query
-            }
-
-            if (column === 'item_type') {
-              const requestedItemTypes = values
-
-              return Promise.resolve({
-                data: claimItems.filter(
-                  (item) =>
-                    requestedClaimIds.includes(item.claim_id) &&
-                    requestedItemTypes.includes(item.item_type)
-                ),
-                error: null,
-              })
-            }
-
-            return query
-          }),
-        }
-
-        return query
+        return Promise.resolve({
+          data: claimItems.filter(
+            (item) =>
+              requestedClaimIds.includes(item.claim_id) &&
+              requestedItemTypes.includes(item.item_type)
+          ),
+          error: null,
+        })
       }
 
-      throw new Error(`Unexpected table: ${tableName}`)
+      throw new Error(`Unexpected rpc: ${fnName}`)
     }),
   }
 }

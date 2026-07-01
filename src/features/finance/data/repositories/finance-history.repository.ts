@@ -1,11 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Claim } from '@/features/claims/types'
-import {
-  CLAIM_COLUMNS,
-  getClaimAvailableActionsByClaimIds,
-  mapClaimRow,
-} from '@/features/claims/data/queries'
+import { getClaimAvailableActionsByClaimIds } from '@/features/claims/data/queries'
 import type {
   FinanceFilters,
   FinanceHistoryItem,
@@ -19,30 +15,171 @@ import {
   toIstDayStart,
 } from '@/features/finance/utils/filters'
 import { decodeCursor, encodeCursor } from '@/lib/utils/pagination'
+import { getClaimStatusDisplay } from '@/lib/utils/claim-status'
 
 import {
   getFinanceActionCodesForDateFilter,
   isFinanceActionDateFilterField,
 } from '@/features/finance/data/repositories/filter-date-resolvers.repository'
-import {
-  DEFAULT_FINANCE_FILTERS,
-  FINANCE_OWNER_COLUMNS,
-  type ExpenseClaimWithOwnerRow,
-  normalizeFinanceOwner,
-} from '@/features/finance/data/repositories/finance-shared.repository'
+import { DEFAULT_FINANCE_FILTERS } from '@/features/finance/data/repositories/finance-shared.repository'
 import { getFinancePaymentJournalTotalsRpc } from '@/features/finance/data/rpc/finance-export.rpc'
 
-type ActionRow = {
+// Raw row shape returned by get_finance_history_page since the Phase-6 rewrite
+// (docs/superpowers/plans/2026-07-01-finance-history-single-rpc-hydration.md): one
+// fully-hydrated row per page entry, flat columns (not nested jsonb — see that plan's
+// review doc for why flat columns were chosen over jsonb mimicking PostgREST embeds).
+// Fields sourced from a LEFT-joined relation are typed `| null` regardless of the
+// underlying column's own nullability, since the join itself can produce null.
+type HydratedHistoryPageRow = {
   id: string
   claim_id: string
-  actor_employee_id: string
-  actor:
-    | { employee_email: string; employee_name: string }
-    | { employee_email: string; employee_name: string }[]
-    | null
-  action: string
-  notes: string | null
   acted_at: string
+  action_type: string
+  action_notes: string | null
+  actor_employee_email: string | null
+  actor_employee_name: string | null
+
+  claim_number: string
+  claim_employee_id: string
+  claim_date: string
+  work_location_id: string | null
+  work_location_name: string | null
+  expense_location_id: string | null
+  expense_location_name: string | null
+  expense_region_code: string | null
+  own_vehicle_used: boolean | null
+  vehicle_type_id: string | null
+  vehicle_type_name: string | null
+  outstation_state_id: string | null
+  outstation_city_id: string | null
+  from_city_id: string | null
+  to_city_id: string | null
+  outstation_state_name_snapshot: string | null
+  outstation_city_name_snapshot: string | null
+  from_city_name_snapshot: string | null
+  to_city_name_snapshot: string | null
+  km_travelled: number | null
+  total_amount: number
+  status_id: string
+  status_code: string | null
+  status_name: string | null
+  status_display_color: string | null
+  allow_resubmit_status_name: string | null
+  allow_resubmit_display_color: string | null
+  status_is_terminal: boolean | null
+  status_is_rejection: boolean | null
+  allow_resubmit: boolean | null
+  is_superseded: boolean | null
+  current_approval_level: number | null
+  submitted_at: string | null
+  claim_created_at: string
+  claim_updated_at: string
+  resubmission_count: number
+  last_rejection_notes: string | null
+  last_rejected_at: string | null
+  accommodation_nights: number | null
+  food_with_principals_amount: number | null
+  has_intercity_travel: boolean | null
+  has_intracity_travel: boolean | null
+  intercity_own_vehicle_used: boolean | null
+  intracity_own_vehicle_used: boolean | null
+  intracity_vehicle_mode: string | null
+  base_location_day_type_code: string | null
+
+  owner_uuid: string
+  owner_employee_code: string
+  owner_employee_name: string
+  owner_employee_email: string
+  owner_designation_id: string | null
+  owner_designation_name: string | null
+}
+
+// Maps one hydrated RPC row directly to claim/owner/action — no PostgREST embed
+// unwrapping needed since the RPC already returns flat columns. Does NOT include
+// availableActions: that's computed once per page (batched across all claim ids) by
+// the caller, not per-row.
+export function mapHydratedHistoryRow(
+  row: HydratedHistoryPageRow
+): Pick<FinanceHistoryItem, 'claim' | 'owner' | 'action'> {
+  const statusDisplay = getClaimStatusDisplay({
+    statusCode: row.status_code,
+    statusName: row.status_name,
+    statusDisplayColor: row.status_display_color,
+    allowResubmit: row.allow_resubmit,
+    allowResubmitStatusName: row.allow_resubmit_status_name,
+    allowResubmitDisplayColor: row.allow_resubmit_display_color,
+  })
+
+  const claim: Claim = {
+    id: row.claim_id,
+    claim_number: row.claim_number,
+    employee_id: row.claim_employee_id,
+    claim_date: row.claim_date,
+    work_location: row.work_location_name ?? '',
+    expense_location_id: row.expense_location_id,
+    expense_location_name: row.expense_location_name,
+    expense_region_code: row.expense_region_code,
+    base_location_day_type_code: row.base_location_day_type_code,
+    own_vehicle_used: row.own_vehicle_used,
+    vehicle_type: row.vehicle_type_name,
+    outstation_state_id: row.outstation_state_id,
+    outstation_city_id: row.outstation_city_id,
+    from_city_id: row.from_city_id,
+    to_city_id: row.to_city_id,
+    has_intercity_travel: row.has_intercity_travel ?? false,
+    has_intracity_travel: row.has_intracity_travel ?? false,
+    intercity_own_vehicle_used: row.intercity_own_vehicle_used ?? null,
+    intracity_own_vehicle_used: row.intracity_own_vehicle_used ?? null,
+    intracity_vehicle_mode:
+      row.intracity_vehicle_mode as Claim['intracity_vehicle_mode'],
+    outstation_state_name: row.outstation_state_name_snapshot,
+    outstation_city_name: row.outstation_city_name_snapshot,
+    from_city_name: row.from_city_name_snapshot,
+    to_city_name: row.to_city_name_snapshot,
+    km_travelled: row.km_travelled,
+    total_amount: row.total_amount,
+    statusName: statusDisplay.label,
+    statusDisplayColor: statusDisplay.colorToken,
+    status_id: row.status_id,
+    is_terminal: row.status_is_terminal ?? false,
+    is_rejection: row.status_is_rejection ?? false,
+    allow_resubmit: row.allow_resubmit ?? false,
+    is_superseded: row.is_superseded ?? false,
+    current_approval_level: row.current_approval_level,
+    submitted_at: row.submitted_at,
+    created_at: row.claim_created_at,
+    updated_at: row.claim_updated_at,
+    resubmission_count: row.resubmission_count,
+    last_rejection_notes: row.last_rejection_notes,
+    last_rejected_at: row.last_rejected_at,
+    accommodation_nights: row.accommodation_nights,
+    food_with_principals_amount: row.food_with_principals_amount,
+  }
+
+  const owner: FinanceOwner = {
+    id: row.owner_uuid,
+    employee_id: row.owner_employee_code,
+    employee_name: row.owner_employee_name,
+    employee_email: row.owner_employee_email,
+    designation_id: row.owner_designation_id,
+    designations: row.owner_designation_name
+      ? { designation_name: row.owner_designation_name }
+      : null,
+  }
+
+  return {
+    claim,
+    owner,
+    action: {
+      id: row.id,
+      claim_id: row.claim_id,
+      actor_email: row.actor_employee_email ?? '',
+      actor_name: row.actor_employee_name ?? null,
+      action: row.action_type,
+      notes: row.action_notes,
+      acted_at: row.acted_at,
+    },
+  }
 }
 
 // Date fields whose bounds the resolver expects as IST day-boundary timestamptz
@@ -154,8 +291,10 @@ export async function getFinanceHistoryPaginated(
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  // SQL keyset ID-page: filtering + pagination happen in Postgres. At most
-  // limit + 1 finance_actions ids ever return to Node.
+  // SQL keyset ID-page + enrichment JOIN in one RPC call (Phase 6 — see
+  // docs/superpowers/plans/2026-07-01-finance-history-single-rpc-hydration.md).
+  // At most limit + 1 fully-hydrated rows ever return to Node; no follow-up
+  // .in('id', ...) fetch is needed (that was the URL-length bug's root cause).
   const decoded = cursor ? decodeCursor(cursor) : null
   const { data: pageRows, error: pageError } = await supabase.rpc(
     'get_finance_history_page',
@@ -176,106 +315,30 @@ export async function getFinanceHistoryPaginated(
     throw new Error(pageError.message)
   }
 
-  const idRows = (pageRows ?? []) as Array<{
-    id: string
-    claim_id: string
-    acted_at: string
-  }>
+  const idRows = (pageRows ?? []) as HydratedHistoryPageRow[]
   const hasNextPage = idRows.length > limit
   const pageRowsBounded = hasNextPage ? idRows.slice(0, limit) : idRows
-  const actionIds = pageRowsBounded.map((row) => row.id)
 
-  if (actionIds.length === 0) {
+  if (pageRowsBounded.length === 0) {
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  // Bounded fetch of the action rows (<= limit) with the actor embed.
-  const { data: actionRowsData, error: actionError } = await supabase
-    .from('finance_actions')
-    .select(
-      'id, claim_id, actor_employee_id, action, notes, acted_at, actor:employees!actor_employee_id(employee_email, employee_name)'
-    )
-    .in('id', actionIds)
-
-  if (actionError) {
-    throw new Error(actionError.message)
-  }
-
-  const actionRowById = new Map(
-    ((actionRowsData ?? []) as ActionRow[]).map((row) => [row.id, row])
-  )
-
-  // Preserve the keyset order from the page RPC (.in does not guarantee order).
-  const orderedActions = actionIds
-    .map((id) => actionRowById.get(id))
-    .filter((row): row is ActionRow => row !== undefined)
-
-  const claimIds = [...new Set(orderedActions.map((row) => row.claim_id))]
+  const claimIds = [...new Set(pageRowsBounded.map((row) => row.claim_id))]
 
   const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
     supabase,
     claimIds
   )
 
-  const { data: claimData, error: claimError } = await supabase
-    .from('expense_claims')
-    .select(
-      `${CLAIM_COLUMNS}, employees!employee_id!inner(${FINANCE_OWNER_COLUMNS})`
-    )
-    .in('id', claimIds)
-
-  if (claimError) {
-    throw new Error(claimError.message)
-  }
-
-  const claimMap = new Map<string, { claim: Claim; owner: FinanceOwner }>()
-  for (const row of (claimData ?? []) as Array<ExpenseClaimWithOwnerRow>) {
-    const ownerRelation = Array.isArray(row.employees)
-      ? row.employees[0]
-      : row.employees
-
-    const owner = ownerRelation ? normalizeFinanceOwner(ownerRelation) : null
-
-    if (!owner) {
-      continue
-    }
-
-    const mapped = mapClaimRow(row)
-    const claimFields = { ...mapped } as Record<string, unknown>
-    delete claimFields.employees
-
-    claimMap.set(row.id as string, {
-      claim: claimFields as Claim,
+  const history: FinanceHistoryItem[] = pageRowsBounded.map((row) => {
+    const { claim, owner, action } = mapHydratedHistoryRow(row)
+    return {
+      claim,
       owner,
-    })
-  }
-
-  const history: FinanceHistoryItem[] = orderedActions
-    .map((action) => {
-      const claim = claimMap.get(action.claim_id)
-      if (!claim) {
-        return null
-      }
-
-      const actorRaw = action.actor
-      const actor = Array.isArray(actorRaw) ? actorRaw[0] : actorRaw
-
-      return {
-        claim: claim.claim,
-        owner: claim.owner,
-        availableActions: availableActionsByClaimId.get(action.claim_id) ?? [],
-        action: {
-          id: action.id,
-          claim_id: action.claim_id,
-          actor_email: actor?.employee_email ?? '',
-          actor_name: actor?.employee_name ?? null,
-          action: action.action,
-          notes: action.notes,
-          acted_at: action.acted_at,
-        },
-      }
-    })
-    .filter((row): row is FinanceHistoryItem => row !== null)
+      action,
+      availableActions: availableActionsByClaimId.get(row.claim_id) ?? [],
+    }
+  })
 
   const lastRecord = pageRowsBounded.at(-1)
   const nextCursor =

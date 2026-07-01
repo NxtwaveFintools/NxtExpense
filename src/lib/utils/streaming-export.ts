@@ -3,7 +3,18 @@ import { toCsvCell } from '@/lib/utils/csv'
 
 /** Hard server-side cap to prevent memory exhaustion on large exports. */
 export const MAX_EXPORT_ROWS = 50_000
-const EXPORT_CHUNK_SIZE = 1000
+// Post Phase-6 rewrite (docs/superpowers/plans/2026-07-01-finance-history-single-rpc-hydration.md),
+// get_finance_history_page returns fully-hydrated rows directly — no follow-up
+// .in('id', [...ids]) call, so the old URL-length ceiling (~350-400 ids) no longer
+// applies. The new ceiling is `db-max-rows` (confirmed 1000 on both dev and prod as of
+// 2026-07-01) — but note the RPC internally requests `p_limit + 1` rows for its own
+// hasNextPage probe, so the TRUE safe ceiling is db-max-rows - 1 = 999, not 1000: a
+// chunk size of exactly 1000 would make PostgREST silently truncate the 1001-row
+// request back to 1000, making `hasNextPage` (`length > limit`) false when a next page
+// actually exists — the same silent-truncation failure mode as the original bug, via a
+// different mechanism. 500 gives 2x margin below that ceiling. Real measured payload:
+// ~2.25KB/row, so 500 rows ≈ 1.1MB per call — trivial, not the binding constraint.
+export const EXPORT_CHUNK_SIZE = 500
 
 type PaginatedFetcher<T> = (
   cursor: string | null,

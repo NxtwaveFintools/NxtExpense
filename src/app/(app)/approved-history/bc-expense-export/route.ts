@@ -23,6 +23,13 @@ import {
 } from '@/lib/utils/export-route'
 
 const BC_EXPORT_PROFILE_CODE = 'BC_EXPENSE'
+// Post Phase-6 rewrite, all three per-page calls this route makes
+// (get_finance_history_page's internal hydration, get_claim_available_actions_bulk,
+// and get_expense_claim_items_by_claim_ids) are RPC/POST-based — no `.in('id', [...])`
+// REST call left with a URL-length exposure. The binding constraint is now
+// `db-max-rows` (confirmed 1000 on dev and prod), minus 1 for the page RPC's internal
+// `p_limit + 1` probe row. Matches EXPORT_CHUNK_SIZE — see streaming-export.ts for the
+// full rationale (measured payload size, the +1 probe landmine).
 const HISTORY_CHUNK_SIZE = 500
 
 type CsvChunkPage = {
