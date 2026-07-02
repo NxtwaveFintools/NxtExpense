@@ -35,8 +35,6 @@ import {
   getFinanceHistoryPaginated,
   mapHydratedHistoryRow,
 } from '@/features/finance/data/repositories/finance-history.repository'
-import { DEFAULT_FINANCE_FILTERS } from '@/features/finance/data/repositories/finance-shared.repository'
-import type { FinanceFilters } from '@/features/finance/types'
 
 // One fully-hydrated row exactly matching get_finance_history_page's flat return
 // shape (docs/superpowers/plans/2026-07-01-finance-history-single-rpc-hydration.md).
