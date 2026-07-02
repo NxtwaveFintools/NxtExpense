@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isFinanceTeamMember } from '@/features/finance/permissions'
-import { getEmployeeByEmail, type EmployeeRow } from '@/lib/services/employee-service'
+import {
+  getEmployeeByEmail,
+  type EmployeeRow,
+} from '@/lib/services/employee-service'
 import {
   getActiveExpenseTypeAccountMappings,
   getFinanceExportProfileByCode,
@@ -117,7 +120,10 @@ export async function resolveBcExpenseExportPreflight(
   const { employee, filters } = resolved.context
   // Approximate: counts source history rows, not final CSV lines (BC-Expense
   // can emit 0, 1, or several CSV rows per history row via item-splitting).
-  const estimatedTotalRows = await getFinanceHistoryTotalCount(supabase, filters)
+  const estimatedTotalRows = await getFinanceHistoryTotalCount(
+    supabase,
+    filters
+  )
 
   return { ok: true, employeeId: employee.id, estimatedTotalRows }
 }

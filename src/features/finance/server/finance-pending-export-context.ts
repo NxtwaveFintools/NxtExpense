@@ -1,10 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isFinanceTeamMember } from '@/features/finance/permissions'
-import { getEmployeeByEmail, type EmployeeRow } from '@/lib/services/employee-service'
+import {
+  getEmployeeByEmail,
+  type EmployeeRow,
+} from '@/lib/services/employee-service'
 import { getFinanceQueueTotalCount } from '@/features/finance/data/queries'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
-import type { FinanceDateFilterField, FinanceFilters } from '@/features/finance/types'
+import type {
+  FinanceDateFilterField,
+  FinanceFilters,
+} from '@/features/finance/types'
 import type { ExportPreflightResult } from '@/lib/utils/export-preflight'
 
 export type FinancePendingExportContext = {
@@ -71,7 +77,10 @@ export async function resolveFinancePendingExportContext(
 
   return {
     ok: true,
-    context: { employee, filters: buildFinancePendingExportFilters(searchParams) },
+    context: {
+      employee,
+      filters: buildFinancePendingExportFilters(searchParams),
+    },
   }
 }
 

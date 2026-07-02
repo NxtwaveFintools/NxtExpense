@@ -96,7 +96,8 @@ describe('runCsvExport', () => {
     )
 
     const reader = response.body?.getReader()
-    if (!reader) throw new Error('Expected response stream body to be available.')
+    if (!reader)
+      throw new Error('Expected response stream body to be available.')
 
     const firstChunk = await reader.read()
     expect(firstChunk.done).toBe(false)
@@ -119,7 +120,8 @@ describe('runCsvExport', () => {
     )
 
     const reader = response.body?.getReader()
-    if (!reader) throw new Error('Expected response stream body to be available.')
+    if (!reader)
+      throw new Error('Expected response stream body to be available.')
 
     const firstChunk = await reader.read()
     expect(firstChunk.done).toBe(false)
@@ -144,7 +146,12 @@ describe('runCsvExport', () => {
     })
 
     const response = runCsvExport<{ value: string }>(
-      { fetchPage, headers: ['Value'], mapRow: (row) => [row.value], filename: 'x.csv' },
+      {
+        fetchPage,
+        headers: ['Value'],
+        mapRow: (row) => [row.value],
+        filename: 'x.csv',
+      },
       null
     )
     await response.text()
@@ -169,13 +176,26 @@ describe('runCsvExport', () => {
       })
 
     const response = runCsvExport<{ value: string }>(
-      { fetchPage, headers: ['Value'], mapRow: (row) => [row.value], filename: 'x.csv' },
+      {
+        fetchPage,
+        headers: ['Value'],
+        mapRow: (row) => [row.value],
+        filename: 'x.csv',
+      },
       'request-123'
     )
     await response.text()
 
-    expect(mocks.updateExportProgress).toHaveBeenNthCalledWith(1, 'request-123', 2)
-    expect(mocks.updateExportProgress).toHaveBeenNthCalledWith(2, 'request-123', 3)
+    expect(mocks.updateExportProgress).toHaveBeenNthCalledWith(
+      1,
+      'request-123',
+      2
+    )
+    expect(mocks.updateExportProgress).toHaveBeenNthCalledWith(
+      2,
+      'request-123',
+      3
+    )
     expect(mocks.markExportDone).toHaveBeenCalledWith('request-123')
     expect(mocks.markExportError).not.toHaveBeenCalled()
   })
@@ -192,7 +212,8 @@ describe('runCsvExport', () => {
     )
 
     const reader = response.body?.getReader()
-    if (!reader) throw new Error('Expected response stream body to be available.')
+    if (!reader)
+      throw new Error('Expected response stream body to be available.')
     await reader.read()
     await expect(reader.read()).rejects.toThrow('boom')
 

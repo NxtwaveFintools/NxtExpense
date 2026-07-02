@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isFinanceTeamMember } from '@/features/finance/permissions'
-import { getEmployeeByEmail, type EmployeeRow } from '@/lib/services/employee-service'
+import {
+  getEmployeeByEmail,
+  type EmployeeRow,
+} from '@/lib/services/employee-service'
 import { getFinanceExportProfileByCode } from '@/lib/services/finance-export-config-service'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import type { FinanceFilters } from '@/features/finance/types'

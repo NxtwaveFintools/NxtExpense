@@ -35,7 +35,10 @@ export function createExportProgress(
   return requestId
 }
 
-export function updateExportProgress(requestId: string, rowsSent: number): void {
+export function updateExportProgress(
+  requestId: string,
+  rowsSent: number
+): void {
   const entry = registry.get(requestId)
 
   if (!entry) {

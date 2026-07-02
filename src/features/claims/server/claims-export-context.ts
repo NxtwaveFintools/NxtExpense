@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { canAccessEmployeeClaims } from '@/features/employees/permissions'
-import { getEmployeeByEmail, type EmployeeRow } from '@/lib/services/employee-service'
+import {
+  getEmployeeByEmail,
+  type EmployeeRow,
+} from '@/lib/services/employee-service'
 import { canDownloadClaimsCsv } from '@/features/claims/utils/export-permissions'
 import { getMyClaimsTotalCount } from '@/features/claims/data/repositories/claims.repository'
 import { normalizeMyClaimsFilters } from '@/features/claims/utils/filters'
@@ -55,7 +58,11 @@ export async function resolveMyClaimsExportPreflight(
   user: { email: string } | null,
   searchParams: URLSearchParams
 ): Promise<ExportPreflightResult> {
-  const resolved = await resolveMyClaimsExportContext(supabase, user, searchParams)
+  const resolved = await resolveMyClaimsExportContext(
+    supabase,
+    user,
+    searchParams
+  )
 
   if (!resolved.ok) {
     return resolved

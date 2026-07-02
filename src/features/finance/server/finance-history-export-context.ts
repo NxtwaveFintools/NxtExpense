@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isFinanceTeamMember } from '@/features/finance/permissions'
-import { getEmployeeByEmail, type EmployeeRow } from '@/lib/services/employee-service'
+import {
+  getEmployeeByEmail,
+  type EmployeeRow,
+} from '@/lib/services/employee-service'
 import { getFinanceHistoryTotalCount } from '@/features/finance/data/queries'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import type { FinanceFilters } from '@/features/finance/types'
@@ -55,7 +58,10 @@ export async function resolveFinanceHistoryExportContext(
 
   return {
     ok: true,
-    context: { employee, filters: buildFinanceHistoryExportFilters(searchParams) },
+    context: {
+      employee,
+      filters: buildFinanceHistoryExportFilters(searchParams),
+    },
   }
 }
 
@@ -75,7 +81,10 @@ export async function resolveFinanceHistoryExportPreflight(
   }
 
   const { employee, filters } = resolved.context
-  const estimatedTotalRows = await getFinanceHistoryTotalCount(supabase, filters)
+  const estimatedTotalRows = await getFinanceHistoryTotalCount(
+    supabase,
+    filters
+  )
 
   return { ok: true, employeeId: employee.id, estimatedTotalRows }
 }
