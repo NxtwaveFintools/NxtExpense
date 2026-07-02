@@ -27,7 +27,9 @@
       "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" log --oneline --all)",
       "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" show master:src/features/finance/data/queries/history-analytics.query.ts)",
       "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" log --oneline master)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "mcp__claude_ai_Supabase__generate_typescript_types"
     ]
   },
   "enableAllProjectMcpServers": true,

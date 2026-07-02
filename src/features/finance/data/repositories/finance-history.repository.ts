@@ -265,7 +265,10 @@ async function buildFinanceHistoryFeedScope(
     }
     feedActionCodes = resolvedDateFilterActions
   } else if (filters.actionFilter) {
-    feedActionCodes = getFinanceActionCodesForFilter(filters.actionFilter)
+    feedActionCodes = await getFinanceActionCodesForFilter(
+      supabase,
+      filters.actionFilter
+    )
   }
 
   return {
@@ -289,32 +292,25 @@ type HydratedHistoryPage = {
 // by the interactive-list path (which layers availableActions on top) and the
 // export path (which does not need availableActions — see
 // docs/superpowers/specs/2026-07-01-csv-export-rebuild-design.md, "RPC Reuse
-// Validation"). Reuses get_finance_history_page as-is; zero SQL changes.
+// Validation").
 async function fetchHydratedFinanceHistoryPage(
   supabase: SupabaseClient,
   cursor: string | null,
   limit: number,
   filters: FinanceFilters
 ): Promise<HydratedHistoryPage> {
-  const scope = await buildFinanceHistoryFeedScope(supabase, filters)
-
-  if (scope.isEmpty) {
-    return { rows: [], hasNextPage: false, nextCursor: null }
-  }
-
-  // SQL keyset ID-page + enrichment JOIN in one RPC call (Phase 6 — see
-  // docs/superpowers/plans/2026-07-01-finance-history-single-rpc-hydration.md).
+  // SQL keyset ID-page + enrichment JOIN in one RPC call. finance_history_filtered()
+  // resolves claim-scope and action/date-filter scoping internally now — no
+  // TypeScript-side pre-resolution needed (see
+  // docs/superpowers/plans/2026-07-02-finance-history-dropdown-and-canonical-filter-plan.md).
   // At most limit + 1 fully-hydrated rows ever return to Node; no follow-up
   // .in('id', ...) fetch is needed (that was the URL-length bug's root cause).
   const decoded = cursor ? decodeCursor(cursor) : null
   const { data: pageRows, error: pageError } = await supabase.rpc(
     'get_finance_history_page',
     {
-      p_has_filters: scope.pHasFilters,
-      ...scope.resolverArgs,
-      p_feed_action_codes: scope.feedActionCodes,
-      p_feed_from: scope.feedFrom,
-      p_feed_to: scope.feedTo,
+      p_has_filters: hasFinanceClaimFilters(filters),
+      ...buildHistoryResolverArgs(filters),
       // The existing cursor encodes acted_at under the created_at key.
       p_cursor_acted_at: decoded?.created_at ?? null,
       p_cursor_id: decoded?.id ?? null,
@@ -411,7 +407,12 @@ export async function getFinanceHistoryTotalCount(
   supabase: SupabaseClient,
   filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
 ): Promise<number> {
-  const { data, error } = await supabase.rpc('get_finance_history_count', {
+  // get_finance_history_count no longer exists (it ignored p_action_filter —
+  // see docs/superpowers/audits/2026-07-01-finance-approvals-claims-filter-display-consistency-audit.md,
+  // Finding 1). total_count now comes from get_finance_history_metrics, the
+  // same RPC getFinanceHistoryAnalytics calls, so the pagination total and
+  // the KPI cards can never disagree.
+  const { data, error } = await supabase.rpc('get_finance_history_metrics', {
     p_has_filters: hasFinanceClaimFilters(filters),
     ...buildHistoryResolverArgs(filters),
   })
@@ -420,7 +421,11 @@ export async function getFinanceHistoryTotalCount(
     throw new Error(error.message)
   }
 
-  return Number(data ?? 0)
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    total_count: number | string | null
+  } | null
+
+  return Number(row?.total_count ?? 0)
 }
 
 // Per-employee payment-journal totals for the export. Aggregation happens entirely in

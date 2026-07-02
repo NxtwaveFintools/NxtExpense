@@ -28,9 +28,11 @@ vi.mock('@/features/finance/utils/filters', () => ({
 
 vi.mock('@/lib/utils/run-csv-export', () => ({
   runCsvExport: mocks.runCsvExport,
+  ENRICHMENT_EXPORT_CHUNK_SIZE: 500,
 }))
 
 import { GET, POST } from '@/app/(app)/finance/pending-export/route'
+import { ENRICHMENT_EXPORT_CHUNK_SIZE } from '@/lib/utils/run-csv-export'
 
 describe('finance pending export route', () => {
   beforeEach(() => {
@@ -83,6 +85,7 @@ describe('finance pending export route', () => {
       expect.objectContaining({
         headers: ['Claim ID'],
         filename: expect.stringContaining('pending-claims-'),
+        chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
       }),
       'req-1'
     )

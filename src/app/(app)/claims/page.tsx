@@ -4,7 +4,6 @@ import { ClaimAnalyticsCards } from '@/components/ui/claim-analytics-cards'
 import {
   getClaimStatusCatalog,
   getMyClaimsStats,
-  getMyClaimsTotalCount,
   getMyClaimsPaginated,
 } from '@/features/claims/data/queries'
 import { requireCurrentUser } from '@/features/auth/queries'
@@ -116,20 +115,12 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [claims, statusCatalog, workLocations, stats, claimsTotalCount] =
-    await Promise.all([
-      getMyClaimsPaginated(
-        supabase,
-        employee.id,
-        cursor,
-        10,
-        normalizedFilters
-      ),
-      getClaimStatusCatalog(supabase),
-      getAllWorkLocations(supabase),
-      getMyClaimsStats(supabase, employee.id),
-      getMyClaimsTotalCount(supabase, employee.id, normalizedFilters),
-    ])
+  const [claims, statusCatalog, workLocations, stats] = await Promise.all([
+    getMyClaimsPaginated(supabase, employee.id, cursor, 10, normalizedFilters),
+    getClaimStatusCatalog(supabase),
+    getAllWorkLocations(supabase),
+    getMyClaimsStats(supabase, employee.id, normalizedFilters),
+  ])
 
   const workLocationOptions = workLocations
 
@@ -143,6 +134,7 @@ export default async function ClaimsPage({ searchParams }: ClaimsPageProps) {
     nextCursor: claims.nextCursor,
   })
 
+  const claimsTotalCount = stats.total.count
   const claimsTotalPages = getCursorTotalPages(claimsTotalCount, claims.limit)
 
   const exportCsvParams = addMyClaimsFiltersToParams(

@@ -30,9 +30,11 @@ vi.mock('@/features/approvals/utils/history-filters', () => ({
 
 vi.mock('@/lib/utils/run-csv-export', () => ({
   runCsvExport: mocks.runCsvExport,
+  ENRICHMENT_EXPORT_CHUNK_SIZE: 500,
 }))
 
 import { GET, POST } from '@/app/(app)/approvals/export/route'
+import { ENRICHMENT_EXPORT_CHUNK_SIZE } from '@/lib/utils/run-csv-export'
 
 describe('approvals export route', () => {
   beforeEach(() => {
@@ -85,6 +87,7 @@ describe('approvals export route', () => {
       expect.objectContaining({
         headers: ['Claim Number'],
         filename: expect.stringContaining('approvals-history-'),
+        chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
       }),
       'req-1'
     )

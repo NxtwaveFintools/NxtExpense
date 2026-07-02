@@ -5,7 +5,6 @@ import type {
   FinanceFilterOptions,
 } from '@/features/finance/types'
 import {
-  hasRejectFinanceActionCode,
   REJECTED_ALLOW_RECLAIM_ACTION_FILTER_LABEL,
   REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
 } from '@/features/finance/utils/action-filter'
@@ -43,7 +42,7 @@ export async function getFinanceFilterOptions(
     .eq('is_terminal', false)
     .maybeSingle()
 
-  const [designations, workLocationRows, statusResult, financeActionResult] =
+  const [designations, workLocationRows, statusResult, actionBucketsResult] =
     await Promise.all([
       getAllDesignations(supabase),
       getAllWorkLocations(supabase),
@@ -54,19 +53,15 @@ export async function getFinanceFilterOptions(
         )
         .eq('is_active', true)
         .order('display_order', { ascending: true }),
-      supabase
-        .from('finance_actions')
-        .select('action')
-        .order('acted_at', { ascending: false })
-        .limit(200),
+      supabase.rpc('finance_action_buckets'),
     ])
 
   if (statusResult.error) {
     throw new Error(statusResult.error.message)
   }
 
-  if (financeActionResult.error) {
-    throw new Error(financeActionResult.error.message)
+  if (actionBucketsResult.error) {
+    throw new Error(actionBucketsResult.error.message)
   }
 
   const designationOptions: FinanceFilterOption[] = designations
@@ -128,20 +123,25 @@ export async function getFinanceFilterOptions(
     label: wl.location_name,
   }))
 
-  const financeActionCodes = [
-    ...new Set(
-      (financeActionResult.data ?? []).map((row) => row.action as string)
-    ),
+  type ActionBucketRow = { action: string; is_rejected: boolean }
+  const actionBuckets = (actionBucketsResult.data ?? []) as ActionBucketRow[]
+
+  // finance_action_buckets() joins claim_status_transitions to claim_statuses,
+  // so the same action code can legitimately appear in more than one row (e.g.
+  // reachable from more than one prior status) — dedupe before mapping to
+  // dropdown options, or React sees duplicate option keys.
+  const uniqueActionCodes = [
+    ...new Set(actionBuckets.map((bucket) => bucket.action)),
   ]
 
-  const financeActions: FinanceFilterOption[] = financeActionCodes.map(
-    (code) => ({
-      value: code,
-      label: formatFinanceActionLabel(code),
+  const financeActions: FinanceFilterOption[] = uniqueActionCodes.map(
+    (action) => ({
+      value: action,
+      label: formatFinanceActionLabel(action),
     })
   )
 
-  if (hasRejectFinanceActionCode(financeActionCodes)) {
+  if (actionBuckets.some((bucket) => bucket.is_rejected)) {
     financeActions.push({
       value: REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE,
       label: REJECTED_ALLOW_RECLAIM_ACTION_FILTER_LABEL,

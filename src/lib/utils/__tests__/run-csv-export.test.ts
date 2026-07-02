@@ -14,9 +14,8 @@ vi.mock('@/lib/utils/export-progress-registry', () => ({
 
 import {
   runCsvExport,
-  exportTooLargeResponse,
   EXPORT_CHUNK_SIZE,
-  MAX_EXPORT_ROWS,
+  ENRICHMENT_EXPORT_CHUNK_SIZE,
 } from '@/lib/utils/run-csv-export'
 
 describe('runCsvExport', () => {
@@ -60,6 +59,28 @@ describe('runCsvExport', () => {
     expect(fetchPage).toHaveBeenNthCalledWith(2, 'cursor-2', EXPORT_CHUNK_SIZE)
   })
 
+  it('uses the recipe chunkSize override instead of EXPORT_CHUNK_SIZE when provided', async () => {
+    const fetchPage = vi.fn().mockResolvedValue({
+      data: [{ value: 'A' }],
+      hasNextPage: false,
+      nextCursor: null,
+    })
+
+    const response = runCsvExport<{ value: string }>(
+      {
+        fetchPage,
+        headers: ['Value'],
+        mapRow: (row) => [row.value],
+        filename: 'x.csv',
+        chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
+      },
+      null
+    )
+    await response.text()
+
+    expect(fetchPage).toHaveBeenCalledWith(null, ENRICHMENT_EXPORT_CHUNK_SIZE)
+  })
+
   it('emits only the header row when fetchPage returns no records', async () => {
     const fetchPage = vi.fn().mockResolvedValue({
       data: [],
@@ -78,34 +99,6 @@ describe('runCsvExport', () => {
     )
 
     await expect(response.text()).resolves.toBe('"Value"\n')
-  })
-
-  it('errors the stream when the row cap is exceeded', async () => {
-    const mapRow = vi.fn((row: { value: string }) => [row.value])
-    const fetchPage = vi.fn().mockResolvedValue({
-      data: Array.from({ length: MAX_EXPORT_ROWS + 1 }, (_, i) => ({
-        value: `row-${i}`,
-      })),
-      hasNextPage: false,
-      nextCursor: null,
-    })
-
-    const response = runCsvExport<{ value: string }>(
-      { fetchPage, headers: ['Value'], mapRow, filename: 'too-large.csv' },
-      null
-    )
-
-    const reader = response.body?.getReader()
-    if (!reader)
-      throw new Error('Expected response stream body to be available.')
-
-    const firstChunk = await reader.read()
-    expect(firstChunk.done).toBe(false)
-
-    await expect(reader.read()).rejects.toThrow(
-      /Export exceeds 50000 rows\. Apply filters to narrow results\./
-    )
-    expect(mapRow).not.toHaveBeenCalled()
   })
 
   it('propagates fetchPage errors through the stream reader', async () => {
@@ -127,15 +120,6 @@ describe('runCsvExport', () => {
     expect(firstChunk.done).toBe(false)
 
     await expect(reader.read()).rejects.toThrow('boom')
-  })
-
-  it('returns 413 helper response for oversized export prechecks', async () => {
-    const response = exportTooLargeResponse()
-
-    expect(response.status).toBe(413)
-    const body = await response.text()
-    expect(body).toContain('Export too large.')
-    expect(body).toContain('Maximum: 50000 rows.')
   })
 
   it('when requestId is null, never touches the progress registry', async () => {

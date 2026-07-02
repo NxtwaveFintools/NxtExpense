@@ -10,7 +10,10 @@ import {
   createCsvExportErrorResponse,
   createExportRouteHandlers,
 } from '@/lib/utils/export-route'
-import { runCsvExport } from '@/lib/utils/run-csv-export'
+import {
+  ENRICHMENT_EXPORT_CHUNK_SIZE,
+  runCsvExport,
+} from '@/lib/utils/run-csv-export'
 
 async function handleExportRequest(request: Request): Promise<Response> {
   try {
@@ -42,6 +45,7 @@ async function handleExportRequest(request: Request): Promise<Response> {
         headers: APPROVAL_HISTORY_CSV_HEADERS,
         mapRow: mapApprovalHistoryToCsvRow,
         filename,
+        chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
       },
       requestId
     )

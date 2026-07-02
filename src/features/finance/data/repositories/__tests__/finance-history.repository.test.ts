@@ -208,6 +208,17 @@ describe('getFinanceHistoryPaginated', () => {
       supabase,
       ['claim-1']
     )
+
+    // finance_history_filtered() resolves action/date scoping in SQL now —
+    // no TypeScript-side pre-resolution needed (see
+    // docs/superpowers/plans/2026-07-02-finance-history-dropdown-and-canonical-filter-plan.md).
+    const rpcArgs = (supabase.rpc as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as Record<string, unknown>
+    expect(rpcArgs).not.toHaveProperty('p_feed_action_codes')
+    expect(rpcArgs).not.toHaveProperty('p_feed_from')
+    expect(rpcArgs).not.toHaveProperty('p_feed_to')
+    expect(rpcArgs).toHaveProperty('p_action_filter')
+    expect(rpcArgs).toHaveProperty('p_date_field')
   })
 
   it('slices to limit and builds the cursor from the last BOUNDED row, not the probe row', async () => {
@@ -244,28 +255,6 @@ describe('getFinanceHistoryPaginated', () => {
       created_at: '2026-06-30T09:00:00+00:00',
       id: 'a2',
     })
-  })
-
-  it('short-circuits with zero DB calls when an action-date filter resolves to zero action codes', async () => {
-    mocks.getFinanceActionCodesForDateFilter.mockResolvedValue([])
-    const supabase = buildSupabaseStub([])
-    const filters: FinanceFilters = {
-      ...DEFAULT_FINANCE_FILTERS,
-      dateFilterField: 'payment_released_date',
-      dateFrom: '2026-01-01',
-      dateTo: '2026-01-31',
-    }
-
-    const result = await getFinanceHistoryPaginated(supabase, null, 10, filters)
-
-    expect(result).toEqual({
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 10,
-    })
-    expect(supabase.rpc).not.toHaveBeenCalled()
-    expect(mocks.getClaimAvailableActionsByClaimIds).not.toHaveBeenCalled()
   })
 
   it('short-circuits with zero availableActions calls when the page RPC returns no rows', async () => {

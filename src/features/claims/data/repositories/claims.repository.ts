@@ -20,6 +20,7 @@ import { resolveClaimAllowResubmitFilterValue } from '@/features/claims/data/que
 import {
   CLAIM_COLUMNS,
   mapClaimRow,
+  mapHydratedClaimRow,
 } from '@/features/claims/data/queries/claim-columns'
 
 const DEFAULT_MY_CLAIMS_FILTERS: MyClaimsFilters = {
@@ -27,17 +28,6 @@ const DEFAULT_MY_CLAIMS_FILTERS: MyClaimsFilters = {
   workLocation: null,
   claimDateFrom: null,
   claimDateTo: null,
-}
-
-type ClaimsFilterQuery = {
-  eq: (column: string, value: unknown) => unknown
-  gte: (column: string, value: unknown) => unknown
-  lte: (column: string, value: unknown) => unknown
-}
-
-type ResolvedMyClaimsStatusFilter = {
-  statusId: string
-  allowResubmitFilter: boolean | null
 }
 
 export type ClaimPayload = {
@@ -101,53 +91,6 @@ export type InitialWorkflowState = {
   currentApprovalLevel: number | null
 }
 
-async function resolveMyClaimsStatusFilter(
-  supabase: SupabaseClient,
-  filters: MyClaimsFilters
-): Promise<ResolvedMyClaimsStatusFilter | null> {
-  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
-
-  if (!parsedStatusFilter) {
-    return null
-  }
-
-  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
-    supabase,
-    parsedStatusFilter
-  )
-
-  return {
-    statusId: parsedStatusFilter.statusId,
-    allowResubmitFilter,
-  }
-}
-
-function applyMyClaimsFilters(
-  query: ClaimsFilterQuery,
-  filters: MyClaimsFilters,
-  statusFilter: ResolvedMyClaimsStatusFilter | null
-): void {
-  if (statusFilter) {
-    query.eq('status_id', statusFilter.statusId)
-
-    if (statusFilter.allowResubmitFilter !== null) {
-      query.eq('allow_resubmit', statusFilter.allowResubmitFilter)
-    }
-  }
-
-  if (filters.workLocation) {
-    query.eq('work_location_id', filters.workLocation)
-  }
-
-  if (filters.claimDateFrom) {
-    query.gte('claim_date', filters.claimDateFrom)
-  }
-
-  if (filters.claimDateTo) {
-    query.lte('claim_date', filters.claimDateTo)
-  }
-}
-
 export async function getMyClaimsPaginated(
   supabase: SupabaseClient,
   employeeId: string,
@@ -155,33 +98,31 @@ export async function getMyClaimsPaginated(
   limit = 10,
   filters: MyClaimsFilters = DEFAULT_MY_CLAIMS_FILTERS
 ): Promise<PaginatedClaims> {
-  const statusFilter = await resolveMyClaimsStatusFilter(supabase, filters)
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
+  const decoded = cursor ? decodeCursor(cursor) : null
 
-  let query = supabase
-    .from('expense_claims')
-    .select(CLAIM_COLUMNS)
-    .eq('employee_id', employeeId)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit + 1)
-
-  if (cursor) {
-    const decoded = decodeCursor(cursor)
-    query = query.or(
-      `created_at.lt.${decoded.created_at},and(created_at.eq.${decoded.created_at},id.lt.${decoded.id})`
-    )
-  }
-
-  applyMyClaimsFilters(query, filters, statusFilter)
-
-  const { data, error } = await query
+  const { data, error } = await supabase.rpc('get_my_claims_page', {
+    p_employee_id: employeeId,
+    p_status_id: parsedStatusFilter?.statusId ?? null,
+    p_allow_resubmit: allowResubmitFilter,
+    p_work_location_id: filters.workLocation,
+    p_claim_date_from: filters.claimDateFrom,
+    p_claim_date_to: filters.claimDateTo,
+    p_cursor_created_at: decoded?.created_at ?? null,
+    p_cursor_id: decoded?.id ?? null,
+    p_limit: limit,
+  })
 
   if (error) {
     throw new Error(error.message)
   }
 
-  const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map(
-    mapClaimRow
+  const rows = ((data ?? []) as Record<string, unknown>[]).map(
+    mapHydratedClaimRow
   )
   const hasNextPage = rows.length > limit
   const pageData = hasNextPage ? rows.slice(0, limit) : rows
@@ -307,22 +248,30 @@ export async function getMyClaimsTotalCount(
   employeeId: string,
   filters: MyClaimsFilters
 ): Promise<number> {
-  const statusFilter = await resolveMyClaimsStatusFilter(supabase, filters)
+  const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
+  const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
+    supabase,
+    parsedStatusFilter
+  )
 
-  const query = supabase
-    .from('expense_claims')
-    .select('id', { count: 'exact', head: true })
-    .eq('employee_id', employeeId)
-
-  applyMyClaimsFilters(query, filters, statusFilter)
-
-  const { count, error } = await query
+  const { data, error } = await supabase.rpc('get_my_claims_metrics', {
+    p_employee_id: employeeId,
+    p_status_id: parsedStatusFilter?.statusId ?? null,
+    p_allow_resubmit: allowResubmitFilter,
+    p_work_location_id: filters.workLocation,
+    p_claim_date_from: filters.claimDateFrom,
+    p_claim_date_to: filters.claimDateTo,
+  })
 
   if (error) {
     throw new Error(error.message)
   }
 
-  return count ?? 0
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    total_count: number | string | null
+  } | null
+
+  return Number(row?.total_count ?? 0)
 }
 
 export async function insertClaim(

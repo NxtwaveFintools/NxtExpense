@@ -13,6 +13,7 @@
     "lint:staged": "lint-staged",
     "guard:finance-reads": "node scripts/check-no-claim-id-collection.mjs",
     "test": "node scripts/check-no-claim-id-collection.mjs && vitest run",
+    "test:db": "supabase test db",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "npx vitest --coverage --ui",
