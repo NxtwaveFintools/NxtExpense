@@ -31,6 +31,7 @@ vi.mock(
 )
 
 import {
+  getFinanceHistoryPageForExport,
   getFinanceHistoryPaginated,
   mapHydratedHistoryRow,
 } from '@/features/finance/data/repositories/finance-history.repository'
@@ -279,5 +280,59 @@ describe('getFinanceHistoryPaginated', () => {
       limit: 10,
     })
     expect(mocks.getClaimAvailableActionsByClaimIds).not.toHaveBeenCalled()
+  })
+})
+
+describe('getFinanceHistoryPageForExport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns claim/owner/action rows without calling getClaimAvailableActionsByClaimIds', async () => {
+    const row = buildHydratedRow()
+    const supabase = buildSupabaseStub([row])
+
+    const result = await getFinanceHistoryPageForExport(supabase, null, 10)
+
+    expect(result.hasNextPage).toBe(false)
+    expect(result.nextCursor).toBeNull()
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].claim.id).toBe('claim-1')
+    expect(result.data[0].owner.employee_id).toBe('NW0000282')
+    expect(result.data[0]).not.toHaveProperty('availableActions')
+    expect(mocks.getClaimAvailableActionsByClaimIds).not.toHaveBeenCalled()
+  })
+
+  it('slices to limit and builds the cursor from the last bounded row, matching getFinanceHistoryPaginated', async () => {
+    const rows = [
+      buildHydratedRow({
+        id: 'a1',
+        claim_id: 'c1',
+        acted_at: '2026-06-30T10:00:00+00:00',
+      }),
+      buildHydratedRow({
+        id: 'a2',
+        claim_id: 'c2',
+        acted_at: '2026-06-30T09:00:00+00:00',
+      }),
+    ]
+    const supabase = buildSupabaseStub(rows)
+
+    const result = await getFinanceHistoryPageForExport(supabase, null, 1)
+
+    expect(result.hasNextPage).toBe(true)
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].claim.id).toBe('c1')
+    expect(result.nextCursor).not.toBeNull()
+  })
+
+  it('returns an empty page when the RPC returns no rows', async () => {
+    const supabase = buildSupabaseStub([])
+
+    const result = await getFinanceHistoryPageForExport(supabase, null, 10)
+
+    expect(result.data).toEqual([])
+    expect(result.hasNextPage).toBe(false)
+    expect(result.nextCursor).toBeNull()
   })
 })

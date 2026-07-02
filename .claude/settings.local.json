@@ -26,7 +26,8 @@
       "Bash(npm test *)",
       "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" log --oneline --all)",
       "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" show master:src/features/finance/data/queries/history-analytics.query.ts)",
-      "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" log --oneline master)"
+      "Bash(git -C \"C:/Users/Nxtwave/Documents/NxtExpense\" log --oneline master)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   },
   "enableAllProjectMcpServers": true,

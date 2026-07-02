@@ -9,6 +9,8 @@ type ClaimExpenseItemRow = {
   amount: number
 }
 
+type BcExpenseHistoryRow = Pick<FinanceHistoryItem, 'claim' | 'owner'>
+
 export const BC_EXPENSE_CSV_HEADERS = [
   'Posting Date',
   'Document No.',
@@ -42,7 +44,7 @@ function formatNegativeAmount(amount: number): string {
 }
 
 type BuildRowsInput = {
-  historyRows: FinanceHistoryItem[]
+  historyRows: BcExpenseHistoryRow[]
   claimItemsByClaimId: Map<string, ClaimExpenseItemRow[]>
   balAccountNoByItemType: Map<string, string>
   postingDate: string

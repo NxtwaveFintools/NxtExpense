@@ -1,97 +1,55 @@
-import { canAccessApprovals } from '@/features/employees/permissions'
-import {
-  getEmployeeByEmail,
-  hasApproverAssignments,
-} from '@/lib/services/employee-service'
+import { resolveApprovalHistoryExportContext } from '@/features/approvals/server/approval-history-export-context'
 import { getFilteredApprovalHistoryPaginated } from '@/features/approvals/data/queries'
 import {
-  buildApprovalHistoryCsv,
-  normalizeApprovalHistoryFilters,
   APPROVAL_HISTORY_CSV_HEADERS,
   mapApprovalHistoryToCsvRow,
 } from '@/features/approvals/utils/history-filters'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   buildDatedCsvFilename,
-  createCsvErrorResponse,
-  createCsvResponse,
+  createCsvExportErrorResponse,
   createExportRouteHandlers,
-  getExportMode,
 } from '@/lib/utils/export-route'
-// FIX [ISSUE#2] — Streaming chunked export to eliminate unbounded in-memory arrays
-import { createStreamingCsvResponse } from '@/lib/utils/streaming-export'
+import { runCsvExport } from '@/lib/utils/run-csv-export'
 
-const PAGE_EXPORT_LIMIT = 10
-
-async function handleExportRequest(request: Request) {
+async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const searchParams = url.searchParams
-
-    const mode = getExportMode(searchParams.get('mode'))
-    const historyCursor = searchParams.get('historyCursor')
-
-    const filters = normalizeApprovalHistoryFilters({
-      claimStatus: searchParams.get('claimStatus') ?? undefined,
-      employeeName: searchParams.get('employeeName') ?? undefined,
-      claimDateFrom: searchParams.get('claimDateFrom') ?? undefined,
-      claimDateTo: searchParams.get('claimDateTo') ?? undefined,
-      amountOperator: searchParams.get('amountOperator') ?? undefined,
-      amountValue: searchParams.get('amountValue') ?? undefined,
-      locationType: searchParams.get('locationType') ?? undefined,
-      claimDateSort: searchParams.get('claimDateSort') ?? undefined,
-      hodApprovedFrom: searchParams.get('hodApprovedFrom') ?? undefined,
-      hodApprovedTo: searchParams.get('hodApprovedTo') ?? undefined,
-      financeApprovedFrom: searchParams.get('financeApprovedFrom') ?? undefined,
-      financeApprovedTo: searchParams.get('financeApprovedTo') ?? undefined,
-    })
+    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user?.email) {
-      return new Response('Unauthorized request.', { status: 401 })
-    }
-
-    const employee = await getEmployeeByEmail(supabase, user.email)
-    if (!employee) {
-      return new Response('Approver profile not found.', { status: 403 })
-    }
-
-    const approverAccess = await hasApproverAssignments(
+    const resolved = await resolveApprovalHistoryExportContext(
       supabase,
-      employee.employee_email
+      user?.email ? { email: user.email } : null,
+      url.searchParams
     )
-    if (!canAccessApprovals(approverAccess)) {
-      return new Response('Access denied.', { status: 403 })
+
+    if (!resolved.ok) {
+      return createCsvExportErrorResponse(resolved.message, resolved.status)
     }
 
-    const filename = buildDatedCsvFilename('approvals-history', mode)
+    const { filters } = resolved.context
+    const filename = buildDatedCsvFilename('approvals-history')
 
-    // FIX [ISSUE#2] — Stream export-all instead of holding full dataset in memory
-    if (mode === 'all') {
-      return createStreamingCsvResponse({
-        fetcher: (cursor, limit) =>
+    return runCsvExport(
+      {
+        fetchPage: (cursor, limit) =>
           getFilteredApprovalHistoryPaginated(supabase, cursor, limit, filters),
         headers: APPROVAL_HISTORY_CSV_HEADERS,
         mapRow: mapApprovalHistoryToCsvRow,
         filename,
-      })
-    }
-
-    const paginated = await getFilteredApprovalHistoryPaginated(
-      supabase,
-      historyCursor,
-      PAGE_EXPORT_LIMIT,
-      filters
+      },
+      requestId
     )
-    const csv = buildApprovalHistoryCsv(paginated.data)
-
-    return createCsvResponse(csv, filename)
   } catch (error) {
-    return createCsvErrorResponse(error)
+    return createCsvExportErrorResponse(
+      error instanceof Error ? error.message : 'Failed to export CSV.',
+      400
+    )
   }
 }
 

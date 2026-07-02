@@ -1,136 +1,66 @@
-import { getEmployeeByEmail } from '@/lib/services/employee-service'
-import { isFinanceTeamMember } from '@/features/finance/permissions'
+import { resolvePaymentJournalsExportContext } from '@/features/finance/server/payment-journals-export-context'
 import { getFinancePaymentJournalTotals } from '@/features/finance/data/queries'
-import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import {
-  getFinanceExportProfileByCode,
-  type FinanceExportProfile,
-} from '@/lib/services/finance-export-config-service'
 import {
   buildPaymentJournalsRows,
   PAYMENT_JOURNALS_CSV_HEADERS,
-  resolvePaymentJournalsDefaults,
-  toCsvLine,
 } from '@/features/finance/utils/payment-journals-export'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   buildDatedCsvFilename,
-  createCsvErrorResponse,
+  createCsvExportErrorResponse,
   createExportRouteHandlers,
 } from '@/lib/utils/export-route'
+import { runCsvExport } from '@/lib/utils/run-csv-export'
 
-const PAYMENT_JOURNALS_EXPORT_PROFILE_CODE = 'PAYMENT_JOURNALS'
-
-type CsvRowsBuilder = () => Promise<string[][]>
-
-function createStreamingCsvResponse(
-  filename: string,
-  headers: string[],
-  buildRows: CsvRowsBuilder
-): Response {
-  const encoder = new TextEncoder()
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        controller.enqueue(encoder.encode(`${toCsvLine(headers)}\n`))
-
-        const rows = await buildRows()
-
-        if (rows.length > 0) {
-          const chunk = rows.map((row) => toCsvLine(row)).join('\n')
-          controller.enqueue(encoder.encode(`${chunk}\n`))
-        }
-
-        controller.close()
-      } catch (error) {
-        controller.error(error)
-      }
-    },
-  })
-
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store',
-      'Transfer-Encoding': 'chunked',
-    },
-  })
-}
-
-function ensureProfileExists(
-  profile: FinanceExportProfile | null
-): asserts profile {
-  if (!profile) {
-    throw new Error('Payment Journals export profile is not configured.')
-  }
-}
-
-async function handleExportRequest(request: Request) {
+async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const searchParams = url.searchParams
-
-    const filters = normalizeFinanceFilters({
-      employeeId: searchParams.get('employeeId') ?? undefined,
-      employeeName: searchParams.get('employeeName') ?? undefined,
-      claimNumber: searchParams.get('claimNumber') ?? undefined,
-      ownerDesignation: searchParams.get('ownerDesignation') ?? undefined,
-      hodApproverEmployeeId:
-        searchParams.get('hodApproverEmployeeId') ?? undefined,
-      workLocation: searchParams.get('workLocation') ?? undefined,
-      actionFilter: searchParams.get('actionFilter') ?? undefined,
-      dateFilterField: searchParams.get('dateFilterField') ?? undefined,
-      dateFrom: searchParams.get('dateFrom') ?? undefined,
-      dateTo: searchParams.get('dateTo') ?? undefined,
-    })
+    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user?.email) {
-      return new Response('Unauthorized request.', { status: 401 })
-    }
-
-    const employee = await getEmployeeByEmail(supabase, user.email)
-
-    if (!employee || !(await isFinanceTeamMember(supabase, employee))) {
-      return new Response('Finance access is required.', { status: 403 })
-    }
-
-    const profile = await getFinanceExportProfileByCode(
+    const resolved = await resolvePaymentJournalsExportContext(
       supabase,
-      PAYMENT_JOURNALS_EXPORT_PROFILE_CODE
+      user?.email ? { email: user.email } : null,
+      url.searchParams
     )
 
-    ensureProfileExists(profile)
+    if (!resolved.ok) {
+      return createCsvExportErrorResponse(resolved.message, resolved.status)
+    }
 
-    const defaults = resolvePaymentJournalsDefaults(profile)
-    const filename = buildDatedCsvFilename('payment-journals', 'all')
+    const { filters, defaults } = resolved.context
+    const filename = buildDatedCsvFilename('payment-journals')
 
-    return createStreamingCsvResponse(
-      filename,
-      PAYMENT_JOURNALS_CSV_HEADERS,
-      async () => {
-        // One DB-side GROUP BY produces the per-employee totals (bounded by employee
-        // count) — no paging the feed and accumulating claim IDs in Node.
-        const totalsByEmployeeId = await getFinancePaymentJournalTotals(
-          supabase,
-          filters
-        )
+    return runCsvExport(
+      {
+        fetchPage: async () => {
+          const totalsByEmployeeId = await getFinancePaymentJournalTotals(
+            supabase,
+            filters
+          )
 
-        return buildPaymentJournalsRows({
-          totalsByEmployeeId,
-          defaults,
-        })
-      }
+          const rows = buildPaymentJournalsRows({
+            totalsByEmployeeId,
+            defaults,
+          })
+
+          return { data: rows, hasNextPage: false, nextCursor: null }
+        },
+        headers: PAYMENT_JOURNALS_CSV_HEADERS,
+        mapRow: (row: string[]) => row,
+        filename,
+      },
+      requestId
     )
   } catch (error) {
-    return createCsvErrorResponse(error)
+    return createCsvExportErrorResponse(
+      error instanceof Error ? error.message : 'Failed to export CSV.',
+      400
+    )
   }
 }
 

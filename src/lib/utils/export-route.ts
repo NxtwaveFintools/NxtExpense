@@ -1,34 +1,17 @@
-type ExportMode = 'page' | 'all'
-
-export function getExportMode(value: string | null): ExportMode {
-  return value === 'all' ? 'all' : 'page'
-}
-
-export function buildDatedCsvFilename(
-  prefix: string,
-  mode: ExportMode
-): string {
+export function buildDatedCsvFilename(prefix: string): string {
   const dateStamp = new Date().toISOString().slice(0, 10)
-  return `${prefix}-${mode}-${dateStamp}.csv`
+  return `${prefix}-${dateStamp}.csv`
 }
 
-export function createCsvResponse(csv: string, filename: string): Response {
-  return new Response(csv, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store',
-    },
-  })
-}
-
-export function createCsvErrorResponse(
-  error: unknown,
-  fallback = 'Failed to export CSV.'
+export function createCsvExportErrorResponse(
+  message: string,
+  status: number
 ): Response {
-  return new Response(error instanceof Error ? error.message : fallback, {
-    status: 400,
+  return new Response(message, {
+    status,
+    headers: {
+      'Content-Disposition': 'attachment; filename="export-error.txt"',
+    },
   })
 }
 

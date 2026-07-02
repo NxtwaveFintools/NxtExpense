@@ -12,7 +12,7 @@ import { useFilterNavigation } from '@/components/ui/filter-navigation'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { INPUT_DEBOUNCE_MS } from '@/lib/constants/ui'
 
-import { CsvExportActions } from '@/components/ui/csv-export-actions'
+import { CsvExportButton } from '@/components/ui/csv-export-button'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
 import { getApprovalEmployeeNameSuggestionsAction } from '@/features/approvals/server/actions'
 import { addApprovalFiltersToParams } from '@/features/approvals/utils/history-filters'
@@ -28,8 +28,7 @@ type ApprovalFiltersBarProps = {
   filters: ApprovalHistoryFilters
   statusCatalog: ClaimStatusCatalogItem[]
   validationError?: string | null
-  exportCurrentPageHref: string
-  exportAllHref: string
+  exportHref: string
 }
 
 const DEFAULT_FILTERS: ApprovalHistoryFilters = {
@@ -56,8 +55,7 @@ export function ApprovalFiltersBar({
   filters,
   statusCatalog,
   validationError,
-  exportCurrentPageHref,
-  exportAllHref,
+  exportHref,
 }: ApprovalFiltersBarProps) {
   const { navigate } = useFilterNavigation()
 
@@ -288,10 +286,11 @@ export function ApprovalFiltersBar({
           >
             Clear
           </button>
-          <CsvExportActions
-            exportCurrentPageHref={exportCurrentPageHref}
-            exportAllHref={exportAllHref}
-            buttonClassName="rounded-md"
+          <CsvExportButton
+            exportType="approval-history"
+            href={exportHref}
+            label="Export CSV"
+            className="rounded-md"
           />
         </div>
       </form>

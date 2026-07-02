@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Filter } from 'lucide-react'
 
-import { CsvExportActions } from '@/components/ui/csv-export-actions'
+import { CsvExportButton } from '@/components/ui/csv-export-button'
 
 import type {
   ClaimStatusCatalogItem,
@@ -13,8 +13,7 @@ type ClaimsFiltersBarProps = {
   filters: MyClaimsFilters
   statusCatalog: ClaimStatusCatalogItem[]
   workLocationOptions: WorkLocationOption[]
-  exportCurrentPageHref: string
-  exportAllHref: string
+  exportHref: string
   canExportCsv: boolean
   validationError?: string | null
 }
@@ -23,8 +22,7 @@ export function ClaimsFiltersBar({
   filters,
   statusCatalog,
   workLocationOptions,
-  exportCurrentPageHref,
-  exportAllHref,
+  exportHref,
   canExportCsv,
   validationError,
 }: ClaimsFiltersBarProps) {
@@ -119,10 +117,11 @@ export function ClaimsFiltersBar({
             Clear
           </Link>
           {canExportCsv ? (
-            <CsvExportActions
-              exportCurrentPageHref={exportCurrentPageHref}
-              exportAllHref={exportAllHref}
-              buttonClassName="rounded-xl"
+            <CsvExportButton
+              exportType="my-claims"
+              href={exportHref}
+              label="Export CSV"
+              className="rounded-xl"
             />
           ) : null}
         </div>

@@ -2,44 +2,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
-  getEmployeeByEmail: vi.fn(),
-  hasApproverAssignments: vi.fn(),
-  canAccessApprovals: vi.fn(),
-  getAllFilteredApprovalHistory: vi.fn(),
+  resolveApprovalHistoryExportContext: vi.fn(),
   getFilteredApprovalHistoryPaginated: vi.fn(),
-  buildApprovalHistoryCsv: vi.fn(),
-  normalizeApprovalHistoryFilters: vi.fn(),
-  createStreamingCsvResponse: vi.fn(),
+  runCsvExport: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }))
 
-vi.mock('@/lib/services/employee-service', () => ({
-  getEmployeeByEmail: mocks.getEmployeeByEmail,
-  hasApproverAssignments: mocks.hasApproverAssignments,
-}))
-
-vi.mock('@/features/employees/permissions', () => ({
-  canAccessApprovals: mocks.canAccessApprovals,
+vi.mock('@/features/approvals/server/approval-history-export-context', () => ({
+  resolveApprovalHistoryExportContext:
+    mocks.resolveApprovalHistoryExportContext,
 }))
 
 vi.mock('@/features/approvals/data/queries', () => ({
-  getAllFilteredApprovalHistory: mocks.getAllFilteredApprovalHistory,
   getFilteredApprovalHistoryPaginated:
     mocks.getFilteredApprovalHistoryPaginated,
 }))
 
 vi.mock('@/features/approvals/utils/history-filters', () => ({
-  buildApprovalHistoryCsv: mocks.buildApprovalHistoryCsv,
-  normalizeApprovalHistoryFilters: mocks.normalizeApprovalHistoryFilters,
-  APPROVAL_HISTORY_CSV_HEADERS: ['col1', 'col2'],
-  mapApprovalHistoryToCsvRow: vi.fn(),
+  APPROVAL_HISTORY_CSV_HEADERS: ['Claim Number'],
+  mapApprovalHistoryToCsvRow: vi.fn((row: { claimNumber: string }) => [
+    row.claimNumber,
+  ]),
 }))
 
-vi.mock('@/lib/utils/streaming-export', () => ({
-  createStreamingCsvResponse: mocks.createStreamingCsvResponse,
+vi.mock('@/lib/utils/run-csv-export', () => ({
+  runCsvExport: mocks.runCsvExport,
 }))
 
 import { GET, POST } from '@/app/(app)/approvals/export/route'
@@ -51,146 +41,118 @@ describe('approvals export route', () => {
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
-          data: {
-            user: {
-              email: 'finance@nxtwave.co.in',
-            },
-          },
+          data: { user: { email: 'approver@nxtwave.co.in' } },
         }),
       },
     })
 
-    mocks.getEmployeeByEmail.mockResolvedValue({
-      employee_email: 'finance@nxtwave.co.in',
-    })
-    mocks.hasApproverAssignments.mockResolvedValue(true)
-    mocks.canAccessApprovals.mockReturnValue(true)
-
-    mocks.normalizeApprovalHistoryFilters.mockReturnValue({
-      employeeName: null,
-      claimStatus: null,
-      claimDateFrom: null,
-      claimDateTo: null,
-      amountOperator: 'lte',
-      amountValue: null,
-      locationType: null,
-      claimDateSort: 'desc',
-      hodApprovedFrom: null,
-      hodApprovedTo: null,
-      financeApprovedFrom: null,
-      financeApprovedTo: null,
-    })
-
-    mocks.getFilteredApprovalHistoryPaginated.mockResolvedValue({
-      data: [
-        {
-          claimId: 'claim-1',
+    mocks.resolveApprovalHistoryExportContext.mockResolvedValue({
+      ok: true,
+      context: {
+        employee: { id: 'emp-1' },
+        filters: {
+          claimStatus: null,
+          employeeName: null,
+          claimDateFrom: null,
+          claimDateTo: null,
+          amountOperator: 'lte',
+          amountValue: null,
+          locationType: null,
+          claimDateSort: 'desc',
+          hodApprovedFrom: null,
+          hodApprovedTo: null,
+          financeApprovedFrom: null,
+          financeApprovedTo: null,
         },
-      ],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 10,
+      },
     })
 
-    mocks.getAllFilteredApprovalHistory.mockResolvedValue([
-      {
-        claimId: 'claim-2',
-      },
-    ])
-
-    mocks.buildApprovalHistoryCsv.mockReturnValue('col1,col2\nval1,val2')
-
-    mocks.createStreamingCsvResponse.mockReturnValue(
-      new Response('col1,col2\nval1,val2', {
+    mocks.runCsvExport.mockReturnValue(
+      new Response('Claim Number\nCLAIM-1', {
         status: 200,
         headers: { 'Content-Type': 'text/csv; charset=utf-8' },
       })
     )
   })
 
-  it('exports current page CSV via GET mode=page', async () => {
+  it('streams the export via runCsvExport with the resolved filters', async () => {
     const response = await GET(
-      new Request(
-        'http://localhost:3000/approvals/export?mode=page&actorFilter=finance'
-      )
+      new Request('http://localhost:3000/approvals/export?requestId=req-1')
     )
 
     expect(response.status).toBe(200)
-    expect(response.headers.get('Content-Type')).toContain('text/csv')
-    expect(await response.text()).toBe('col1,col2\nval1,val2')
-    const normalizeInput =
-      mocks.normalizeApprovalHistoryFilters.mock.calls[0]?.[0]
-    expect(normalizeInput.amountOperator).toBeUndefined()
+    expect(mocks.runCsvExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: ['Claim Number'],
+        filename: expect.stringContaining('approvals-history-'),
+      }),
+      'req-1'
+    )
+
+    const [recipe] = mocks.runCsvExport.mock.calls[0]
+    await recipe.fetchPage('cursor-a', 500)
     expect(mocks.getFilteredApprovalHistoryPaginated).toHaveBeenCalledWith(
       expect.anything(),
-      null,
-      10,
+      'cursor-a',
+      500,
       expect.anything()
     )
   })
 
-  it('exports all rows CSV via GET mode=all', async () => {
-    const response = await GET(
-      new Request('http://localhost:3000/approvals/export?mode=all')
-    )
-
-    expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: ['col1', 'col2'],
-        filename: expect.stringContaining('approvals-history-all-'),
-      })
-    )
-  })
-
-  it('supports POST requests without returning 405', async () => {
-    const response = await POST(
-      new Request('http://localhost:3000/approvals/export?mode=all', {
-        method: 'POST',
-      })
-    )
-
-    expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns 401 when request is unauthenticated', async () => {
-    mocks.createSupabaseServerClient.mockResolvedValueOnce({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
+  it('returns 401 with Content-Disposition set for unauthenticated requests', async () => {
+    mocks.resolveApprovalHistoryExportContext.mockResolvedValue({
+      ok: false,
+      status: 401,
+      message: 'Unauthorized request.',
     })
 
     const response = await GET(
-      new Request('http://localhost:3000/approvals/export?mode=page')
+      new Request('http://localhost:3000/approvals/export')
     )
 
     expect(response.status).toBe(401)
-    expect(await response.text()).toBe('Unauthorized request.')
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
   })
 
-  it('returns 403 when approver profile is missing', async () => {
-    mocks.getEmployeeByEmail.mockResolvedValueOnce(null)
+  it('returns 403 when access is denied', async () => {
+    mocks.resolveApprovalHistoryExportContext.mockResolvedValue({
+      ok: false,
+      status: 403,
+      message: 'Access denied.',
+    })
 
     const response = await GET(
-      new Request('http://localhost:3000/approvals/export?mode=page')
+      new Request('http://localhost:3000/approvals/export')
     )
 
     expect(response.status).toBe(403)
-    expect(await response.text()).toBe('Approver profile not found.')
   })
 
-  it('returns 403 when user has no approval access', async () => {
-    mocks.hasApproverAssignments.mockResolvedValueOnce(false)
-    mocks.canAccessApprovals.mockReturnValueOnce(false)
-
+  it('supports POST requests', async () => {
     const response = await POST(
-      new Request('http://localhost:3000/approvals/export?mode=all', {
+      new Request('http://localhost:3000/approvals/export', {
         method: 'POST',
       })
     )
 
-    expect(response.status).toBe(403)
-    expect(await response.text()).toBe('Access denied.')
+    expect(response.status).toBe(200)
+  })
+
+  it('returns 400 with Content-Disposition set when the context resolver throws (e.g. invalid filter validation)', async () => {
+    mocks.resolveApprovalHistoryExportContext.mockRejectedValue(
+      new Error('Invalid date range.')
+    )
+
+    const response = await GET(
+      new Request('http://localhost:3000/approvals/export')
+    )
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
+    expect(await response.text()).toBe('Invalid date range.')
   })
 })

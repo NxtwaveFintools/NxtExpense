@@ -181,15 +181,14 @@ export default async function ApprovedHistoryPage({
     })
   )
 
-  const allRowsCsvParams = addFinanceFiltersToParams(
+  const exportParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
   )
-  allRowsCsvParams.set('mode', 'all')
 
-  const exportAllHref = `/approved-history/export?${allRowsCsvParams.toString()}`
-  const exportBcExpenseHref = `/approved-history/bc-expense-export?${allRowsCsvParams.toString()}`
-  const exportPaymentJournalsHref = `/approved-history/payment-journals-export?${allRowsCsvParams.toString()}`
+  const financeHistoryExportHref = `/approved-history/export?${exportParams.toString()}`
+  const exportBcExpenseHref = `/approved-history/bc-expense-export?${exportParams.toString()}`
+  const exportPaymentJournalsHref = `/approved-history/payment-journals-export?${exportParams.toString()}`
 
   return (
     <>
@@ -212,7 +211,7 @@ export default async function ApprovedHistoryPage({
                 showEmployeeIdFilter
                 showHodApproverFilter={false}
                 showClaimStatusFilter={false}
-                approvedHistoryExportAllHref={exportAllHref}
+                financeHistoryExportHref={financeHistoryExportHref}
                 approvedHistoryBcExpenseHref={exportBcExpenseHref}
                 approvedHistoryPaymentJournalsHref={exportPaymentJournalsHref}
               />

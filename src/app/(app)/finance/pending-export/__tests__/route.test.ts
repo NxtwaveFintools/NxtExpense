@@ -2,24 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
-  getEmployeeByEmail: vi.fn(),
-  isFinanceTeamMember: vi.fn(),
+  resolveFinancePendingExportContext: vi.fn(),
   getFinanceQueuePaginated: vi.fn(),
-  normalizeFinanceFilters: vi.fn(),
-  buildFinancePendingClaimsCsv: vi.fn(),
-  createStreamingCsvResponse: vi.fn(),
+  runCsvExport: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }))
 
-vi.mock('@/lib/services/employee-service', () => ({
-  getEmployeeByEmail: mocks.getEmployeeByEmail,
-}))
-
-vi.mock('@/features/finance/permissions', () => ({
-  isFinanceTeamMember: mocks.isFinanceTeamMember,
+vi.mock('@/features/finance/server/finance-pending-export-context', () => ({
+  resolveFinancePendingExportContext: mocks.resolveFinancePendingExportContext,
 }))
 
 vi.mock('@/features/finance/data/queries', () => ({
@@ -27,16 +20,14 @@ vi.mock('@/features/finance/data/queries', () => ({
 }))
 
 vi.mock('@/features/finance/utils/filters', () => ({
-  normalizeFinanceFilters: mocks.normalizeFinanceFilters,
-  buildFinancePendingClaimsCsv: mocks.buildFinancePendingClaimsCsv,
   FINANCE_PENDING_CLAIMS_CSV_HEADERS: ['Claim ID'],
   mapFinancePendingClaimToCsvRow: vi.fn((row: { claimId: string }) => [
     row.claimId,
   ]),
 }))
 
-vi.mock('@/lib/utils/streaming-export', () => ({
-  createStreamingCsvResponse: mocks.createStreamingCsvResponse,
+vi.mock('@/lib/utils/run-csv-export', () => ({
+  runCsvExport: mocks.runCsvExport,
 }))
 
 import { GET, POST } from '@/app/(app)/finance/pending-export/route'
@@ -53,162 +44,98 @@ describe('finance pending export route', () => {
       },
     })
 
-    mocks.getEmployeeByEmail.mockResolvedValue({
-      id: 'finance-1',
-      employee_email: 'finance@nxtwave.co.in',
+    mocks.resolveFinancePendingExportContext.mockResolvedValue({
+      ok: true,
+      context: {
+        employee: { id: 'finance-1' },
+        filters: {
+          employeeName: null,
+          claimNumber: null,
+          ownerDesignation: null,
+          hodApproverEmployeeId: null,
+          claimStatus: null,
+          workLocation: null,
+          actionFilter: null,
+          dateFilterField: 'claim_date',
+          dateFrom: null,
+          dateTo: null,
+        },
+      },
     })
 
-    mocks.isFinanceTeamMember.mockResolvedValue(true)
-
-    mocks.normalizeFinanceFilters.mockReturnValue({
-      employeeName: null,
-      claimNumber: null,
-      ownerDesignation: null,
-      hodApproverEmployeeId: null,
-      claimStatus: null,
-      workLocation: null,
-      actionFilter: null,
-      dateFilterField: 'claim_date',
-      dateFrom: null,
-      dateTo: null,
-    })
-
-    mocks.getFinanceQueuePaginated.mockResolvedValue({
-      data: [{ claimId: 'CLAIM-260306-001' }],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 10,
-    })
-
-    mocks.buildFinancePendingClaimsCsv.mockReturnValue(
-      'Claim ID\nCLAIM-260306-001'
-    )
-
-    mocks.createStreamingCsvResponse.mockReturnValue(
-      new Response('Claim ID\nCLAIM-260306-001', {
+    mocks.runCsvExport.mockReturnValue(
+      new Response('Claim ID\nCLAIM-1', {
         status: 200,
         headers: { 'Content-Type': 'text/csv; charset=utf-8' },
       })
     )
   })
 
-  it('falls back forged unsupported date filter field to claim_date', async () => {
+  it('streams via runCsvExport using getFinanceQueuePaginated', async () => {
     const response = await GET(
       new Request(
-        'http://localhost:3000/finance/pending-export?mode=page&dateFilterField=issued_at'
+        'http://localhost:3000/finance/pending-export?requestId=req-1'
       )
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.getFinanceQueuePaginated).toHaveBeenCalledWith(
-      expect.anything(),
-      null,
-      10,
-      expect.objectContaining({
-        dateFilterField: 'claim_date',
-      })
-    )
-  })
-
-  it('allows whitelisted date filter values', async () => {
-    mocks.normalizeFinanceFilters.mockReturnValueOnce({
-      employeeName: null,
-      claimNumber: null,
-      ownerDesignation: null,
-      hodApproverEmployeeId: null,
-      claimStatus: null,
-      workLocation: null,
-      actionFilter: null,
-      dateFilterField: 'submitted_at',
-      dateFrom: null,
-      dateTo: null,
-    })
-
-    mocks.normalizeFinanceFilters.mockReturnValueOnce({
-      employeeName: null,
-      claimNumber: null,
-      ownerDesignation: null,
-      hodApproverEmployeeId: null,
-      claimStatus: null,
-      workLocation: null,
-      actionFilter: null,
-      dateFilterField: 'hod_approved_date',
-      dateFrom: null,
-      dateTo: null,
-    })
-
-    await GET(
-      new Request(
-        'http://localhost:3000/finance/pending-export?mode=page&dateFilterField=submitted_at'
-      )
-    )
-
-    await GET(
-      new Request(
-        'http://localhost:3000/finance/pending-export?mode=page&dateFilterField=hod_approved_date'
-      )
-    )
-
-    expect(mocks.getFinanceQueuePaginated).toHaveBeenNthCalledWith(
-      1,
-      expect.anything(),
-      null,
-      10,
-      expect.objectContaining({
-        dateFilterField: 'submitted_at',
-      })
-    )
-
-    expect(mocks.getFinanceQueuePaginated).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
-      null,
-      10,
-      expect.objectContaining({
-        dateFilterField: 'hod_approved_date',
-      })
-    )
-  })
-
-  it('supports all-mode streaming exports', async () => {
-    const response = await GET(
-      new Request('http://localhost:3000/finance/pending-export?mode=all')
-    )
-
-    expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledWith(
+    expect(mocks.runCsvExport).toHaveBeenCalledWith(
       expect.objectContaining({
         headers: ['Claim ID'],
-        filename: expect.stringContaining('pending-claims-all-'),
-      })
+        filename: expect.stringContaining('pending-claims-'),
+      }),
+      'req-1'
+    )
+
+    const [recipe] = mocks.runCsvExport.mock.calls[0]
+    await recipe.fetchPage('cursor-a', 500)
+    expect(mocks.getFinanceQueuePaginated).toHaveBeenCalledWith(
+      expect.anything(),
+      'cursor-a',
+      500,
+      expect.anything()
     )
   })
 
-  it('returns 401 for unauthenticated requests', async () => {
-    mocks.createSupabaseServerClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
+  it('returns 403 when finance access is required', async () => {
+    mocks.resolveFinancePendingExportContext.mockResolvedValue({
+      ok: false,
+      status: 403,
+      message: 'Finance access is required.',
     })
 
     const response = await GET(
       new Request('http://localhost:3000/finance/pending-export')
     )
 
-    expect(response.status).toBe(401)
-    expect(await response.text()).toBe('Unauthorized request.')
+    expect(response.status).toBe(403)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
   })
 
-  it('returns 403 when requester is not finance', async () => {
-    mocks.isFinanceTeamMember.mockResolvedValue(false)
-
+  it('supports POST requests', async () => {
     const response = await POST(
       new Request('http://localhost:3000/finance/pending-export', {
         method: 'POST',
       })
     )
+    expect(response.status).toBe(200)
+  })
 
-    expect(response.status).toBe(403)
-    expect(await response.text()).toBe('Finance access is required.')
+  it('returns 400 with Content-Disposition set when the context resolver throws (e.g. invalid filter validation)', async () => {
+    mocks.resolveFinancePendingExportContext.mockRejectedValue(
+      new Error('Invalid date range.')
+    )
+
+    const response = await GET(
+      new Request('http://localhost:3000/finance/pending-export')
+    )
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
+    expect(await response.text()).toBe('Invalid date range.')
   })
 })

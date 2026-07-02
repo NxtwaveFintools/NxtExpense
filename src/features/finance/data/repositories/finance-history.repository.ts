@@ -279,16 +279,27 @@ async function buildFinanceHistoryFeedScope(
   }
 }
 
-export async function getFinanceHistoryPaginated(
+type HydratedHistoryPage = {
+  rows: Pick<FinanceHistoryItem, 'claim' | 'owner' | 'action'>[]
+  hasNextPage: boolean
+  nextCursor: string | null
+}
+
+// RPC-call-only portion of the former getFinanceHistoryPaginated body. Shared
+// by the interactive-list path (which layers availableActions on top) and the
+// export path (which does not need availableActions — see
+// docs/superpowers/specs/2026-07-01-csv-export-rebuild-design.md, "RPC Reuse
+// Validation"). Reuses get_finance_history_page as-is; zero SQL changes.
+async function fetchHydratedFinanceHistoryPage(
   supabase: SupabaseClient,
   cursor: string | null,
-  limit = 10,
-  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
-): Promise<PaginatedFinanceHistory> {
+  limit: number,
+  filters: FinanceFilters
+): Promise<HydratedHistoryPage> {
   const scope = await buildFinanceHistoryFeedScope(supabase, filters)
 
   if (scope.isEmpty) {
-    return { data: [], hasNextPage: false, nextCursor: null, limit }
+    return { rows: [], hasNextPage: false, nextCursor: null }
   }
 
   // SQL keyset ID-page + enrichment JOIN in one RPC call (Phase 6 — see
@@ -320,40 +331,79 @@ export async function getFinanceHistoryPaginated(
   const pageRowsBounded = hasNextPage ? idRows.slice(0, limit) : idRows
 
   if (pageRowsBounded.length === 0) {
+    return { rows: [], hasNextPage: false, nextCursor: null }
+  }
+
+  const rows = pageRowsBounded.map((row) => mapHydratedHistoryRow(row))
+  const lastRecord = pageRowsBounded.at(-1)
+  const nextCursor =
+    hasNextPage && lastRecord
+      ? encodeCursor({ created_at: lastRecord.acted_at, id: lastRecord.id })
+      : null
+
+  return { rows, hasNextPage, nextCursor }
+}
+
+export async function getFinanceHistoryPaginated(
+  supabase: SupabaseClient,
+  cursor: string | null,
+  limit = 10,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+): Promise<PaginatedFinanceHistory> {
+  const page = await fetchHydratedFinanceHistoryPage(
+    supabase,
+    cursor,
+    limit,
+    filters
+  )
+
+  if (page.rows.length === 0) {
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
-  const claimIds = [...new Set(pageRowsBounded.map((row) => row.claim_id))]
-
+  const claimIds = [...new Set(page.rows.map((row) => row.claim.id))]
   const availableActionsByClaimId = await getClaimAvailableActionsByClaimIds(
     supabase,
     claimIds
   )
 
-  const history: FinanceHistoryItem[] = pageRowsBounded.map((row) => {
-    const { claim, owner, action } = mapHydratedHistoryRow(row)
-    return {
-      claim,
-      owner,
-      action,
-      availableActions: availableActionsByClaimId.get(row.claim_id) ?? [],
-    }
-  })
-
-  const lastRecord = pageRowsBounded.at(-1)
-  const nextCursor =
-    hasNextPage && lastRecord
-      ? encodeCursor({
-          created_at: lastRecord.acted_at,
-          id: lastRecord.id,
-        })
-      : null
+  const history: FinanceHistoryItem[] = page.rows.map((row) => ({
+    ...row,
+    availableActions: availableActionsByClaimId.get(row.claim.id) ?? [],
+  }))
 
   return {
     data: history,
-    hasNextPage,
-    nextCursor,
+    hasNextPage: page.hasNextPage,
+    nextCursor: page.nextCursor,
     limit,
+  }
+}
+
+// Export-only variant: same RPC, no availableActions enrichment. Used by
+// finance/export and approved-history/bc-expense-export, neither of which
+// reads availableActions from their CSV rows.
+export async function getFinanceHistoryPageForExport(
+  supabase: SupabaseClient,
+  cursor: string | null,
+  limit: number,
+  filters: FinanceFilters = DEFAULT_FINANCE_FILTERS
+): Promise<{
+  data: Pick<FinanceHistoryItem, 'claim' | 'owner' | 'action'>[]
+  hasNextPage: boolean
+  nextCursor: string | null
+}> {
+  const page = await fetchHydratedFinanceHistoryPage(
+    supabase,
+    cursor,
+    limit,
+    filters
+  )
+
+  return {
+    data: page.rows,
+    hasNextPage: page.hasNextPage,
+    nextCursor: page.nextCursor,
   }
 }
 
