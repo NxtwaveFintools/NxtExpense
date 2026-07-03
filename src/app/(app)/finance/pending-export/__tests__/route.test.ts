@@ -75,9 +75,7 @@ describe('finance pending export route', () => {
 
   it('streams via runCsvExport using getFinanceQueuePaginated', async () => {
     const response = await GET(
-      new Request(
-        'http://localhost:3000/finance/pending-export?requestId=req-1'
-      )
+      new Request('http://localhost:3000/finance/pending-export')
     )
 
     expect(response.status).toBe(200)
@@ -86,8 +84,7 @@ describe('finance pending export route', () => {
         headers: ['Claim ID'],
         filename: expect.stringContaining('pending-claims-'),
         chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
-      }),
-      'req-1'
+      })
     )
 
     const [recipe] = mocks.runCsvExport.mock.calls[0]

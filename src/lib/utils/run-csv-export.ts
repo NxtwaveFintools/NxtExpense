@@ -1,9 +1,4 @@
 import { toCsvCell } from '@/lib/utils/csv'
-import {
-  markExportDone,
-  markExportError,
-  updateExportProgress,
-} from '@/lib/utils/export-progress-registry'
 
 // Same chunk-size rationale as the retired streaming-export.ts: db-max-rows
 // (confirmed 1000 on dev/prod) minus 1 for the page RPC's internal p_limit+1
@@ -59,15 +54,7 @@ function toCsvLine(cells: string[]): string {
   return cells.map((cell) => toCsvCell(cell)).join(',')
 }
 
-/**
- * requestId is null when a route is hit directly without going through
- * POST /api/exports/start (e.g. a bookmarked URL) — the export still runs,
- * just without progress-registry side effects.
- */
-export function runCsvExport<T>(
-  recipe: CsvExportRecipe<T>,
-  requestId: string | null
-): Response {
+export function runCsvExport<T>(recipe: CsvExportRecipe<T>): Response {
   const {
     fetchPage,
     headers,
@@ -83,12 +70,9 @@ export function runCsvExport<T>(
         controller.enqueue(encoder.encode(toCsvLine(headers) + '\n'))
 
         let cursor: string | null = null
-        let totalFetched = 0
 
         do {
           const page = await fetchPage(cursor, chunkSize)
-
-          totalFetched += page.data.length
 
           const chunk = page.data
             .map((row) => toCsvLine(mapRow(row)))
@@ -98,26 +82,11 @@ export function runCsvExport<T>(
             controller.enqueue(encoder.encode(chunk + '\n'))
           }
 
-          if (requestId) {
-            updateExportProgress(requestId, totalFetched)
-          }
-
           cursor = page.hasNextPage ? page.nextCursor : null
         } while (cursor)
 
-        if (requestId) {
-          markExportDone(requestId)
-        }
-
         controller.close()
       } catch (error) {
-        if (requestId) {
-          markExportError(
-            requestId,
-            error instanceof Error ? error.message : 'Export failed.'
-          )
-        }
-
         controller.error(error)
       }
     },

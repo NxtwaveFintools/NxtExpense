@@ -10,7 +10,6 @@ import {
   getFinanceExportProfileByCode,
   type FinanceExportProfile,
 } from '@/lib/services/finance-export-config-service'
-import { getFinanceHistoryTotalCount } from '@/features/finance/data/queries'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import type { FinanceFilters } from '@/features/finance/types'
 import { formatDate } from '@/lib/utils/date'
@@ -113,17 +112,5 @@ export async function resolveBcExpenseExportPreflight(
     searchParams
   )
 
-  if (!resolved.ok) {
-    return resolved
-  }
-
-  const { employee, filters } = resolved.context
-  // Approximate: counts source history rows, not final CSV lines (BC-Expense
-  // can emit 0, 1, or several CSV rows per history row via item-splitting).
-  const estimatedTotalRows = await getFinanceHistoryTotalCount(
-    supabase,
-    filters
-  )
-
-  return { ok: true, employeeId: employee.id, estimatedTotalRows }
+  return resolved.ok ? { ok: true } : resolved
 }

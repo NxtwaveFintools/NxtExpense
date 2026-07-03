@@ -18,7 +18,6 @@ import {
 async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -38,17 +37,14 @@ async function handleExportRequest(request: Request): Promise<Response> {
     const { filters } = resolved.context
     const filename = buildDatedCsvFilename('pending-claims')
 
-    return runCsvExport(
-      {
-        fetchPage: (cursor, limit) =>
-          getFinanceQueuePaginated(supabase, cursor, limit, filters),
-        headers: FINANCE_PENDING_CLAIMS_CSV_HEADERS,
-        mapRow: mapFinancePendingClaimToCsvRow,
-        filename,
-        chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
-      },
-      requestId
-    )
+    return runCsvExport({
+      fetchPage: (cursor, limit) =>
+        getFinanceQueuePaginated(supabase, cursor, limit, filters),
+      headers: FINANCE_PENDING_CLAIMS_CSV_HEADERS,
+      mapRow: mapFinancePendingClaimToCsvRow,
+      filename,
+      chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
+    })
   } catch (error) {
     return createCsvExportErrorResponse(
       error instanceof Error ? error.message : 'Failed to export CSV.',

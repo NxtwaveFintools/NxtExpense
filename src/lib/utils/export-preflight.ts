@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type ExportPreflightResult =
-  | { ok: true; employeeId: string; estimatedTotalRows: number | null }
+  | { ok: true }
   | { ok: false; status: number; message: string }
 
 export type ExportPreflightHandler = (

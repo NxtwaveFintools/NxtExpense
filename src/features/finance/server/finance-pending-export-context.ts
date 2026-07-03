@@ -5,7 +5,6 @@ import {
   getEmployeeByEmail,
   type EmployeeRow,
 } from '@/lib/services/employee-service'
-import { getFinanceQueueTotalCount } from '@/features/finance/data/queries'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import type {
   FinanceDateFilterField,
@@ -95,12 +94,5 @@ export async function resolveFinancePendingExportPreflight(
     searchParams
   )
 
-  if (!resolved.ok) {
-    return resolved
-  }
-
-  const { employee, filters } = resolved.context
-  const estimatedTotalRows = await getFinanceQueueTotalCount(supabase, filters)
-
-  return { ok: true, employeeId: employee.id, estimatedTotalRows }
+  return resolved.ok ? { ok: true } : resolved
 }

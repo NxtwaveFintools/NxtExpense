@@ -81,7 +81,7 @@ describe('approved-history Payment Journals export route', () => {
   it('streams one row per employee from the DB-aggregated totals in a single fetchPage call', async () => {
     const response = await GET(
       new Request(
-        'http://localhost:3000/approved-history/payment-journals-export?requestId=req-1'
+        'http://localhost:3000/approved-history/payment-journals-export'
       )
     )
 
@@ -89,8 +89,7 @@ describe('approved-history Payment Journals export route', () => {
     expect(mocks.runCsvExport).toHaveBeenCalledWith(
       expect.objectContaining({
         filename: expect.stringContaining('payment-journals-'),
-      }),
-      'req-1'
+      })
     )
 
     const [recipe] = mocks.runCsvExport.mock.calls[0]

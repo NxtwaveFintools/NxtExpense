@@ -79,7 +79,7 @@ describe('approvals export route', () => {
 
   it('streams the export via runCsvExport with the resolved filters', async () => {
     const response = await GET(
-      new Request('http://localhost:3000/approvals/export?requestId=req-1')
+      new Request('http://localhost:3000/approvals/export')
     )
 
     expect(response.status).toBe(200)
@@ -88,8 +88,7 @@ describe('approvals export route', () => {
         headers: ['Claim Number'],
         filename: expect.stringContaining('approvals-history-'),
         chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
-      }),
-      'req-1'
+      })
     )
 
     const [recipe] = mocks.runCsvExport.mock.calls[0]

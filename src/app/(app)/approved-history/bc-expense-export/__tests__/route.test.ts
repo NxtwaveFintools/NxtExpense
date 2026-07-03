@@ -79,9 +79,7 @@ describe('approved-history BC expense export route', () => {
     })
 
     const response = await GET(
-      new Request(
-        'http://localhost:3000/approved-history/bc-expense-export?requestId=req-1'
-      )
+      new Request('http://localhost:3000/approved-history/bc-expense-export')
     )
 
     expect(response.status).toBe(200)
@@ -100,22 +98,6 @@ describe('approved-history BC expense export route', () => {
       ['claim-1'],
       ['food']
     )
-  })
-
-  it('passes the runCsvExport requestId through', async () => {
-    mocks.getFinanceHistoryPageForExport.mockResolvedValue({
-      data: [],
-      hasNextPage: false,
-      nextCursor: null,
-    })
-
-    await GET(
-      new Request(
-        'http://localhost:3000/approved-history/bc-expense-export?requestId=req-2'
-      )
-    )
-
-    expect(mocks.runCsvExport).toHaveBeenCalledWith(expect.anything(), 'req-2')
   })
 
   it('returns 400 with Content-Disposition set when mapping config is missing', async () => {

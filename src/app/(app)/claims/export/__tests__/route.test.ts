@@ -67,7 +67,7 @@ describe('claims export route', () => {
 
   it('streams the export via runCsvExport with the resolved employee/filters', async () => {
     const response = await GET(
-      new Request('http://localhost:3000/claims/export?requestId=req-1')
+      new Request('http://localhost:3000/claims/export')
     )
 
     expect(response.status).toBe(200)
@@ -75,8 +75,7 @@ describe('claims export route', () => {
       expect.objectContaining({
         headers: ['Claim ID'],
         filename: expect.stringContaining('my-claims-'),
-      }),
-      'req-1'
+      })
     )
 
     const [recipe] = mocks.runCsvExport.mock.calls[0]
@@ -88,12 +87,6 @@ describe('claims export route', () => {
       500,
       expect.anything()
     )
-  })
-
-  it('passes null requestId to runCsvExport when the query param is absent', async () => {
-    await GET(new Request('http://localhost:3000/claims/export'))
-
-    expect(mocks.runCsvExport).toHaveBeenCalledWith(expect.anything(), null)
   })
 
   it('returns 401 for unauthenticated requests, with Content-Disposition set', async () => {

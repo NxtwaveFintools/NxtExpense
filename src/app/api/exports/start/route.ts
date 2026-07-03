@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { createExportProgress } from '@/lib/utils/export-progress-registry'
 import type { ExportPreflightHandler } from '@/lib/utils/export-preflight'
 import { resolveMyClaimsExportPreflight } from '@/features/claims/server/claims-export-context'
 import { resolveApprovalHistoryExportPreflight } from '@/features/approvals/server/approval-history-export-context'
@@ -56,12 +55,7 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: result.message }, { status: result.status })
     }
 
-    const requestId = createExportProgress(
-      result.employeeId,
-      result.estimatedTotalRows
-    )
-
-    return Response.json({ requestId })
+    return Response.json({ ok: true })
   } catch (error) {
     return Response.json(
       {

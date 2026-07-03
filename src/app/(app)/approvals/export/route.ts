@@ -18,7 +18,6 @@ import {
 async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -38,17 +37,14 @@ async function handleExportRequest(request: Request): Promise<Response> {
     const { filters } = resolved.context
     const filename = buildDatedCsvFilename('approvals-history')
 
-    return runCsvExport(
-      {
-        fetchPage: (cursor, limit) =>
-          getFilteredApprovalHistoryPaginated(supabase, cursor, limit, filters),
-        headers: APPROVAL_HISTORY_CSV_HEADERS,
-        mapRow: mapApprovalHistoryToCsvRow,
-        filename,
-        chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
-      },
-      requestId
-    )
+    return runCsvExport({
+      fetchPage: (cursor, limit) =>
+        getFilteredApprovalHistoryPaginated(supabase, cursor, limit, filters),
+      headers: APPROVAL_HISTORY_CSV_HEADERS,
+      mapRow: mapApprovalHistoryToCsvRow,
+      filename,
+      chunkSize: ENRICHMENT_EXPORT_CHUNK_SIZE,
+    })
   } catch (error) {
     return createCsvExportErrorResponse(
       error instanceof Error ? error.message : 'Failed to export CSV.',

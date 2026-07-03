@@ -18,7 +18,6 @@ import { runCsvExport } from '@/lib/utils/run-csv-export'
 async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -44,46 +43,43 @@ async function handleExportRequest(request: Request): Promise<Response> {
     } = resolved.context
     const filename = buildDatedCsvFilename('bc-expense')
 
-    return runCsvExport(
-      {
-        fetchPage: async (cursor, limit) => {
-          const historyPage = await getFinanceHistoryPageForExport(
-            supabase,
-            cursor,
-            limit,
-            filters
-          )
+    return runCsvExport({
+      fetchPage: async (cursor, limit) => {
+        const historyPage = await getFinanceHistoryPageForExport(
+          supabase,
+          cursor,
+          limit,
+          filters
+        )
 
-          const claimIds = [
-            ...new Set(historyPage.data.map((row) => row.claim.id)),
-          ]
+        const claimIds = [
+          ...new Set(historyPage.data.map((row) => row.claim.id)),
+        ]
 
-          const claimItemsByClaimId = await getMappedClaimItemsByClaimId(
-            supabase,
-            claimIds,
-            mappedExpenseItemTypes
-          )
+        const claimItemsByClaimId = await getMappedClaimItemsByClaimId(
+          supabase,
+          claimIds,
+          mappedExpenseItemTypes
+        )
 
-          const rows = buildBcExpenseRows({
-            historyRows: historyPage.data,
-            claimItemsByClaimId,
-            balAccountNoByItemType,
-            postingDate,
-            exportProfile,
-          })
+        const rows = buildBcExpenseRows({
+          historyRows: historyPage.data,
+          claimItemsByClaimId,
+          balAccountNoByItemType,
+          postingDate,
+          exportProfile,
+        })
 
-          return {
-            data: rows,
-            hasNextPage: historyPage.hasNextPage,
-            nextCursor: historyPage.nextCursor,
-          }
-        },
-        headers: BC_EXPENSE_CSV_HEADERS,
-        mapRow: (row: string[]) => row,
-        filename,
+        return {
+          data: rows,
+          hasNextPage: historyPage.hasNextPage,
+          nextCursor: historyPage.nextCursor,
+        }
       },
-      requestId
-    )
+      headers: BC_EXPENSE_CSV_HEADERS,
+      mapRow: (row: string[]) => row,
+      filename,
+    })
   } catch (error) {
     return createCsvExportErrorResponse(
       error instanceof Error ? error.message : 'Failed to export CSV.',

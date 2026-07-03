@@ -15,7 +15,6 @@ import { runCsvExport } from '@/lib/utils/run-csv-export'
 async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -35,16 +34,13 @@ async function handleExportRequest(request: Request): Promise<Response> {
     const { employee, filters } = resolved.context
     const filename = buildDatedCsvFilename('my-claims')
 
-    return runCsvExport(
-      {
-        fetchPage: (cursor, limit) =>
-          getMyClaimsPaginated(supabase, employee.id, cursor, limit, filters),
-        headers: MY_CLAIMS_CSV_HEADERS,
-        mapRow: mapMyClaimToCsvRow,
-        filename,
-      },
-      requestId
-    )
+    return runCsvExport({
+      fetchPage: (cursor, limit) =>
+        getMyClaimsPaginated(supabase, employee.id, cursor, limit, filters),
+      headers: MY_CLAIMS_CSV_HEADERS,
+      mapRow: mapMyClaimToCsvRow,
+      filename,
+    })
   } catch (error) {
     return createCsvExportErrorResponse(
       error instanceof Error ? error.message : 'Failed to export CSV.',

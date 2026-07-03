@@ -19,12 +19,10 @@ describe('CsvExportButton', () => {
     clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {})
-    vi.useFakeTimers()
   })
 
   afterEach(() => {
     clickSpy.mockRestore()
-    vi.useRealTimers()
   })
 
   it('renders the idle label', () => {
@@ -39,22 +37,14 @@ describe('CsvExportButton', () => {
     expect(screen.getByRole('button', { name: 'Export CSV' })).not.toBeNull()
   })
 
-  it('posts to /api/exports/start with the export type and query, then downloads with the returned requestId', async () => {
+  it('posts to /api/exports/start with the export type and query, then downloads and returns to idle', async () => {
     let capturedBody: unknown = null
 
     mswServer.use(
       http.post('*/api/exports/start', async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json({ requestId: 'req-1' })
-      }),
-      http.get('*/api/exports/status', () =>
-        HttpResponse.json({
-          status: 'streaming',
-          rowsSent: 0,
-          estimatedTotalRows: 10,
-          errorMessage: null,
-        })
-      )
+        return HttpResponse.json({ ok: true })
+      })
     )
 
     render(
@@ -67,7 +57,6 @@ describe('CsvExportButton', () => {
 
     await act(async () => {
       screen.getByRole('button', { name: 'Export CSV' }).click()
-      await vi.advanceTimersByTimeAsync(0)
     })
 
     expect(capturedBody).toEqual({
@@ -78,7 +67,8 @@ describe('CsvExportButton', () => {
 
     const anchor = clickSpy.mock.instances[0] as HTMLAnchorElement
     expect(anchor.href).toContain('claimStatus=approved')
-    expect(anchor.href).toContain('requestId=req-1')
+
+    expect(screen.getByRole('button').textContent).toContain('Export CSV')
   })
 
   it('shows an error toast and never downloads when the preflight fails', async () => {
@@ -101,82 +91,15 @@ describe('CsvExportButton', () => {
 
     await act(async () => {
       screen.getByRole('button', { name: 'Export CSV' }).click()
-      await vi.advanceTimersByTimeAsync(0)
     })
 
     expect(toast.error).toHaveBeenCalledWith('Finance access is required.')
     expect(clickSpy).not.toHaveBeenCalled()
-  })
-
-  it('updates progress from streaming polls, then resets after done', async () => {
-    let pollCount = 0
-
-    mswServer.use(
-      http.post('*/api/exports/start', () =>
-        HttpResponse.json({ requestId: 'req-2' })
-      ),
-      http.get('*/api/exports/status', () => {
-        pollCount += 1
-        if (pollCount === 1) {
-          return HttpResponse.json({
-            status: 'streaming',
-            rowsSent: 5,
-            estimatedTotalRows: 10,
-            errorMessage: null,
-          })
-        }
-        return HttpResponse.json({
-          status: 'done',
-          rowsSent: 10,
-          estimatedTotalRows: 10,
-          errorMessage: null,
-        })
-      })
-    )
-
-    render(
-      <CsvExportButton
-        exportType="my-claims"
-        href="/claims/export"
-        label="Export CSV"
-      />
-    )
-
-    await act(async () => {
-      screen.getByRole('button', { name: 'Export CSV' }).click()
-      await vi.advanceTimersByTimeAsync(0)
-    })
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(750)
-    })
-    expect(screen.getByRole('button').textContent).toContain('Exporting 50%')
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(750)
-    })
-    expect(screen.getByRole('button').textContent).toContain('Done')
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1200)
-    })
     expect(screen.getByRole('button').textContent).toContain('Export CSV')
   })
 
-  it('shows the incomplete-file toast and resets when polling reports an error', async () => {
-    mswServer.use(
-      http.post('*/api/exports/start', () =>
-        HttpResponse.json({ requestId: 'req-3' })
-      ),
-      http.get('*/api/exports/status', () =>
-        HttpResponse.json({
-          status: 'error',
-          rowsSent: 3,
-          estimatedTotalRows: 10,
-          errorMessage: 'DB connection lost.',
-        })
-      )
-    )
+  it('shows a generic error toast and returns to idle on a network failure', async () => {
+    mswServer.use(http.post('*/api/exports/start', () => HttpResponse.error()))
 
     render(
       <CsvExportButton
@@ -188,16 +111,10 @@ describe('CsvExportButton', () => {
 
     await act(async () => {
       screen.getByRole('button', { name: 'Export CSV' }).click()
-      await vi.advanceTimersByTimeAsync(0)
     })
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(750)
-    })
-
-    expect(toast.error).toHaveBeenCalledWith(
-      'Export failed partway through — the downloaded file may be incomplete. Please delete it and retry.'
-    )
+    expect(toast.error).toHaveBeenCalledWith('Unable to start export.')
+    expect(clickSpy).not.toHaveBeenCalled()
     expect(screen.getByRole('button').textContent).toContain('Export CSV')
   })
 })

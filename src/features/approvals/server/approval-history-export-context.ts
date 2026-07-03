@@ -6,7 +6,6 @@ import {
   hasApproverAssignments,
   type EmployeeRow,
 } from '@/lib/services/employee-service'
-import { getFilteredApprovalHistoryCount } from '@/features/approvals/data/queries'
 import { normalizeApprovalHistoryFilters } from '@/features/approvals/utils/history-filters'
 import type { ApprovalHistoryFilters } from '@/features/approvals/types'
 import type { ExportPreflightResult } from '@/lib/utils/export-preflight'
@@ -80,15 +79,5 @@ export async function resolveApprovalHistoryExportPreflight(
     searchParams
   )
 
-  if (!resolved.ok) {
-    return resolved
-  }
-
-  const { employee, filters } = resolved.context
-  const estimatedTotalRows = await getFilteredApprovalHistoryCount(
-    supabase,
-    filters
-  )
-
-  return { ok: true, employeeId: employee.id, estimatedTotalRows }
+  return resolved.ok ? { ok: true } : resolved
 }

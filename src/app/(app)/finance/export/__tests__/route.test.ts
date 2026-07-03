@@ -74,7 +74,7 @@ describe('finance export route', () => {
 
   it('streams via runCsvExport using getFinanceHistoryPageForExport (no availableActions call)', async () => {
     const response = await GET(
-      new Request('http://localhost:3000/finance/export?requestId=req-1')
+      new Request('http://localhost:3000/finance/export')
     )
 
     expect(response.status).toBe(200)
@@ -82,8 +82,7 @@ describe('finance export route', () => {
       expect.objectContaining({
         headers: ['Claim Number'],
         filename: expect.stringContaining('approved-history-'),
-      }),
-      'req-1'
+      })
     )
 
     const [recipe] = mocks.runCsvExport.mock.calls[0]

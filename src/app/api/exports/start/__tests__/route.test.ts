@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   resolveFinancePendingExportPreflight: vi.fn(),
   resolveBcExpenseExportPreflight: vi.fn(),
   resolvePaymentJournalsExportPreflight: vi.fn(),
-  createExportProgress: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -41,10 +40,6 @@ vi.mock('@/features/finance/server/bc-expense-export-context', () => ({
 vi.mock('@/features/finance/server/payment-journals-export-context', () => ({
   resolvePaymentJournalsExportPreflight:
     mocks.resolvePaymentJournalsExportPreflight,
-}))
-
-vi.mock('@/lib/utils/export-progress-registry', () => ({
-  createExportProgress: mocks.createExportProgress,
 }))
 
 import { POST } from '@/app/api/exports/start/route'
@@ -102,16 +97,10 @@ describe('POST /api/exports/start', () => {
     expect(await response.json()).toEqual({
       error: 'Claims access is required.',
     })
-    expect(mocks.createExportProgress).not.toHaveBeenCalled()
   })
 
-  it('creates a progress entry and returns a requestId on success', async () => {
-    mocks.resolveMyClaimsExportPreflight.mockResolvedValue({
-      ok: true,
-      employeeId: 'emp-1',
-      estimatedTotalRows: 42,
-    })
-    mocks.createExportProgress.mockReturnValue('req-abc')
+  it('returns { ok: true } on success', async () => {
+    mocks.resolveMyClaimsExportPreflight.mockResolvedValue({ ok: true })
 
     const response = await POST(
       new Request('http://localhost:3000/api/exports/start', {
@@ -124,8 +113,7 @@ describe('POST /api/exports/start', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ requestId: 'req-abc' })
-    expect(mocks.createExportProgress).toHaveBeenCalledWith('emp-1', 42)
+    expect(await response.json()).toEqual({ ok: true })
 
     const [, , searchParamsArg] =
       mocks.resolveMyClaimsExportPreflight.mock.calls[0]
@@ -135,10 +123,7 @@ describe('POST /api/exports/start', () => {
   it('routes approval-history exports to the approvals preflight resolver', async () => {
     mocks.resolveApprovalHistoryExportPreflight.mockResolvedValue({
       ok: true,
-      employeeId: 'emp-2',
-      estimatedTotalRows: 5,
     })
-    mocks.createExportProgress.mockReturnValue('req-xyz')
 
     const response = await POST(
       new Request('http://localhost:3000/api/exports/start', {
@@ -153,12 +138,7 @@ describe('POST /api/exports/start', () => {
   })
 
   it('routes finance-history exports to the finance-history preflight resolver', async () => {
-    mocks.resolveFinanceHistoryExportPreflight.mockResolvedValue({
-      ok: true,
-      employeeId: 'emp-3',
-      estimatedTotalRows: 8,
-    })
-    mocks.createExportProgress.mockReturnValue('req-fh')
+    mocks.resolveFinanceHistoryExportPreflight.mockResolvedValue({ ok: true })
 
     const response = await POST(
       new Request('http://localhost:3000/api/exports/start', {
@@ -172,12 +152,7 @@ describe('POST /api/exports/start', () => {
   })
 
   it('routes finance-pending exports to the finance-pending preflight resolver', async () => {
-    mocks.resolveFinancePendingExportPreflight.mockResolvedValue({
-      ok: true,
-      employeeId: 'emp-4',
-      estimatedTotalRows: 3,
-    })
-    mocks.createExportProgress.mockReturnValue('req-fp')
+    mocks.resolveFinancePendingExportPreflight.mockResolvedValue({ ok: true })
 
     const response = await POST(
       new Request('http://localhost:3000/api/exports/start', {
@@ -191,12 +166,7 @@ describe('POST /api/exports/start', () => {
   })
 
   it('routes bc-expense exports to the bc-expense preflight resolver', async () => {
-    mocks.resolveBcExpenseExportPreflight.mockResolvedValue({
-      ok: true,
-      employeeId: 'emp-5',
-      estimatedTotalRows: 30,
-    })
-    mocks.createExportProgress.mockReturnValue('req-bc')
+    mocks.resolveBcExpenseExportPreflight.mockResolvedValue({ ok: true })
 
     const response = await POST(
       new Request('http://localhost:3000/api/exports/start', {
@@ -212,10 +182,7 @@ describe('POST /api/exports/start', () => {
   it('routes payment-journals exports to the payment-journals preflight resolver', async () => {
     mocks.resolvePaymentJournalsExportPreflight.mockResolvedValue({
       ok: true,
-      employeeId: 'emp-6',
-      estimatedTotalRows: null,
     })
-    mocks.createExportProgress.mockReturnValue('req-pj')
 
     const response = await POST(
       new Request('http://localhost:3000/api/exports/start', {
@@ -247,6 +214,5 @@ describe('POST /api/exports/start', () => {
     expect(await response.json()).toEqual({
       error: 'Invalid claim status filter.',
     })
-    expect(mocks.createExportProgress).not.toHaveBeenCalled()
   })
 })

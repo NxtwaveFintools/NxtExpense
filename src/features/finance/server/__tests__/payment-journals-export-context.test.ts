@@ -118,17 +118,13 @@ describe('resolvePaymentJournalsExportPreflight', () => {
     mocks.getFinanceExportProfileByCode.mockResolvedValue(PAYMENT_PROFILE)
   })
 
-  it('returns employeeId with a null estimated total (no count query for this export)', async () => {
+  it('returns { ok: true } on success', async () => {
     const result = await resolvePaymentJournalsExportPreflight(
       supabase,
       { email: 'finance@nxtwave.co.in' },
       new URLSearchParams()
     )
 
-    expect(result).toEqual({
-      ok: true,
-      employeeId: 'emp-1',
-      estimatedTotalRows: null,
-    })
+    expect(result).toEqual({ ok: true })
   })
 })

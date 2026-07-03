@@ -5,7 +5,6 @@ import {
   getEmployeeByEmail,
   type EmployeeRow,
 } from '@/lib/services/employee-service'
-import { getFinanceHistoryTotalCount } from '@/features/finance/data/queries'
 import { normalizeFinanceFilters } from '@/features/finance/utils/filters'
 import type { FinanceFilters } from '@/features/finance/types'
 import type { ExportPreflightResult } from '@/lib/utils/export-preflight'
@@ -76,15 +75,5 @@ export async function resolveFinanceHistoryExportPreflight(
     searchParams
   )
 
-  if (!resolved.ok) {
-    return resolved
-  }
-
-  const { employee, filters } = resolved.context
-  const estimatedTotalRows = await getFinanceHistoryTotalCount(
-    supabase,
-    filters
-  )
-
-  return { ok: true, employeeId: employee.id, estimatedTotalRows }
+  return resolved.ok ? { ok: true } : resolved
 }

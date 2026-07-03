@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   isFinanceTeamMember: vi.fn(),
   getFinanceExportProfileByCode: vi.fn(),
   getActiveExpenseTypeAccountMappings: vi.fn(),
-  getFinanceHistoryTotalCount: vi.fn(),
   formatDate: vi.fn(),
 }))
 
@@ -21,10 +20,6 @@ vi.mock('@/lib/services/finance-export-config-service', () => ({
   getFinanceExportProfileByCode: mocks.getFinanceExportProfileByCode,
   getActiveExpenseTypeAccountMappings:
     mocks.getActiveExpenseTypeAccountMappings,
-}))
-
-vi.mock('@/features/finance/data/queries', () => ({
-  getFinanceHistoryTotalCount: mocks.getFinanceHistoryTotalCount,
 }))
 
 vi.mock('@/lib/utils/date', () => ({
@@ -163,20 +158,15 @@ describe('resolveBcExpenseExportPreflight', () => {
       { expense_item_type: 'food', bal_account_no: '503063', is_active: true },
     ])
     mocks.formatDate.mockReturnValue('15/04/2026')
-    mocks.getFinanceHistoryTotalCount.mockResolvedValue(60)
   })
 
-  it('returns employeeId and an approximate estimated total (history-row proxy)', async () => {
+  it('returns { ok: true } on success', async () => {
     const result = await resolveBcExpenseExportPreflight(
       supabase,
       { email: 'finance@nxtwave.co.in' },
       new URLSearchParams()
     )
 
-    expect(result).toEqual({
-      ok: true,
-      employeeId: 'emp-1',
-      estimatedTotalRows: 60,
-    })
+    expect(result).toEqual({ ok: true })
   })
 })

@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   getEmployeeByEmail: vi.fn(),
   canAccessEmployeeClaims: vi.fn(),
   canDownloadClaimsCsv: vi.fn(),
-  getMyClaimsTotalCount: vi.fn(),
 }))
 
 vi.mock('@/lib/services/employee-service', () => ({
@@ -17,10 +16,6 @@ vi.mock('@/features/employees/permissions', () => ({
 
 vi.mock('@/features/claims/utils/export-permissions', () => ({
   canDownloadClaimsCsv: mocks.canDownloadClaimsCsv,
-}))
-
-vi.mock('@/features/claims/data/repositories/claims.repository', () => ({
-  getMyClaimsTotalCount: mocks.getMyClaimsTotalCount,
 }))
 
 import {
@@ -114,10 +109,9 @@ describe('resolveMyClaimsExportPreflight', () => {
     })
     mocks.canAccessEmployeeClaims.mockResolvedValue(true)
     mocks.canDownloadClaimsCsv.mockReturnValue(true)
-    mocks.getMyClaimsTotalCount.mockResolvedValue(42)
   })
 
-  it('propagates a context failure without calling the count query', async () => {
+  it('propagates a context failure', async () => {
     mocks.canAccessEmployeeClaims.mockResolvedValue(false)
 
     const result = await resolveMyClaimsExportPreflight(
@@ -131,10 +125,9 @@ describe('resolveMyClaimsExportPreflight', () => {
       status: 403,
       message: 'Claims access is required.',
     })
-    expect(mocks.getMyClaimsTotalCount).not.toHaveBeenCalled()
   })
 
-  it('returns employeeId and the estimated total row count on success', async () => {
+  it('returns { ok: true } on success', async () => {
     const statusId = '11111111-1111-4111-8111-111111111111'
     const result = await resolveMyClaimsExportPreflight(
       supabase,
@@ -142,15 +135,6 @@ describe('resolveMyClaimsExportPreflight', () => {
       new URLSearchParams({ claimStatus: statusId })
     )
 
-    expect(result).toEqual({
-      ok: true,
-      employeeId: 'emp-1',
-      estimatedTotalRows: 42,
-    })
-    expect(mocks.getMyClaimsTotalCount).toHaveBeenCalledWith(
-      supabase,
-      'emp-1',
-      expect.objectContaining({ claimStatus: statusId })
-    )
+    expect(result).toEqual({ ok: true })
   })
 })

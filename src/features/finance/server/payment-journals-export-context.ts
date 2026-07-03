@@ -90,13 +90,5 @@ export async function resolvePaymentJournalsExportPreflight(
     searchParams
   )
 
-  if (!resolved.ok) {
-    return resolved
-  }
-
-  return {
-    ok: true,
-    employeeId: resolved.context.employee.id,
-    estimatedTotalRows: null,
-  }
+  return resolved.ok ? { ok: true } : resolved
 }

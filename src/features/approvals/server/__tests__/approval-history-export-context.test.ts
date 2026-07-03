@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   getEmployeeByEmail: vi.fn(),
   hasApproverAssignments: vi.fn(),
   canAccessApprovals: vi.fn(),
-  getFilteredApprovalHistoryCount: vi.fn(),
 }))
 
 vi.mock('@/lib/services/employee-service', () => ({
@@ -14,10 +13,6 @@ vi.mock('@/lib/services/employee-service', () => ({
 
 vi.mock('@/features/employees/permissions', () => ({
   canAccessApprovals: mocks.canAccessApprovals,
-}))
-
-vi.mock('@/features/approvals/data/queries', () => ({
-  getFilteredApprovalHistoryCount: mocks.getFilteredApprovalHistoryCount,
 }))
 
 import {
@@ -104,10 +99,9 @@ describe('resolveApprovalHistoryExportPreflight', () => {
     })
     mocks.hasApproverAssignments.mockResolvedValue(true)
     mocks.canAccessApprovals.mockReturnValue(true)
-    mocks.getFilteredApprovalHistoryCount.mockResolvedValue(17)
   })
 
-  it('propagates a context failure without calling the count query', async () => {
+  it('propagates a context failure', async () => {
     mocks.canAccessApprovals.mockReturnValue(false)
 
     const result = await resolveApprovalHistoryExportPreflight(
@@ -121,20 +115,15 @@ describe('resolveApprovalHistoryExportPreflight', () => {
       status: 403,
       message: 'Access denied.',
     })
-    expect(mocks.getFilteredApprovalHistoryCount).not.toHaveBeenCalled()
   })
 
-  it('returns employeeId and the estimated total row count on success', async () => {
+  it('returns { ok: true } on success', async () => {
     const result = await resolveApprovalHistoryExportPreflight(
       supabase,
       { email: 'approver@nxtwave.co.in' },
       new URLSearchParams({ employeeName: 'Jane' })
     )
 
-    expect(result).toEqual({
-      ok: true,
-      employeeId: 'emp-1',
-      estimatedTotalRows: 17,
-    })
+    expect(result).toEqual({ ok: true })
   })
 })

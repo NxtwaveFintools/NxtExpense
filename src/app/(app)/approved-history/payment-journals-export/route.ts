@@ -15,7 +15,6 @@ import { runCsvExport } from '@/lib/utils/run-csv-export'
 async function handleExportRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const requestId = url.searchParams.get('requestId')
 
     const supabase = await createSupabaseServerClient()
     const {
@@ -35,27 +34,24 @@ async function handleExportRequest(request: Request): Promise<Response> {
     const { filters, defaults } = resolved.context
     const filename = buildDatedCsvFilename('payment-journals')
 
-    return runCsvExport(
-      {
-        fetchPage: async () => {
-          const totalsByEmployeeId = await getFinancePaymentJournalTotals(
-            supabase,
-            filters
-          )
+    return runCsvExport({
+      fetchPage: async () => {
+        const totalsByEmployeeId = await getFinancePaymentJournalTotals(
+          supabase,
+          filters
+        )
 
-          const rows = buildPaymentJournalsRows({
-            totalsByEmployeeId,
-            defaults,
-          })
+        const rows = buildPaymentJournalsRows({
+          totalsByEmployeeId,
+          defaults,
+        })
 
-          return { data: rows, hasNextPage: false, nextCursor: null }
-        },
-        headers: PAYMENT_JOURNALS_CSV_HEADERS,
-        mapRow: (row: string[]) => row,
-        filename,
+        return { data: rows, hasNextPage: false, nextCursor: null }
       },
-      requestId
-    )
+      headers: PAYMENT_JOURNALS_CSV_HEADERS,
+      mapRow: (row: string[]) => row,
+      filename,
+    })
   } catch (error) {
     return createCsvExportErrorResponse(
       error instanceof Error ? error.message : 'Failed to export CSV.',

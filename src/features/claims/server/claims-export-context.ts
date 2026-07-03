@@ -6,7 +6,6 @@ import {
   type EmployeeRow,
 } from '@/lib/services/employee-service'
 import { canDownloadClaimsCsv } from '@/features/claims/utils/export-permissions'
-import { getMyClaimsTotalCount } from '@/features/claims/data/repositories/claims.repository'
 import { normalizeMyClaimsFilters } from '@/features/claims/utils/filters'
 import type { MyClaimsFilters } from '@/features/claims/types'
 import type { ExportPreflightResult } from '@/lib/utils/export-preflight'
@@ -64,16 +63,5 @@ export async function resolveMyClaimsExportPreflight(
     searchParams
   )
 
-  if (!resolved.ok) {
-    return resolved
-  }
-
-  const { employee, filters } = resolved.context
-  const estimatedTotalRows = await getMyClaimsTotalCount(
-    supabase,
-    employee.id,
-    filters
-  )
-
-  return { ok: true, employeeId: employee.id, estimatedTotalRows }
+  return resolved.ok ? { ok: true } : resolved
 }

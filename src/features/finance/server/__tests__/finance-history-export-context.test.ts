@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getEmployeeByEmail: vi.fn(),
   isFinanceTeamMember: vi.fn(),
-  getFinanceHistoryTotalCount: vi.fn(),
 }))
 
 vi.mock('@/lib/services/employee-service', () => ({
@@ -12,10 +11,6 @@ vi.mock('@/lib/services/employee-service', () => ({
 
 vi.mock('@/features/finance/permissions', () => ({
   isFinanceTeamMember: mocks.isFinanceTeamMember,
-}))
-
-vi.mock('@/features/finance/data/queries', () => ({
-  getFinanceHistoryTotalCount: mocks.getFinanceHistoryTotalCount,
 }))
 
 import {
@@ -79,24 +74,19 @@ describe('resolveFinanceHistoryExportPreflight', () => {
     vi.clearAllMocks()
     mocks.getEmployeeByEmail.mockResolvedValue({ id: 'emp-1' })
     mocks.isFinanceTeamMember.mockResolvedValue(true)
-    mocks.getFinanceHistoryTotalCount.mockResolvedValue(99)
   })
 
-  it('returns employeeId and the estimated total on success', async () => {
+  it('returns { ok: true } on success', async () => {
     const result = await resolveFinanceHistoryExportPreflight(
       supabase,
       { email: 'finance@nxtwave.co.in' },
       new URLSearchParams()
     )
 
-    expect(result).toEqual({
-      ok: true,
-      employeeId: 'emp-1',
-      estimatedTotalRows: 99,
-    })
+    expect(result).toEqual({ ok: true })
   })
 
-  it('propagates a context failure without calling the count query', async () => {
+  it('propagates a context failure', async () => {
     mocks.isFinanceTeamMember.mockResolvedValue(false)
 
     const result = await resolveFinanceHistoryExportPreflight(
@@ -106,6 +96,5 @@ describe('resolveFinanceHistoryExportPreflight', () => {
     )
 
     expect(result.ok).toBe(false)
-    expect(mocks.getFinanceHistoryTotalCount).not.toHaveBeenCalled()
   })
 })
