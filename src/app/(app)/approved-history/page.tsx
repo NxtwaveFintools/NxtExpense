@@ -14,10 +14,7 @@ import {
   normalizeCursorPageSize,
 } from '@/lib/utils/pagination'
 import { getFinanceHistoryAction } from '@/features/finance/server/actions'
-import {
-  getFinanceFilterOptions,
-  getFinanceHistoryTotalCount,
-} from '@/features/finance/data/queries'
+import { getFinanceFilterOptions } from '@/features/finance/data/queries'
 import { getFinanceHistoryAnalytics } from '@/features/finance/data/queries'
 import {
   addFinanceFiltersToParams,
@@ -145,13 +142,19 @@ export default async function ApprovedHistoryPage({
 
   const paginationQuery = Object.fromEntries(canonicalParams.entries())
 
-  const [history, filterOptions, historyTotalCount, analytics] =
-    await Promise.all([
-      getFinanceHistoryAction(historyCursor, pageSize, normalizedFilterParams),
-      getFinanceFilterOptions(supabase),
-      getFinanceHistoryTotalCount(supabase, effectiveFilters),
-      getFinanceHistoryAnalytics(supabase, effectiveFilters),
-    ])
+  const [history, filterOptions, analytics] = await Promise.all([
+    getFinanceHistoryAction(historyCursor, pageSize, normalizedFilterParams),
+    getFinanceFilterOptions(supabase),
+    getFinanceHistoryAnalytics(supabase, effectiveFilters),
+  ])
+
+  // getFinanceHistoryAnalytics and the old getFinanceHistoryTotalCount both
+  // read get_finance_history_metrics as of this refactor — calling both would
+  // compute the same number twice per page load. The pagination footer's
+  // total is now literally the same value as the "Total History Records"
+  // card, not a second query (see
+  // docs/superpowers/plans/2026-07-02-finance-history-dropdown-and-canonical-filter-plan.md).
+  const historyTotalCount = analytics.total.count
 
   const historyPagination = buildCursorNavigationLinks({
     pathname: '/approved-history',
@@ -181,15 +184,14 @@ export default async function ApprovedHistoryPage({
     })
   )
 
-  const allRowsCsvParams = addFinanceFiltersToParams(
+  const exportParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
   )
-  allRowsCsvParams.set('mode', 'all')
 
-  const exportAllHref = `/approved-history/export?${allRowsCsvParams.toString()}`
-  const exportBcExpenseHref = `/approved-history/bc-expense-export?${allRowsCsvParams.toString()}`
-  const exportPaymentJournalsHref = `/approved-history/payment-journals-export?${allRowsCsvParams.toString()}`
+  const financeHistoryExportHref = `/approved-history/export?${exportParams.toString()}`
+  const exportBcExpenseHref = `/approved-history/bc-expense-export?${exportParams.toString()}`
+  const exportPaymentJournalsHref = `/approved-history/payment-journals-export?${exportParams.toString()}`
 
   return (
     <>
@@ -212,7 +214,7 @@ export default async function ApprovedHistoryPage({
                 showEmployeeIdFilter
                 showHodApproverFilter={false}
                 showClaimStatusFilter={false}
-                approvedHistoryExportAllHref={exportAllHref}
+                financeHistoryExportHref={financeHistoryExportHref}
                 approvedHistoryBcExpenseHref={exportBcExpenseHref}
                 approvedHistoryPaymentJournalsHref={exportPaymentJournalsHref}
               />

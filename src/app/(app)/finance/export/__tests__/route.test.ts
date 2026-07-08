@@ -2,39 +2,32 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
-  getEmployeeByEmail: vi.fn(),
-  isFinanceTeamMember: vi.fn(),
-  getFinanceHistoryPaginated: vi.fn(),
-  normalizeFinanceFilters: vi.fn(),
-  buildFinanceHistoryCsv: vi.fn(),
-  createStreamingCsvResponse: vi.fn(),
+  resolveFinanceHistoryExportContext: vi.fn(),
+  getFinanceHistoryPageForExport: vi.fn(),
+  runCsvExport: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }))
 
-vi.mock('@/lib/services/employee-service', () => ({
-  getEmployeeByEmail: mocks.getEmployeeByEmail,
-}))
-
-vi.mock('@/features/finance/permissions', () => ({
-  isFinanceTeamMember: mocks.isFinanceTeamMember,
+vi.mock('@/features/finance/server/finance-history-export-context', () => ({
+  resolveFinanceHistoryExportContext: mocks.resolveFinanceHistoryExportContext,
 }))
 
 vi.mock('@/features/finance/data/queries', () => ({
-  getFinanceHistoryPaginated: mocks.getFinanceHistoryPaginated,
+  getFinanceHistoryPageForExport: mocks.getFinanceHistoryPageForExport,
 }))
 
 vi.mock('@/features/finance/utils/filters', () => ({
-  normalizeFinanceFilters: mocks.normalizeFinanceFilters,
-  buildFinanceHistoryCsv: mocks.buildFinanceHistoryCsv,
-  FINANCE_HISTORY_CSV_HEADERS: ['Claim ID'],
-  mapFinanceHistoryToCsvRow: vi.fn((row: { claimId: string }) => [row.claimId]),
+  FINANCE_HISTORY_CSV_HEADERS: ['Claim Number'],
+  mapFinanceHistoryToCsvRow: vi.fn(
+    (row: { claim: { claim_number: string } }) => [row.claim.claim_number]
+  ),
 }))
 
-vi.mock('@/lib/utils/streaming-export', () => ({
-  createStreamingCsvResponse: mocks.createStreamingCsvResponse,
+vi.mock('@/lib/utils/run-csv-export', () => ({
+  runCsvExport: mocks.runCsvExport,
 }))
 
 import { GET, POST } from '@/app/(app)/finance/export/route'
@@ -51,81 +44,62 @@ describe('finance export route', () => {
       },
     })
 
-    mocks.getEmployeeByEmail.mockResolvedValue({
-      id: 'finance-1',
-      employee_email: 'finance@nxtwave.co.in',
+    mocks.resolveFinanceHistoryExportContext.mockResolvedValue({
+      ok: true,
+      context: {
+        employee: { id: 'finance-1' },
+        filters: {
+          employeeId: null,
+          employeeName: null,
+          claimNumber: null,
+          ownerDesignation: null,
+          hodApproverEmployeeId: null,
+          claimStatus: null,
+          workLocation: null,
+          actionFilter: null,
+          dateFilterField: 'claim_date',
+          dateFrom: null,
+          dateTo: null,
+        },
+      },
     })
 
-    mocks.isFinanceTeamMember.mockResolvedValue(true)
-
-    mocks.normalizeFinanceFilters.mockReturnValue({
-      employeeName: null,
-      claimNumber: null,
-      ownerDesignation: null,
-      hodApproverEmployeeId: null,
-      claimStatus: null,
-      workLocation: null,
-      actionFilter: null,
-      dateFilterField: 'claim_date',
-      dateFrom: null,
-      dateTo: null,
-    })
-
-    mocks.getFinanceHistoryPaginated.mockResolvedValue({
-      data: [{ claimId: 'CLAIM-260306-001' }],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 10,
-    })
-
-    mocks.buildFinanceHistoryCsv.mockReturnValue('Claim ID\nCLAIM-260306-001')
-
-    mocks.createStreamingCsvResponse.mockReturnValue(
-      new Response('Claim ID\nCLAIM-260306-001', {
+    mocks.runCsvExport.mockReturnValue(
+      new Response('Claim Number\nCLAIM-1', {
         status: 200,
         headers: { 'Content-Type': 'text/csv; charset=utf-8' },
       })
     )
   })
 
-  it('exports current page CSV via GET mode=page', async () => {
+  it('streams via runCsvExport using getFinanceHistoryPageForExport (no availableActions call)', async () => {
     const response = await GET(
-      new Request(
-        'http://localhost:3000/finance/export?mode=page&historyCursor=cursor-1&pageSize=25'
-      )
+      new Request('http://localhost:3000/finance/export')
     )
 
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe('Claim ID\nCLAIM-260306-001')
-    expect(mocks.getFinanceHistoryPaginated).toHaveBeenCalledWith(
+    expect(mocks.runCsvExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: ['Claim Number'],
+        filename: expect.stringContaining('approved-history-'),
+      })
+    )
+
+    const [recipe] = mocks.runCsvExport.mock.calls[0]
+    await recipe.fetchPage('cursor-a', 500)
+    expect(mocks.getFinanceHistoryPageForExport).toHaveBeenCalledWith(
       expect.anything(),
-      'cursor-1',
-      25,
-      expect.objectContaining({
-        claimStatus: null,
-      })
+      'cursor-a',
+      500,
+      expect.anything()
     )
   })
 
-  it('exports all rows CSV via GET mode=all', async () => {
-    const response = await GET(
-      new Request('http://localhost:3000/finance/export?mode=all')
-    )
-
-    expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: ['Claim ID'],
-        filename: expect.stringContaining('approved-history-all-'),
-      })
-    )
-  })
-
-  it('returns 401 for unauthenticated requests', async () => {
-    mocks.createSupabaseServerClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
+  it('returns 401 with Content-Disposition set for unauthenticated requests', async () => {
+    mocks.resolveFinanceHistoryExportContext.mockResolvedValue({
+      ok: false,
+      status: 401,
+      message: 'Unauthorized request.',
     })
 
     const response = await GET(
@@ -133,28 +107,45 @@ describe('finance export route', () => {
     )
 
     expect(response.status).toBe(401)
-    expect(await response.text()).toBe('Unauthorized request.')
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
   })
 
-  it('returns 403 when requester is not in finance team', async () => {
-    mocks.isFinanceTeamMember.mockResolvedValue(false)
+  it('returns 403 when finance access is required', async () => {
+    mocks.resolveFinanceHistoryExportContext.mockResolvedValue({
+      ok: false,
+      status: 403,
+      message: 'Finance access is required.',
+    })
 
     const response = await GET(
       new Request('http://localhost:3000/finance/export')
     )
 
     expect(response.status).toBe(403)
-    expect(await response.text()).toBe('Finance access is required.')
   })
 
-  it('supports POST requests and all-mode streaming', async () => {
+  it('supports POST requests', async () => {
     const response = await POST(
-      new Request('http://localhost:3000/finance/export?mode=all', {
-        method: 'POST',
-      })
+      new Request('http://localhost:3000/finance/export', { method: 'POST' })
+    )
+    expect(response.status).toBe(200)
+  })
+
+  it('returns 400 with Content-Disposition set when the context resolver throws (e.g. invalid filter validation)', async () => {
+    mocks.resolveFinanceHistoryExportContext.mockRejectedValue(
+      new Error('Invalid date range.')
     )
 
-    expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledTimes(1)
+    const response = await GET(
+      new Request('http://localhost:3000/finance/export')
+    )
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
+    expect(await response.text()).toBe('Invalid date range.')
   })
 })

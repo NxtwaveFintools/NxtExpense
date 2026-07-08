@@ -6,7 +6,6 @@ import type {
   FinanceQueueItem,
 } from '@/features/finance/types'
 import { financeFiltersSchema } from '@/features/finance/validations'
-import { shouldForceAllowResubmitFromActionFilter } from '@/features/finance/utils/action-filter'
 
 type FinanceFilterInput = Partial<
   Record<keyof FinanceFilters, string | undefined>
@@ -142,7 +141,9 @@ export const FINANCE_HISTORY_CSV_HEADERS = [
   'Current Status',
 ]
 
-export function mapFinanceHistoryToCsvRow(row: FinanceHistoryItem): string[] {
+export function mapFinanceHistoryToCsvRow(
+  row: Pick<FinanceHistoryItem, 'claim' | 'owner' | 'action'>
+): string[] {
   return [
     row.claim.claim_number,
     row.owner.employee_id,

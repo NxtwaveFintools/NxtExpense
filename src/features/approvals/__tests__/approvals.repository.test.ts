@@ -70,4 +70,20 @@ describe('getPendingApprovalsPaginated', () => {
       limit: 10,
     })
   })
+
+  it('calls get_pending_approvals_page (not the old get_pending_approvals)', async () => {
+    const supabase = buildSupabaseMock({ data: [], error: null })
+
+    await getPendingApprovalsPaginated(
+      supabase as unknown as SupabaseClient,
+      'someone@nxtwave.co.in',
+      null,
+      10
+    )
+
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'get_pending_approvals_page',
+      expect.anything()
+    )
+  })
 })

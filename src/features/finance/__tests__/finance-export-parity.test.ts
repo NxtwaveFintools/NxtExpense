@@ -28,7 +28,7 @@ const ENABLED = process.env.PARITY === '1'
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
 
-// Smaller than the route's 500 so the legacy baseline exercises MANY keyset pages
+// Smaller than the route's 800 so the legacy baseline exercises MANY keyset pages
 // (the dataset has ~2.6k history actions), and so the per-page .in('id', ...) enrichment
 // URL stays comfortably short.
 const PAGE_SIZE = 200

@@ -2,46 +2,28 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildDatedCsvFilename,
-  createCsvErrorResponse,
-  createCsvResponse,
+  createCsvExportErrorResponse,
   createExportRouteHandlers,
-  getExportMode,
 } from '@/lib/utils/export-route'
 
 describe('export-route utilities', () => {
-  it('resolves export mode from query value', () => {
-    expect(getExportMode('all')).toBe('all')
-    expect(getExportMode('page')).toBe('page')
-    expect(getExportMode(null)).toBe('page')
+  it('builds a dated CSV filename with a prefix', () => {
+    const filename = buildDatedCsvFilename('claims-history')
+
+    expect(filename).toMatch(/^claims-history-\d{4}-\d{2}-\d{2}\.csv$/)
   })
 
-  it('builds a dated CSV filename with prefix and mode', () => {
-    const filename = buildDatedCsvFilename('claims-history', 'all')
-
-    expect(filename).toMatch(/^claims-history-all-\d{4}-\d{2}-\d{2}\.csv$/)
-  })
-
-  it('creates a downloadable CSV response', async () => {
-    const response = createCsvResponse('a,b', 'claims.csv')
-
-    expect(response.status).toBe(200)
-    expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8')
-    expect(response.headers.get('content-disposition')).toBe(
-      'attachment; filename="claims.csv"'
+  it('creates a csv export error response with an explicit status and always sets Content-Disposition', async () => {
+    const response = createCsvExportErrorResponse(
+      'Finance access is required.',
+      403
     )
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    await expect(response.text()).resolves.toBe('a,b')
-  })
 
-  it('creates csv error response from Error and non-Error values', async () => {
-    const fromError = createCsvErrorResponse(new Error('bad request'))
-    const fromUnknown = createCsvErrorResponse({ code: 'E_BAD' }, 'fallback')
-
-    expect(fromError.status).toBe(400)
-    expect(await fromError.text()).toBe('bad request')
-
-    expect(fromUnknown.status).toBe(400)
-    expect(await fromUnknown.text()).toBe('fallback')
+    expect(response.status).toBe(403)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
+    await expect(response.text()).resolves.toBe('Finance access is required.')
   })
 
   it('returns GET/POST handlers that delegate to provided handler', async () => {

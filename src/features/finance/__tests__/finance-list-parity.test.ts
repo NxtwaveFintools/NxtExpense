@@ -182,7 +182,10 @@ async function feedActionCodesFor(
   }
   if (filters.actionFilter) {
     return {
-      codes: getFinanceActionCodesForFilter(filters.actionFilter),
+      codes: await getFinanceActionCodesForFilter(
+        supabase,
+        filters.actionFilter
+      ),
       actionDate: false,
     }
   }

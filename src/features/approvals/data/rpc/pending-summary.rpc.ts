@@ -1,16 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-type PendingApprovalScopeSummaryRow = {
+type PendingApprovalsMetricsRow = {
   claim_count: number | string | null
   total_amount: number | string | null
 }
 
-export async function getPendingApprovalScopeSummaryRpc(
+export async function getPendingApprovalsMetricsRpc(
   supabase: SupabaseClient,
   args: Record<string, unknown>
-): Promise<PendingApprovalScopeSummaryRow | null> {
+): Promise<PendingApprovalsMetricsRow | null> {
   const { data, error } = await supabase.rpc(
-    'get_pending_approval_scope_summary',
+    'get_pending_approvals_metrics',
     args
   )
 
@@ -20,5 +20,5 @@ export async function getPendingApprovalScopeSummaryRpc(
 
   return (
     Array.isArray(data) ? data[0] : data
-  ) as PendingApprovalScopeSummaryRow | null
+  ) as PendingApprovalsMetricsRow | null
 }

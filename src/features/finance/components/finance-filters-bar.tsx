@@ -12,9 +12,8 @@ import { useFilterNavigation } from '@/components/ui/filter-navigation'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { INPUT_DEBOUNCE_MS } from '@/lib/constants/ui'
 
-import { CsvExportActions } from '@/components/ui/csv-export-actions'
+import { CsvExportButton } from '@/components/ui/csv-export-button'
 import { EmployeeNameSuggestionInput } from '@/components/ui/employee-name-suggestion-input'
-import { ApprovedHistoryExportActions } from '@/features/finance/components/approved-history-export-actions'
 import { getFinanceEmployeeNameSuggestionsAction } from '@/features/finance/server/actions'
 
 import type {
@@ -34,9 +33,8 @@ type FinanceFiltersBarProps = {
   showActionFilter?: boolean
   showDateFilter?: boolean
   dateFilterOptions?: FinanceDateFilterField[]
-  exportCurrentPageHref?: string
-  exportAllHref?: string
-  approvedHistoryExportAllHref?: string
+  exportHref?: string
+  financeHistoryExportHref?: string
   approvedHistoryBcExpenseHref?: string
   approvedHistoryPaymentJournalsHref?: string
 }
@@ -79,9 +77,8 @@ export function FinanceFiltersBar({
   showActionFilter = true,
   showDateFilter = true,
   dateFilterOptions = DEFAULT_DATE_FILTER_OPTIONS,
-  exportCurrentPageHref,
-  exportAllHref,
-  approvedHistoryExportAllHref,
+  exportHref,
+  financeHistoryExportHref,
   approvedHistoryBcExpenseHref,
   approvedHistoryPaymentJournalsHref,
 }: FinanceFiltersBarProps) {
@@ -410,20 +407,35 @@ export function FinanceFiltersBar({
           >
             Clear Filters
           </button>
-          {approvedHistoryExportAllHref &&
+          {financeHistoryExportHref &&
           approvedHistoryBcExpenseHref &&
           approvedHistoryPaymentJournalsHref ? (
-            <ApprovedHistoryExportActions
-              exportAllHref={approvedHistoryExportAllHref}
-              exportBcExpenseHref={approvedHistoryBcExpenseHref}
-              exportPaymentJournalsHref={approvedHistoryPaymentJournalsHref}
-              buttonClassName="rounded-md"
-            />
-          ) : exportCurrentPageHref && exportAllHref ? (
-            <CsvExportActions
-              exportCurrentPageHref={exportCurrentPageHref}
-              exportAllHref={exportAllHref}
-              buttonClassName="rounded-md"
+            <>
+              <CsvExportButton
+                exportType="finance-history"
+                href={financeHistoryExportHref}
+                label="All CSV"
+                className="rounded-md"
+              />
+              <CsvExportButton
+                exportType="bc-expense"
+                href={approvedHistoryBcExpenseHref}
+                label="BC Expense"
+                className="rounded-md"
+              />
+              <CsvExportButton
+                exportType="payment-journals"
+                href={approvedHistoryPaymentJournalsHref}
+                label="Payment Journals"
+                className="rounded-md"
+              />
+            </>
+          ) : exportHref ? (
+            <CsvExportButton
+              exportType="finance-pending"
+              href={exportHref}
+              label="Export CSV"
+              className="rounded-md"
             />
           ) : null}
         </div>

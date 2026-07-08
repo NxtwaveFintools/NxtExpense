@@ -2,29 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createSupabaseServerClient: vi.fn(),
-  getEmployeeByEmail: vi.fn(),
-  canAccessEmployeeClaims: vi.fn(),
-  canDownloadClaimsCsv: vi.fn(),
+  resolveMyClaimsExportContext: vi.fn(),
   getMyClaimsPaginated: vi.fn(),
-  normalizeMyClaimsFilters: vi.fn(),
-  buildMyClaimsCsv: vi.fn(),
-  createStreamingCsvResponse: vi.fn(),
+  runCsvExport: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }))
 
-vi.mock('@/lib/services/employee-service', () => ({
-  getEmployeeByEmail: mocks.getEmployeeByEmail,
-}))
-
-vi.mock('@/features/employees/permissions', () => ({
-  canAccessEmployeeClaims: mocks.canAccessEmployeeClaims,
-}))
-
-vi.mock('@/features/claims/utils/export-permissions', () => ({
-  canDownloadClaimsCsv: mocks.canDownloadClaimsCsv,
+vi.mock('@/features/claims/server/claims-export-context', () => ({
+  resolveMyClaimsExportContext: mocks.resolveMyClaimsExportContext,
 }))
 
 vi.mock('@/features/claims/data/queries', () => ({
@@ -32,16 +20,14 @@ vi.mock('@/features/claims/data/queries', () => ({
 }))
 
 vi.mock('@/features/claims/utils/filters', () => ({
-  normalizeMyClaimsFilters: mocks.normalizeMyClaimsFilters,
-  buildMyClaimsCsv: mocks.buildMyClaimsCsv,
   MY_CLAIMS_CSV_HEADERS: ['Claim ID'],
   mapMyClaimToCsvRow: vi.fn((row: { claim_number: string }) => [
     row.claim_number,
   ]),
 }))
 
-vi.mock('@/lib/utils/streaming-export', () => ({
-  createStreamingCsvResponse: mocks.createStreamingCsvResponse,
+vi.mock('@/lib/utils/run-csv-export', () => ({
+  runCsvExport: mocks.runCsvExport,
 }))
 
 import { GET, POST } from '@/app/(app)/claims/export/route'
@@ -58,32 +44,20 @@ describe('claims export route', () => {
       },
     })
 
-    mocks.getEmployeeByEmail.mockResolvedValue({
-      id: 'emp-1',
-      employee_email: 'employee@nxtwave.co.in',
-      designations: { designation_name: 'Student Relationship Officer' },
+    mocks.resolveMyClaimsExportContext.mockResolvedValue({
+      ok: true,
+      context: {
+        employee: { id: 'emp-1' },
+        filters: {
+          claimStatus: null,
+          workLocation: null,
+          claimDateFrom: null,
+          claimDateTo: null,
+        },
+      },
     })
 
-    mocks.canAccessEmployeeClaims.mockResolvedValue(true)
-    mocks.canDownloadClaimsCsv.mockReturnValue(true)
-
-    mocks.normalizeMyClaimsFilters.mockReturnValue({
-      claimStatus: null,
-      workLocation: null,
-      claimDateFrom: null,
-      claimDateTo: null,
-    })
-
-    mocks.getMyClaimsPaginated.mockResolvedValue({
-      data: [{ id: 'claim-1' }],
-      hasNextPage: false,
-      nextCursor: null,
-      limit: 10,
-    })
-
-    mocks.buildMyClaimsCsv.mockReturnValue('Claim ID\nCLAIM-260306-001')
-
-    mocks.createStreamingCsvResponse.mockReturnValue(
+    mocks.runCsvExport.mockReturnValue(
       new Response('Claim ID\nCLAIM-260306-001', {
         status: 200,
         headers: { 'Content-Type': 'text/csv; charset=utf-8' },
@@ -91,42 +65,35 @@ describe('claims export route', () => {
     )
   })
 
-  it('exports current page CSV via GET mode=page', async () => {
+  it('streams the export via runCsvExport with the resolved employee/filters', async () => {
     const response = await GET(
-      new Request('http://localhost:3000/claims/export?mode=page&cursor=abc')
+      new Request('http://localhost:3000/claims/export')
     )
 
     expect(response.status).toBe(200)
-    expect(response.headers.get('content-type')).toContain('text/csv')
-    expect(await response.text()).toBe('Claim ID\nCLAIM-260306-001')
+    expect(mocks.runCsvExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: ['Claim ID'],
+        filename: expect.stringContaining('my-claims-'),
+      })
+    )
+
+    const [recipe] = mocks.runCsvExport.mock.calls[0]
+    await recipe.fetchPage('cursor-a', 500)
     expect(mocks.getMyClaimsPaginated).toHaveBeenCalledWith(
       expect.anything(),
       'emp-1',
-      'abc',
-      10,
+      'cursor-a',
+      500,
       expect.anything()
     )
   })
 
-  it('exports all rows CSV via GET mode=all', async () => {
-    const response = await GET(
-      new Request('http://localhost:3000/claims/export?mode=all')
-    )
-
-    expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: ['Claim ID'],
-        filename: expect.stringContaining('my-claims-all-'),
-      })
-    )
-  })
-
-  it('returns 401 for unauthenticated requests', async () => {
-    mocks.createSupabaseServerClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
+  it('returns 401 for unauthenticated requests, with Content-Disposition set', async () => {
+    mocks.resolveMyClaimsExportContext.mockResolvedValue({
+      ok: false,
+      status: 401,
+      message: 'Unauthorized request.',
     })
 
     const response = await GET(
@@ -134,41 +101,48 @@ describe('claims export route', () => {
     )
 
     expect(response.status).toBe(401)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
     expect(await response.text()).toBe('Unauthorized request.')
   })
 
-  it('returns 403 when employee lacks claims access', async () => {
-    mocks.canAccessEmployeeClaims.mockResolvedValue(false)
+  it('returns 403 when the context resolver rejects the designation', async () => {
+    mocks.resolveMyClaimsExportContext.mockResolvedValue({
+      ok: false,
+      status: 403,
+      message: 'CSV export is not available for your designation.',
+    })
 
     const response = await GET(
       new Request('http://localhost:3000/claims/export')
     )
 
     expect(response.status).toBe(403)
-    expect(await response.text()).toBe('Claims access is required.')
   })
 
-  it('returns 403 when designation is not allowed to download claims CSV', async () => {
-    mocks.canDownloadClaimsCsv.mockReturnValue(false)
-
-    const response = await GET(
-      new Request('http://localhost:3000/claims/export')
-    )
-
-    expect(response.status).toBe(403)
-    expect(await response.text()).toBe(
-      'CSV export is not available for your designation.'
-    )
-  })
-
-  it('supports POST requests and preserves auth checks', async () => {
+  it('supports POST requests and preserves the same behavior', async () => {
     const response = await POST(
-      new Request('http://localhost:3000/claims/export?mode=all', {
-        method: 'POST',
-      })
+      new Request('http://localhost:3000/claims/export', { method: 'POST' })
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.createStreamingCsvResponse).toHaveBeenCalledTimes(1)
+    expect(mocks.runCsvExport).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns 400 with Content-Disposition set when the context resolver throws (e.g. invalid filter validation)', async () => {
+    mocks.resolveMyClaimsExportContext.mockRejectedValue(
+      new Error('Invalid claim status filter.')
+    )
+
+    const response = await GET(
+      new Request('http://localhost:3000/claims/export?claimStatus=bogus')
+    )
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="export-error.txt"'
+    )
+    expect(await response.text()).toBe('Invalid claim status filter.')
   })
 })
