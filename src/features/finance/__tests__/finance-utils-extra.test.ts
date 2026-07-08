@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   addFinanceFiltersToParams,
@@ -153,22 +153,54 @@ describe('buildFinanceHistoryCsv', () => {
 })
 
 describe('action-filter utils', () => {
-  it('returns empty array for falsy actionFilter', () => {
-    expect(getFinanceActionCodesForFilter(null as never)).toEqual([])
-    expect(getFinanceActionCodesForFilter('' as never)).toEqual([])
+  function buildSupabaseStub(
+    bucketRows: Array<{ action: string; is_rejected: boolean }>
+  ) {
+    return {
+      rpc: vi.fn().mockImplementation((name: string) => {
+        if (name === 'finance_action_buckets') {
+          return Promise.resolve({ data: bucketRows, error: null })
+        }
+        throw new Error(`Unexpected rpc: ${name}`)
+      }),
+    } as unknown as import('@supabase/supabase-js').SupabaseClient
+  }
+
+  it('returns empty array for falsy actionFilter without calling the RPC', async () => {
+    const supabase = buildSupabaseStub([])
+    expect(
+      await getFinanceActionCodesForFilter(supabase, null as never)
+    ).toEqual([])
+    expect(await getFinanceActionCodesForFilter(supabase, '' as never)).toEqual(
+      []
+    )
+    expect(supabase.rpc).not.toHaveBeenCalled()
   })
 
-  it('returns reject codes for rejected_allow_reclaim filter', () => {
-    const codes = getFinanceActionCodesForFilter(
+  it('derives reject codes for rejected_allow_reclaim from finance_action_buckets(), not a hardcoded list', async () => {
+    const supabase = buildSupabaseStub([
+      { action: 'finance_approved', is_rejected: false },
+      { action: 'payment_released', is_rejected: false },
+      { action: 'rejected', is_rejected: true },
+      { action: 'finance_rejected', is_rejected: true },
+    ])
+
+    const codes = await getFinanceActionCodesForFilter(
+      supabase,
       REJECTED_ALLOW_RECLAIM_ACTION_FILTER_VALUE
     )
-    expect(codes).toContain('rejected')
-    expect(codes).toContain('finance_rejected')
+    expect(codes).toEqual(['rejected', 'finance_rejected'])
+    expect(supabase.rpc).toHaveBeenCalledWith('finance_action_buckets')
   })
 
-  it('returns single code for a regular action filter', () => {
-    const codes = getFinanceActionCodesForFilter('finance_approved')
+  it('returns single code for a regular action filter without calling the RPC', async () => {
+    const supabase = buildSupabaseStub([])
+    const codes = await getFinanceActionCodesForFilter(
+      supabase,
+      'finance_approved'
+    )
     expect(codes).toEqual(['finance_approved'])
+    expect(supabase.rpc).not.toHaveBeenCalled()
   })
 
   it('detects reject action codes in an array', () => {

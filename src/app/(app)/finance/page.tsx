@@ -184,26 +184,12 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     })
   )
 
-  const currentPageCsvParams = addFinanceFiltersToParams(
+  const exportCsvParams = addFinanceFiltersToParams(
     new URLSearchParams(),
     effectiveFilters
   )
-  currentPageCsvParams.set('mode', 'page')
-  if (queueCursor) {
-    currentPageCsvParams.set('queueCursor', queueCursor)
-  }
-  if (pageSize !== DEFAULT_CURSOR_PAGE_SIZE) {
-    currentPageCsvParams.set('pageSize', String(pageSize))
-  }
 
-  const allRowsCsvParams = addFinanceFiltersToParams(
-    new URLSearchParams(),
-    effectiveFilters
-  )
-  allRowsCsvParams.set('mode', 'all')
-
-  const exportCurrentPageHref = `/finance/pending-export?${currentPageCsvParams.toString()}`
-  const exportAllHref = `/finance/pending-export?${allRowsCsvParams.toString()}`
+  const exportHref = `/finance/pending-export?${exportCsvParams.toString()}`
 
   return (
     <>
@@ -227,8 +213,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
                 showClaimStatusFilter={false}
                 showActionFilter={false}
                 dateFilterOptions={PENDING_CLAIMS_DATE_FILTER_OPTIONS}
-                exportCurrentPageHref={exportCurrentPageHref}
-                exportAllHref={exportAllHref}
+                exportHref={exportHref}
               />
               <PendingResults skeleton={<AnalyticsCardsSkeleton count={4} />}>
                 <ClaimAnalyticsCards

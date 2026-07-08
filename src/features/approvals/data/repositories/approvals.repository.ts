@@ -19,22 +19,16 @@ import type {
   PendingApprovalsFilters,
 } from '@/features/approvals/types'
 
-export async function getApproverActorByEmail(
-  supabase: SupabaseClient,
-  approverEmail: string
-): Promise<{ id: string } | null> {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id')
-    .eq('employee_email', approverEmail.toLowerCase())
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
-}
+// Bounded enrichment below does `.in('id', pageIds)` against expense_claims,
+// which puts every id directly in the request URL. The Supabase REST gateway
+// rejects that URL above roughly 25-27KB (live-verified 2026-07-02: 650 ids
+// succeeds, 700 fails, for this exact CLAIM_COLUMNS + employees!inner(*)
+// embed). No current caller passes more than 10, but this clamp protects any
+// future large-limit caller (e.g. a Pending Approvals CSV export) from the
+// same failure that hit getFinanceQueuePaginated when EXPORT_CHUNK_SIZE was
+// raised — see src/features/approvals/data/queries/history-filters.query.ts's
+// getFilteredApprovalHistoryPaginated for the same clamp already in place.
+const MAX_ENRICHMENT_LIMIT = 500
 
 export async function getPendingApprovalStatuses(
   supabase: SupabaseClient
@@ -75,6 +69,8 @@ export async function getPendingApprovalsPaginated(
     return { data: [], hasNextPage: false, nextCursor: null, limit }
   }
 
+  const normalizedLimit = Math.max(1, Math.min(limit, MAX_ENRICHMENT_LIMIT))
+
   const parsedStatusFilter = parseClaimStatusFilterValue(filters.claimStatus)
   const allowResubmitFilter = await resolveClaimAllowResubmitFilterValue(
     supabase,
@@ -90,9 +86,9 @@ export async function getPendingApprovalsPaginated(
   const normalizedName = filters.employeeName?.trim() ?? ''
 
   const { data: pageRows, error: pageError } = await supabase.rpc(
-    'get_pending_approvals',
+    'get_pending_approvals_page',
     {
-      p_limit: limit,
+      p_limit: normalizedLimit,
       p_cursor_claim_date: decoded?.created_at ?? null,
       p_cursor_id: decoded?.id ?? null,
       p_sort: filters.claimDateSort === 'asc' ? 'asc' : 'desc',
@@ -112,12 +108,17 @@ export async function getPendingApprovalsPaginated(
   }
 
   const idRows = (pageRows ?? []) as Array<{ id: string; claim_date: string }>
-  const hasNextPage = idRows.length > limit
-  const pageIdRows = hasNextPage ? idRows.slice(0, limit) : idRows
+  const hasNextPage = idRows.length > normalizedLimit
+  const pageIdRows = hasNextPage ? idRows.slice(0, normalizedLimit) : idRows
   const pageIds = pageIdRows.map((row) => row.id)
 
   if (pageIds.length === 0) {
-    return { data: [], hasNextPage: false, nextCursor: null, limit }
+    return {
+      data: [],
+      hasNextPage: false,
+      nextCursor: null,
+      limit: normalizedLimit,
+    }
   }
 
   // Bounded enrichment (<= limit ids). .in('id', pageIds) does not guarantee
@@ -203,7 +204,7 @@ export async function getPendingApprovalsPaginated(
     data: pending,
     hasNextPage,
     nextCursor,
-    limit,
+    limit: normalizedLimit,
   }
 }
 

@@ -241,23 +241,12 @@ export default async function ApprovalsPage({
     history.limit
   )
 
-  const currentPageCsvParams = addApprovalFiltersToParams(
+  const exportCsvParams = addApprovalFiltersToParams(
     new URLSearchParams(),
     normalizedFilters
   )
-  currentPageCsvParams.set('mode', 'page')
-  if (historyCursor) {
-    currentPageCsvParams.set('historyCursor', historyCursor)
-  }
 
-  const allRowsCsvParams = addApprovalFiltersToParams(
-    new URLSearchParams(),
-    normalizedFilters
-  )
-  allRowsCsvParams.set('mode', 'all')
-
-  const exportCurrentPageHref = `/approvals/export?${currentPageCsvParams.toString()}`
-  const exportAllHref = `/approvals/export?${allRowsCsvParams.toString()}`
+  const exportHref = `/approvals/export?${exportCsvParams.toString()}`
 
   return (
     <>
@@ -283,8 +272,7 @@ export default async function ApprovalsPage({
                 filters={normalizedFilters}
                 statusCatalog={statusCatalog}
                 validationError={filterValidationError}
-                exportCurrentPageHref={exportCurrentPageHref}
-                exportAllHref={exportAllHref}
+                exportHref={exportHref}
               />
               <PendingResults
                 skeleton={
