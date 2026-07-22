@@ -321,6 +321,16 @@ Expected: five matches in exactly that order, with `CREATE OR REPLACE FUNCTION` 
 
 Single migration file written, **not applied**. Report to the user that it is ready to apply. Do not commit.
 
+> **⚠️ Deploy ordering is a hard dependency.** This migration MUST be applied before the
+> Task 2–4 code is deployed. Task 2 adds `approval_start_level` to `EMPLOYEE_COLUMNS`, an
+> explicit PostgREST select list — if that code reaches an environment without the column,
+> every employee fetch fails with "column does not exist", taking down login, claims, and
+> approvals. Not a silent fallback: a hard outage. Applying the migration early is safe —
+> an unused nullable column changes nothing until the code ships.
+>
+> (This is the mirror image of the risk described in Task 2: column absent from the select
+> list = silent no-op; column absent from the database = total failure.)
+
 ---
 
 ## Task 2: Expose the column to the application

@@ -149,6 +149,7 @@ describe('submitClaimAction race and atomicity coverage', () => {
       id: 'emp-1',
       designation_id: 'desig-1',
       employee_statuses: { status_code: 'ACTIVE' },
+      approval_employee_id_level_1: 'emp-sbh',
     })
 
     mocks.getEmployeeRoles.mockResolvedValue([{ role_code: 'EMPLOYEE' }])

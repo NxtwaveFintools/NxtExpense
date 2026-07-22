@@ -225,6 +225,7 @@ describe('submitClaimAction branch coverage', () => {
     mocks.getEmployeeByEmail.mockResolvedValue({
       id: 'emp-1',
       designation_id: 'desg-1',
+      approval_employee_id_level_1: 'emp-sbh',
     })
 
     mocks.getEmployeeRoles.mockResolvedValue([{ role_code: 'EMPLOYEE' }])
