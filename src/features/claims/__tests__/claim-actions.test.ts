@@ -161,6 +161,7 @@ describe('submitClaimAction', () => {
     mocks.getEmployeeByEmail.mockResolvedValue({
       id: 'emp-1',
       designation_id: 'desg-1',
+      approval_employee_id_level_1: 'emp-sbh',
     })
 
     mocks.getEmployeeRoles.mockResolvedValue([{ role_code: 'EMPLOYEE' }])
@@ -385,6 +386,27 @@ describe('submitClaimAction', () => {
     // Assert
     expect(result.ok).toBe(false)
     expect(result.error).toBe('Employee profile not found.')
+  })
+
+  it('blocks submission when no level 1 approver is assigned', async () => {
+    // Arrange — employee starts at stage 1 (designation flow) but has no SBH.
+    mocks.getEmployeeByEmail.mockResolvedValueOnce({
+      id: 'emp-1',
+      designation_id: 'desg-1',
+      approval_employee_id_level_1: null,
+    })
+    mocks.getDesignationApprovalFlow.mockResolvedValueOnce({
+      required_approval_levels: [1],
+    })
+
+    // Act
+    const result = await submitClaimAction(VALID_FORM_INPUT)
+
+    // Assert
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('no Level 1 (SBH) approver is assigned')
+    // The whole point of the guard: nothing was persisted.
+    expect(mocks.insertClaim).not.toHaveBeenCalled()
   })
 
   it('should reject invalid claim payloads before DB operations', async () => {

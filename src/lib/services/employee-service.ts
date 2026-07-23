@@ -16,6 +16,7 @@ export type EmployeeRow = {
   approval_employee_id_level_1: string | null
   approval_employee_id_level_2: string | null
   approval_employee_id_level_3: string | null
+  approval_start_level: number | null
   created_at: string
   employee_statuses: { status_code: string } | null
   designations: { designation_name: string } | null
@@ -41,7 +42,14 @@ export type EmployeeAccessState = 'active' | 'inactive' | 'missing'
 // ────────────────────────────────────────────────────────────
 
 const EMPLOYEE_COLUMNS =
-  'id, employee_id, employee_name, employee_email, designation_id, employee_status_id, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, created_at, employee_statuses!employee_status_id(status_code), designations!designation_id(designation_name), employee_states!employee_id(is_primary, state_id, states!state_id(state_name))'
+  'id, employee_id, employee_name, employee_email, designation_id, employee_status_id, approval_employee_id_level_1, approval_employee_id_level_2, approval_employee_id_level_3, approval_start_level, created_at, employee_statuses!employee_status_id(status_code), designations!designation_id(designation_name), employee_states!employee_id(is_primary, state_id, states!state_id(state_name))'
+
+/**
+ * Exported for tests only. `EMPLOYEE_COLUMNS` is an explicit select list, so a
+ * column missing here reads as `undefined` at runtime with no error — see
+ * approval-start-level.test.ts.
+ */
+export const EMPLOYEE_COLUMNS_FOR_TEST = EMPLOYEE_COLUMNS
 
 const EMPLOYEE_FETCH_MAX_RETRIES = 1
 
