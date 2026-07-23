@@ -22,4 +22,18 @@ describe('csv utils', () => {
     expect(sanitizeCsvValue('NXT-EMP-1001')).toBe('NXT-EMP-1001')
     expect(toCsvCell('NXT-EMP-1001')).toBe('"NXT-EMP-1001"')
   })
+
+  it('leaves plain negative numbers numeric so spreadsheets do not read them as text', () => {
+    expect(sanitizeCsvValue('-350')).toBe('-350')
+    expect(sanitizeCsvValue('-350.25')).toBe('-350.25')
+    expect(toCsvCell('-350')).toBe('"-350"')
+  })
+
+  it('still neutralizes formulas that merely start with a digit-like prefix', () => {
+    expect(sanitizeCsvValue("-350+cmd|' /C calc'!A0")).toBe(
+      "'-350+cmd|' /C calc'!A0"
+    )
+    expect(sanitizeCsvValue('-1e9')).toBe("'-1e9")
+    expect(sanitizeCsvValue('-')).toBe("'-")
+  })
 })
