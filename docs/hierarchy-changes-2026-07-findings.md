@@ -3,7 +3,8 @@
 **Date:** 2026-07-23
 **Branch:** `hierarchy_changes`
 **Source:** `NxtExpense_Tool_Higherachy_Changes` sheet (tabs: `New_Employees`, `Higherachy_Changes`)
-**Status:** Findings only — nothing implemented, nothing applied. For your review before decisions.
+**Status:** Discovery complete · all decisions received (§9, §9.3) · **nothing implemented, no migration written, nothing applied.**
+**Start here if resuming:** §11 is the consolidated build spec — the exact records to create and pointers to move. §0 and §8 first, though: all head-counts below are dev-DB numbers and must be re-measured on production.
 
 ---
 
@@ -55,7 +56,7 @@ Note also **Hari Haran covers two states** (TN + KL) and is being replaced by **
 
 ## 2. Identification — who already exists in the DB
 
-### 2.1 Already exists (5 of the 15 named people)
+### 2.1 Already exists (6 of the 15 named people)
 
 | Person                    | Emp ID in DB     | Designation | Status          | States       | Roles                 | Note                                          |
 | ------------------------- | ---------------- | ----------- | --------------- | ------------ | --------------------- | --------------------------------------------- |
@@ -68,19 +69,19 @@ Note also **Hari Haran covers two states** (TN + KL) and is being replaced by **
 
 `*` = primary state.
 
-### 2.2 Does NOT exist — must be created (8 people)
+### 2.2 Does NOT exist — must be created (9 people)
 
-| Person               | Designation | State         | Notes                                                                                                             |
-| -------------------- | ----------- | ------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Ashish Prakash Patil | SBH         | Maharashtra   | new SBH                                                                                                           |
-| Bipin Chandra Sati   | SBH         | Delhi NCR     | new SBH                                                                                                           |
-| Jijo Varghese        | SBH         | Kerala        | new SBH — Emp ID NW0000747 is an _old-series_ number; worth confirming he isn't already in HR under another email |
-| Nithin K             | SBH         | Karnataka     | new SBH — **not mentioned in the swap sheet at all**, see §5                                                      |
-| Siranjeeva C         | ABH         | Tamil Nadu    |                                                                                                                   |
-| Rethina Kumar C      | ABH         | Tamil Nadu    |                                                                                                                   |
-| Nilesh Tiwari        | ABH         | Uttar Pradesh |                                                                                                                   |
-| Prathamesh Pawar     | ABH         | Maharashtra   |                                                                                                                   |
-| Sparsh Gupta         | ABH         | Rajasthan     |                                                                                                                   |
+| Person               | Designation | State         | Notes                                                                                                          |
+| -------------------- | ----------- | ------------- | -------------------------------------------------------------------------------------------------------------- |
+| Ashish Prakash Patil | SBH         | Maharashtra   | new SBH                                                                                                        |
+| Bipin Chandra Sati   | SBH         | Delhi NCR     | new SBH                                                                                                        |
+| Jijo Varghese        | SBH         | Kerala        | new SBH — Emp ID NW0000747 is an _old-series_ number. Prior-history check ruled **out of scope** (decision #5) |
+| Nithin K             | SBH         | Karnataka     | new SBH — **not on the swap sheet**; an _addition_ to Karnataka alongside Vignesh, not a replacement. See §5   |
+| Siranjeeva C         | ABH         | Tamil Nadu    |                                                                                                                |
+| Rethina Kumar C      | ABH         | Tamil Nadu    |                                                                                                                |
+| Nilesh Tiwari        | ABH         | Uttar Pradesh |                                                                                                                |
+| Prathamesh Pawar     | ABH         | Maharashtra   |                                                                                                                |
+| Sparsh Gupta         | ABH         | Rajasthan     |                                                                                                                |
 
 None of the sheet's employee IDs (NW0007161, NW0007243, NW0007236, NW0007233, NW0007185, NW0006996, NW0000747, NW0007097, NW0007253) currently exist in the DB — **no ID collisions**, safe to insert.
 
@@ -292,7 +293,7 @@ These will bite during execution if not handled.
 **Phase 0 — Confirm against production (blocking, no writes)**
 Re-run the §8 queries on `rourehizhyshgvbzcscc`. Produce the real per-SBH report lists. Snapshot `employees(id, approval_employee_id_level_1..3)` for every affected person so we have a byte-exact rollback.
 
-**Phase 1 — Close the remaining questions in §9.3.** Items A–D change what gets built.
+**Phase 1 — ✅ Done.** All decisions received (§9 and §9.3). §9.4 lists five items being actioned on stated assumptions rather than explicit answers — glance at those before building.
 
 **Phase 2 — Create the 9 new people + fix the 2 existing records**
 
@@ -321,9 +322,10 @@ Each step is one migration with a matching rollback file — the repo keeps `sup
 
 **Phase 4 — Role and status changes (last, after queues are empty)**
 
-- **Hari Haran → INACTIVE.** Only after his queue is drained (landmine #4).
-- **Adarsh Digal → ABH.** Set `approval_employee_id_level_1` = Arka in the _same_ migration — otherwise he cannot submit claims at all (§9.1). Confirm the ₹2000→₹1000 accommodation change first (§9.3 A).
-- Akshay: state remap only, pending §9.3 E. Arka: state + ZBH remap, pending §9.3 C/F.
+- **Hari Haran → INACTIVE.** Only after his approval queue _and_ his own claims are settled (landmine #4, §9.4 G).
+- **Adarsh Digal → ABH.** Set `approval_employee_id_level_1` = Arka in the _same_ migration — otherwise he cannot submit claims at all (§9.1). The ₹2000→₹1000 accommodation drop is confirmed intended (§9.3 A); no override.
+- **Akshay** — state remap only: `UP` primary, drop `DL` (§9.4 E). Stays SBH, stays active.
+- **Arka** — `RJ` primary added (§9.4 F) and ZBH switched Hari Santhosh → Satya Priya Dash (§9.3 C).
 
 **Phase 5 — Fix the tests and fixtures** (landmines #8–#10), then full e2e via `npm run test:e2e:parallel`.
 
@@ -531,3 +533,84 @@ All five also get `level_3` = Mansoor and `APPROVER_L1` is **not** needed (they'
 **HOD/PM:** Mansoor Valli Gangupalli (NW0000320) — `approval_employee_id_level_3` for essentially everyone.
 **ZBHs:** Satya Priya Dash (DL, OD*, RJ, UP, WB) · Tibirisetty V L S Hari Santhosh (KA*, MH)
 **Special case:** Narina Venkata Naga Chandramouli (BOA, central) has `approval_start_level = 2` — skips SBH, goes direct to HOD. Only such record in the DB.
+
+**Observed approver pattern across all active non-SBH staff** (confirms the spec in §11):
+
+- `level_3` = **Mansoor for every single employee**, without exception.
+- `level_2` = the ZBH of their state: Hari Santhosh (KA/MH), Satya Priya Dash (DL/OD/RJ/UP/WB), NULL (TN/KL/AP/TG).
+- `level_1` = the SBH of their state, NULL for SBH/ZBH/PM.
+
+---
+
+## 11. Build spec — the consolidated target state
+
+⚠️ **Resolve everything by natural key (`employee_id`, `employee_email`, `designation_code`, `state_code`, `role_code`) — never by hard-coded UUID.** The UUIDs I observed are from the dev database and **will differ on production**. The two prior handover migrations already follow this convention; match them.
+
+### 11.1 The 9 employees to create (Phase 2)
+
+`level_3` = Mansoor (`mansoor@nxtwave.co.in`) for all nine. `level_2` follows the ZBH-of-state pattern. `level_1` is NULL for SBHs by design — the SBH flow is `[2,3]`, so their own claims go direct to HOD.
+
+| Emp ID    | Name                 | Email                | Desig   | State (primary) | Roles                      | `level_1`            | `level_2` (ZBH)  |
+| --------- | -------------------- | -------------------- | ------- | --------------- | -------------------------- | -------------------- | ---------------- |
+| NW0007161 | Siranjeeva C         | siranjeeva.c@        | ABH     | TN              | EMPLOYEE                   | Sreejish             | NULL             |
+| NW0007243 | Rethina Kumar C      | c.rethinakumar@      | ABH     | TN              | EMPLOYEE                   | Sreejish             | NULL             |
+| NW0007236 | Nilesh Tiwari        | nilesh.tiwari@       | ABH     | UP              | EMPLOYEE                   | Akshay Kumar Pal     | Satya Priya Dash |
+| NW0007233 | Prathamesh Pawar     | prathamesh.pawar@    | ABH     | MH              | EMPLOYEE                   | Ashish Prakash Patil | Hari Santhosh    |
+| NW0007253 | Sparsh Gupta         | sparsh.gupta@        | ABH     | RJ              | EMPLOYEE                   | Arka Prabha Ghosh    | Satya Priya Dash |
+| NW0007185 | Ashish Prakash Patil | ashish.prakashpatil@ | **SBH** | MH              | EMPLOYEE + **APPROVER_L1** | NULL                 | Hari Santhosh    |
+| NW0006996 | Bipin Chandra Sati   | bipin.sati@          | **SBH** | DL              | EMPLOYEE + **APPROVER_L1** | NULL                 | Satya Priya Dash |
+| NW0000747 | Jijo Varghese        | jijo.varghese@       | **SBH** | KL              | EMPLOYEE + **APPROVER_L1** | NULL                 | NULL             |
+| NW0007097 | Nithin K             | nithin.k@            | **SBH** | KA              | EMPLOYEE + **APPROVER_L1** | NULL                 | Hari Santhosh    |
+
+⚠️ **Ordering within Phase 2:** the 4 SBHs must be inserted _before_ the ABHs that point at them (Ashish before Prathamesh, etc.). Sreejish must be reactivated before Siranjeeva/Rethina are created.
+
+⚠️ `admin_create_employee_atomic` validates `level_1` against `approver_selection_rules` (level 1 → SBH, `requires_same_state`), so an ABH's SBH must already hold the right designation **and** share the state. If writing raw SQL instead, that check is bypassed — get it right manually.
+
+### 11.2 The 3 existing records to fix (Phase 2)
+
+| Who                                   | Change                                                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Sreejish Mohana Kumar** (NW0000744) | status INACTIVE → **ACTIVE** · grant **APPROVER_L1** · primary state KL → **TN** (keep TN, drop or demote KL)                  |
+| **Muhammed Hijas**                    | `employee_id` NW1006377 → **NW0007045** (Intern→Employee conversion). Existing `claim_number`s keep the old prefix — expected. |
+| **Arka Prabha Ghosh** (NW0001212)     | add `employee_states` row → **RJ primary** (currently has none at all)                                                         |
+| **7 Maharashtra staff**               | backfill `employee_states` → **MH primary** (Akre, Ingole, Adhapure, Jain, Bhatkar, Bhure, Raut — currently zero rows)         |
+
+### 11.3 Pointer moves (Phase 3 — each gated on `L1_PENDING = 0`)
+
+All are `UPDATE employees SET approval_employee_id_level_1 = <new>` over a filtered set. **Do not touch `level_2` or `level_3` in these migrations.**
+
+| #   | State | Filter                                                                             | New `level_1` | Expected rows (dev)                  |
+| --- | ----- | ---------------------------------------------------------------------------------- | ------------- | ------------------------------------ |
+| 1   | MH    | `level_1 = Arka` (no state filter — MH team has no state rows until 11.2 backfill) | Ashish        | 7                                    |
+| 2   | RJ    | `level_1 = Adarsh`                                                                 | Arka          | 9 (incl. Adarsh himself — self-loop) |
+| 3   | KL    | `level_1 = Hari` **AND** primary state = KL                                        | Jijo          | 4                                    |
+| 4   | TN    | `level_1 = Hari` **AND** primary state = TN                                        | Sreejish      | 12                                   |
+| 5   | DL    | `level_1 = Akshay` **AND** primary state = DL                                      | Bipin         | 7                                    |
+
+⚠️ Steps 3–5 **must** carry the state filter, or they'll sweep up the other state's team. Step 1 must run before step 2.
+⚠️ **Do not use `admin_finalize_employee_replacement_atomic`** for any of these — it does a blanket unfiltered update _and_ writes an `employee_replacements` row, which contradicts the clean-cut decision (§9.3 D).
+
+### 11.4 Role / status / designation changes (Phase 4 — last)
+
+| Who                   | Change                                                            | Precondition                                          |
+| --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| **Hari Haran**        | → **INACTIVE**                                                    | approval queue drained **and** his own claims settled |
+| **Adarsh Digal**      | SBH → **ABH**, and set `level_1` = **Arka** in the same migration | after 11.3 step 2                                     |
+| **Akshay Kumar Pal**  | states → **UP primary, drop DL**. Stays SBH, stays ACTIVE.        | after 11.3 step 5                                     |
+| **Arka Prabha Ghosh** | `level_2` **Hari Santhosh → Satya Priya Dash** (MH ZBH → RJ ZBH)  | after 11.3 step 2                                     |
+
+⚠️ Adarsh's `level_1` is **mandatory**, not optional — as an ABH his flow becomes `[1,2,3]` and `shouldBlockForMissingLevel1Approver` will block every claim he tries to submit if it's NULL. His `APPROVER_L1` role row becomes inert; removing it is optional cleanup.
+
+### 11.5 Unchanged — explicitly out of scope
+
+Vignesh Shenoy keeps all 16 Karnataka reports · Akshay keeps all 11 UP reports · Mansoor stays `level_3` for everyone · no ZBH changes except Arka · no state split (`Karnataka_1`/`Karnataka_2` rejected, §5) · Nithin gets **no** reports in this change · Chandramouli's `approval_start_level = 2` untouched.
+
+### 11.6 Definition of done
+
+- [ ] §8 queries A/B/E re-run on **production**; head-counts in 11.1/11.3 corrected to real numbers
+- [ ] §8 query D snapshot captured for rollback
+- [ ] Phase 2 migration + rollback file; verify all 9 exist with correct designation/state/role/approvers
+- [ ] Per state: §8 query C shows `L1_PENDING = 0` → apply migration → re-verify counts moved
+- [ ] Phase 4 applied; Adarsh can still submit a claim (the real regression test for §9.1)
+- [ ] Tests/fixtures updated (landmines #8–#10) — `workflow-test-kit.ts`, `workflow-standard.test.ts`, `workflow-direct.test.ts`, `approval-analytics.test.ts`, `e2e/fixtures/test-accounts.ts`, `scripts/dev/provision-test-accounts.mjs`
+- [ ] `npm run test:e2e:parallel` green
