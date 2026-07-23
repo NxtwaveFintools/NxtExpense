@@ -11,6 +11,7 @@ import {
   getEmployeeByEmail,
   getEmployeePrimaryStateId,
   getEmployeeRoles,
+  type EmployeeRow,
 } from '@/lib/services/employee-service'
 import { canAccessEmployeeClaimsFromRoles } from '@/features/employees/permissions/access-from-roles'
 import {
@@ -148,16 +149,60 @@ async function resolveBaseLocationDayTypeSelection(
   }
 }
 
+/**
+ * Resolves which approval stage a new claim starts at.
+ *
+ * Precedence: the per-employee override wins over the designation flow. Only
+ * element [0] of the designation flow has runtime effect — every hop after
+ * submit is driven by claim_status_transitions, which never reads designation.
+ */
+export function resolveStartLevel(
+  override: number | null | undefined,
+  requiredApprovalLevels: number[] | null | undefined
+): number | undefined {
+  return override ?? requiredApprovalLevels?.[0]
+}
+
+/**
+ * A claim starting at stage 1 is only actionable by the owner's
+ * `approval_employee_id_level_1`. If that is unset the claim would be written
+ * with no eligible approver and would never appear in any queue — invisible,
+ * with no error. Blocking at submit turns that silent failure into one the
+ * submitter can report.
+ */
+export function shouldBlockForMissingLevel1Approver(
+  startLevel: number | undefined,
+  level1ApproverId: string | null | undefined
+): boolean {
+  return startLevel === 1 && !level1ApproverId
+}
+
 async function resolveInitialWorkflowState(
   supabase: SupabaseClient,
-  designationId: string | null
+  employee: EmployeeRow
 ) {
+  const designationId = employee.designation_id
+
   if (!designationId) {
     throw new Error('Employee designation is required to submit claims.')
   }
 
   const approvalFlow = await getDesignationApprovalFlow(supabase, designationId)
-  const firstLevel = approvalFlow.required_approval_levels?.[0]
+  const firstLevel = resolveStartLevel(
+    employee.approval_start_level,
+    approvalFlow.required_approval_levels
+  )
+
+  if (
+    shouldBlockForMissingLevel1Approver(
+      firstLevel,
+      employee.approval_employee_id_level_1
+    )
+  ) {
+    throw new Error(
+      'Your approval chain is not configured: no Level 1 (SBH) approver is assigned. Contact your administrator.'
+    )
+  }
 
   return resolveInitialWorkflowStateFromRepository(supabase, firstLevel)
 }
@@ -641,10 +686,7 @@ export async function submitClaimOrchestrator(
   }
 
   try {
-    initialWorkflowState = await resolveInitialWorkflowState(
-      supabase,
-      employee.designation_id
-    )
+    initialWorkflowState = await resolveInitialWorkflowState(supabase, employee)
   } catch (error) {
     return {
       ok: false,

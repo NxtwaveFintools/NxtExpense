@@ -28,6 +28,7 @@ function makeEmployeeRow(overrides: Partial<EmployeeRow> = {}): EmployeeRow {
     approval_employee_id_level_1: 'emp-id-sbh',
     approval_employee_id_level_2: null,
     approval_employee_id_level_3: 'emp-id-mansoor',
+    approval_start_level: null,
     created_at: '2026-03-06T00:00:00.000Z',
     employee_statuses: null,
     designations: { designation_name: 'Student Relationship Officer' },
