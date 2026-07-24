@@ -1,7 +1,14 @@
 import { type Page } from '@playwright/test'
 
 import { test, expect } from './fixtures/auth'
-import { SRO_AP, SBH_AP, FINANCE_1 } from './fixtures/test-accounts'
+import {
+  SRO_AP,
+  SBH_AP,
+  FINANCE_1,
+  HARI_INACTIVE,
+  SBH_KARNATAKA_NITHIN,
+} from './fixtures/test-accounts'
+import { getTestPassword } from './fixtures/test-accounts'
 
 /**
  * E2E: Authorization boundaries — ensures users cannot access
@@ -148,5 +155,39 @@ test.describe('Authorization Boundaries', () => {
     await page.waitForLoadState('networkidle')
 
     expect(page.url()).toContain('/approved-history')
+  })
+
+  // ── Hierarchy change (2026-07) targeted regression ─────────────────────────
+
+  test('Hierarchy 8.3: INACTIVE employee (Hari Haran) cannot access the app', async ({
+    page,
+  }) => {
+    // Hari still has valid auth credentials, but he is INACTIVE. The app resolves
+    // the employee record after auth and sends inactive users to /no-access. This
+    // deliberately does NOT use the loginAs fixture — that fixture waits for
+    // /dashboard, which an inactive user never reaches.
+    await page.context().clearCookies()
+    await page.goto('/login')
+    await page.waitForLoadState('networkidle')
+
+    await page.getByLabel('Email').fill(HARI_INACTIVE.email)
+    await page.getByLabel('Password').fill(getTestPassword(HARI_INACTIVE.email))
+    await page.getByRole('button', { name: /sign in/i }).click()
+
+    // Must end up denied — never on the dashboard.
+    await expect(page).toHaveURL(/\/no-access|\/login/, { timeout: 20_000 })
+    expect(page.url()).not.toContain('/dashboard')
+  })
+
+  test('Hierarchy: SBH with no reports (Nithin) is redirected away from /approvals', async ({
+    page,
+    loginAs,
+  }) => {
+    // Nithin is a real SBH but nobody points at him yet, so hasApproverAssignments
+    // is false and he has no approvals access — same as a plain submitter.
+    await loginAs(SBH_KARNATAKA_NITHIN.email)
+    await navigateAndExpectUrl(page, '/approvals', /\/dashboard/)
+
+    expect(page.url()).toContain('/dashboard')
   })
 })

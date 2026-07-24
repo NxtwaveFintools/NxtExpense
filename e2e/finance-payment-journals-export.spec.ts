@@ -27,4 +27,46 @@ test.describe('Approved History Payment Journals export', () => {
       /^payment-journals-\d{4}-\d{2}-\d{2}\.csv$/
     )
   })
+
+  test('Finance user can trigger Approved History (All) CSV download', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs(FINANCE_1.email)
+
+    const finance = new FinancePage(page)
+    await finance.gotoApprovedHistory()
+
+    await expect(finance.approvedHistoryAllCsvButton).toBeVisible({
+      timeout: 20_000,
+    })
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20_000 }),
+      finance.approvedHistoryAllCsvButton.click(),
+    ])
+
+    expect(download.suggestedFilename()).toMatch(/\.csv$/)
+  })
+
+  test('Finance user can trigger BC Expense CSV download', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs(FINANCE_1.email)
+
+    const finance = new FinancePage(page)
+    await finance.gotoApprovedHistory()
+
+    await expect(finance.approvedHistoryBcExpenseButton).toBeVisible({
+      timeout: 20_000,
+    })
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20_000 }),
+      finance.approvedHistoryBcExpenseButton.click(),
+    ])
+
+    expect(download.suggestedFilename()).toMatch(/\.csv$/)
+  })
 })

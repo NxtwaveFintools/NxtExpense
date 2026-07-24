@@ -358,4 +358,36 @@ test.describe
       'new-claim-permitted'
     )
   })
+
+  test('Rejection Flow 3: L2 (HOD/Mansoor) reject marks claim permanently closed', async ({
+    page,
+    loginAs,
+  }) => {
+    // Fills the §5.2 gap: rejection at the HOD stage (after an SBH approval),
+    // not just L1 or Finance.
+    const claimNumber = await submitOfficeClaimAndGetClaimNumber(
+      page,
+      loginAs,
+      SRO_AP.email
+    )
+
+    await approveClaimAtCurrentLevel(page, loginAs, SBH_AP.email, claimNumber)
+
+    await rejectClaimAtCurrentLevel(
+      page,
+      loginAs,
+      PM_MANSOOR.email,
+      claimNumber,
+      false,
+      'L2 (HOD) rejection for E2E validation'
+    )
+
+    await assertClaimTerminalBanner(
+      page,
+      loginAs,
+      SRO_AP.email,
+      claimNumber,
+      'permanently-closed'
+    )
+  })
 })

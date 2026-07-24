@@ -196,6 +196,52 @@ export const SRO_WEST_BENGAL: TestAccount = {
   state: 'West Bengal',
 }
 
+// ── Hierarchy-specific regression personas (added 2026-07-24) ───────────────
+
+// INACTIVE after the change — must NOT be able to access the app.
+export const HARI_INACTIVE: TestAccount = {
+  email: 'hari.haran@nxtwave.co.in',
+  label: 'INACTIVE ex-SBH - Hari Haran S',
+  designation: 'State Business Head',
+  state: 'Tamil Nadu, Kerala',
+}
+
+// Intern -> Employee ID conversion (NW1006377 -> NW0007045). New claims carry
+// the new prefix. Kerala SRO, routes to Jijo.
+export const SRO_KERALA_HIJAS: TestAccount = {
+  email: 'muhammed.hijas@nxtwave.co.in',
+  label: 'SRO Kerala - Muhammed Hijas (ID converted)',
+  designation: 'Student Relationship Officer',
+  state: 'Kerala',
+}
+
+// Central-team BOA with approval_start_level = 2: skips the SBH stage and routes
+// straight to the HOD (Mansoor). The only such record in the DB.
+export const CENTRAL_BOA_CHANDRAMOULI: TestAccount = {
+  email: 'chandramouli.narina@nxtwave.co.in',
+  label: 'Central BOA - Narina Chandramouli (direct to HOD)',
+  designation: 'Business Operation Associate',
+  state: 'Central',
+}
+
+// New RJ ABH. The migration bug we fixed captured him into the MH SBH's reports;
+// he must route to Arka (RJ), never Ashish (MH).
+export const ABH_RAJASTHAN_SPARSH: TestAccount = {
+  email: 'sparsh.gupta@nxtwave.co.in',
+  label: 'ABH Rajasthan - Sparsh Gupta',
+  designation: 'Area Business Head',
+  state: 'Rajasthan',
+}
+
+// Second KA SBH with NO reports yet — has no approver assignments, so must be
+// redirected away from /approvals just like a submitter.
+export const SBH_KARNATAKA_NITHIN: TestAccount = {
+  email: 'nithin.k@nxtwave.co.in',
+  label: 'SBH Karnataka (no reports) - Nithin K',
+  designation: 'State Business Head',
+  state: 'Karnataka',
+}
+
 // Finance team
 
 export const FINANCE_1: TestAccount = {

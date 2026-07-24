@@ -25,6 +25,11 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
+// Full auth.users id map for every provisioned account. Without SUPABASE_DB_URL
+// the script's only other lookup is admin.listUsers pagination, which is
+// order-dependent and intermittently misses accounts that already exist without
+// a password (SSO-only). Hardcoding the ids makes every re-run deterministic.
+// Captured from auth.users on 2026-07-24; re-query if an account is recreated.
 const KNOWN_AUTH_USER_IDS = new Map([
   ['yohan.mutluri@nxtwave.co.in', 'b088702a-6dd8-451a-8b40-13ca4b9b39bb'],
   ['akshay.e@nxtwave.co.in', '6fa11099-0d97-47aa-90d7-261c20319112'],
@@ -39,9 +44,28 @@ const KNOWN_AUTH_USER_IDS = new Map([
   ['finance1@nxtwave.co.in', '1663b810-ddcd-4043-97a5-4fd73b1114c8'],
   ['finance2@nxtwave.co.in', 'fb523841-425c-437f-a5c4-8e7ce2d8459d'],
   ['chennakesava.konda@nxtwave.co.in', '437d117b-9e28-445a-9705-e2367acdad0b'],
-  // SSO-only account that sits beyond the listUsers pagination window
-  // (SUPABASE_DB_URL is unset, so the reliable DB lookup is skipped).
   ['ravinder.jangili@nxtwave.co.in', '239ec437-20c7-4094-aaa5-ea7e81046df8'],
+  ['chandramouli.narina@nxtwave.co.in', '46a36dc1-3db3-473c-9c96-7479393bd8be'],
+  ['jijo.varghese@nxtwave.co.in', '3eec3324-9e8d-4d1e-bf43-11ce204443fc'],
+  ['ashish.prakashpatil@nxtwave.co.in', 'ed1f260c-87c0-4013-99b2-e13734f2feec'],
+  ['bipin.sati@nxtwave.co.in', '0be08c58-2979-49d2-b795-8d21729b7d73'],
+  ['nithin.k@nxtwave.co.in', '7464ccc7-28ec-4650-82bd-50fcaff34499'],
+  ['siranjeeva.c@nxtwave.co.in', '9f5275a5-6e56-410c-b955-811bf83acb75'],
+  ['c.rethinakumar@nxtwave.co.in', '23814fdf-31cc-402b-92f3-fc421bdec2ce'],
+  ['nilesh.tiwari@nxtwave.co.in', 'e618116f-767a-4dd9-a99e-8b827a0204cf'],
+  ['prathamesh.pawar@nxtwave.co.in', 'd5f6dab1-4205-4eb1-afd7-5151f0477b53'],
+  ['sparsh.gupta@nxtwave.co.in', '95888eeb-db74-4ad7-9220-87d5257e6fb7'],
+  ['arkaprabha.ghosh@nxtwave.co.in', '5749e1e0-e40e-494b-8705-edfa52144149'],
+  ['akshaykumar.pal@nxtwave.co.in', '8a132474-18ab-4853-8fc6-ba65935be7cb'],
+  ['adarshanand.digal@nxtwave.co.in', 'fae9780d-f33b-4bb2-86a6-f8510dc5a6fe'],
+  ['sambitkumar.aich@nxtwave.co.in', '26206957-90a5-484f-8841-92cc8a858f16'],
+  ['indraneel.sanjayingole@nxtwave.co.in', '31ae7067-7f18-43f9-b2b3-91b6cc1e59ba'],
+  ['veerabhadraswamy.attili@nxtwave.co.in', 'def5e7ab-6730-4d72-97d4-94d293e33a0e'],
+  ['abhay.kumar@nxtwave.co.in', 'f3e3c5a6-c121-46be-aa6a-63670990dc19'],
+  ['ashish.patel@nxtwave.co.in', '4a4163b9-16b8-4970-85ff-2c673557235f'],
+  ['badalranjan.rout@nxtwave.co.in', '23c9d433-b084-4f08-82de-bea22b288a51'],
+  ['kushal.mukherjee@nxtwave.co.in', '1922ead6-c588-47e1-b5c3-ebc46d05bd93'],
+  ['muhammed.hijas@nxtwave.co.in', '79782ec5-b71c-4ab4-a709-950449e7df80'],
 ])
 
 let dbClient = null
@@ -188,6 +212,10 @@ const TEST_ACCOUNTS = [
   { email: 'ashish.patel@nxtwave.co.in',               label: 'SRO  | Uttar Pradesh| Ashish Patel (-> Akshay)' },
   { email: 'badalranjan.rout@nxtwave.co.in',           label: 'SRO  | Odisha      | Badal Ranjan Rout (-> Sambit)' },
   { email: 'kushal.mukherjee@nxtwave.co.in',           label: 'SRO  | West Bengal | Kushal Mukherjee (-> Sambit)' },
+
+  // Hierarchy-specific regression personas.
+  { email: 'muhammed.hijas@nxtwave.co.in',             label: 'SRO  | Kerala      | Muhammed Hijas (ID converted NW1006377 -> NW0007045)' },
+  { email: 'chandramouli.narina@nxtwave.co.in',        label: 'BOA  | Central     | Narina Chandramouli (approval_start_level=2 -> direct to HOD)' },
 ]
 
 async function upsertTestUser(email) {

@@ -2,8 +2,10 @@ import { type Page } from '@playwright/test'
 import { test, expect } from './fixtures/auth'
 import {
   ABH_RAJASTHAN,
+  ABH_RAJASTHAN_SPARSH,
   ABH_TAMIL_NADU,
   BOA_KARNATAKA,
+  CENTRAL_BOA_CHANDRAMOULI,
   FINANCE_1,
   PM_MANSOOR,
   SBH_AP,
@@ -19,6 +21,7 @@ import {
   SRO_AP,
   SRO_DELHI,
   SRO_KERALA,
+  SRO_KERALA_HIJAS,
   SRO_MAHARASHTRA,
   SRO_ODISHA,
   SRO_TELANGANA,
@@ -611,6 +614,65 @@ test.describe
       level3ApproverEmail: PM_MANSOOR.email,
       financeEmail: FINANCE_1.email,
     })
+  })
+
+  // ── Hierarchy change (2026-07) targeted regression ─────────────────────────
+
+  test('Hierarchy 8.6: Central BOA (Chandramouli, start-level 2) routes direct to Mansoor', async ({
+    page,
+    loginAs,
+  }) => {
+    // approval_start_level = 2 means his claim starts at stage 2 (HOD), skipping
+    // the SBH stage entirely. Modeled here as a direct flow with no L1 approver:
+    // if the claim wrongly started at L1_PENDING, Mansoor's stage-2 approval would
+    // be rejected (he is not the level-1 approver), so this fails loudly.
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: CENTRAL_BOA_CHANDRAMOULI.email,
+      level1ApproverEmail: null,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('Hierarchy 8.5: Muhammed Hijas new claim carries converted ID prefix NW0007045', async ({
+    page,
+    loginAs,
+  }) => {
+    // claim_number is generated from employee_id at submit time. After the
+    // Intern -> Employee conversion, his new claims must use NW0007045.
+    const claimNumber = await submitOfficeClaimAndGetClaimNumber(
+      page,
+      loginAs,
+      SRO_KERALA_HIJAS.email
+    )
+    expect(claimNumber).toContain('NW0007045')
+  })
+
+  test('Hierarchy 8.4: Sparsh (RJ ABH) routes to Arka (RJ), never Ashish (MH)', async ({
+    page,
+    loginAs,
+  }) => {
+    // The Maharashtra pointer-sweep bug captured Sparsh into Ashish's reports.
+    // This proves the corrected routing: his claim lands in the RJ SBH's queue
+    // and is absent from the MH SBH's queue.
+    const claimNumber = await submitOfficeClaimAndGetClaimNumber(
+      page,
+      loginAs,
+      ABH_RAJASTHAN_SPARSH.email
+    )
+
+    // Positive: Arka (RJ SBH) has it.
+    await loginAsFresh(page, loginAs, SBH_RAJASTHAN.email)
+    const arkaApprovals = new ApprovalsPage(page)
+    await arkaApprovals.waitForPendingRowByClaimNumber(claimNumber)
+
+    // Negative: Ashish (MH SBH) does NOT.
+    await loginAsFresh(page, loginAs, SBH_MAHARASHTRA.email)
+    const ashishApprovals = new ApprovalsPage(page)
+    await ashishApprovals.goto()
+    expect(await ashishApprovals.hasPendingRowByClaimNumber(claimNumber)).toBe(
+      false
+    )
   })
 
   test('Direct Flow 1: SBH AP -> Mansoor -> Finance', async ({
