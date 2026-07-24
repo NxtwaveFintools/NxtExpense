@@ -6,7 +6,7 @@ import {
   FINANCE_1,
   PM_MANSOOR,
   SBH_KARNATAKA,
-  SBH_TN_KERALA,
+  SBH_TAMIL_NADU,
 } from './fixtures/test-accounts'
 import { ApprovalsPage } from './pages/approvals.page'
 import { ClaimsPage } from './pages/claims.page'
@@ -312,14 +312,14 @@ test.describe.serial('Finance Rejection Flows - Requested E2E coverage', () => {
     )
   })
 
-  test('Finance Rejection 2: Finance reject with allow reclaim enables new TN/Kerala claim', async ({
+  test('Finance Rejection 2: Finance reject with allow reclaim enables new Tamil Nadu claim', async ({
     page,
     loginAs,
   }) => {
     const claimNumber = await submitOfficeClaimAndGetClaimNumber(
       page,
       loginAs,
-      SBH_TN_KERALA.email
+      SBH_TAMIL_NADU.email
     )
 
     await approveClaimAtCurrentLevel(
@@ -341,7 +341,7 @@ test.describe.serial('Finance Rejection Flows - Requested E2E coverage', () => {
     await assertClaimTerminalBanner(
       page,
       loginAs,
-      SBH_TN_KERALA.email,
+      SBH_TAMIL_NADU.email,
       claimNumber,
       'new-claim-permitted'
     )

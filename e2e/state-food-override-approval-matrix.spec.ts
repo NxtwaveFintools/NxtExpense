@@ -9,7 +9,8 @@ import {
   PM_MANSOOR,
   SBH_AP,
   SBH_KARNATAKA,
-  SBH_TN_KERALA,
+  SBH_KERALA,
+  SBH_TAMIL_NADU,
   SRO_AP,
   SRO_KERALA,
   ZBH_MULTI_STATE,
@@ -34,7 +35,7 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
   {
     name: 'G1 Kerala standard flow',
     submitterEmail: SRO_KERALA.email,
-    approverEmails: [SBH_TN_KERALA.email, PM_MANSOOR.email],
+    approverEmails: [SBH_KERALA.email, PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Kerala',
   },
@@ -46,9 +47,12 @@ const STANDARD_FIRST_SCENARIOS: WorkflowScenario[] = [
     outstationStateName: 'Karnataka',
   },
   {
-    name: 'G1 Tamil Nadu replacement direct flow',
+    name: 'G1 Tamil Nadu ABH standard flow',
+    // Post-2026-07: a real TN ABH (Siranjeeva) now runs the full standard flow
+    // through the TN SBH (Sreejish). Previously this slot was Hari-the-SBH going
+    // direct to Mansoor; that person is now INACTIVE.
     submitterEmail: ABH_TAMIL_NADU.email,
-    approverEmails: [PM_MANSOOR.email],
+    approverEmails: [SBH_TAMIL_NADU.email, PM_MANSOOR.email],
     financeEmail: FINANCE_1.email,
     outstationStateName: 'Tamil Nadu',
   },

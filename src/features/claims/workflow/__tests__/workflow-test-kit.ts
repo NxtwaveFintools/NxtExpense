@@ -68,7 +68,9 @@ const WORKFLOW_CONFIG_BY_SUBMITTER: Record<string, WorkflowConfig> = {
   },
   'akshay.e@nxtwave.co.in': {
     submitterEmail: 'akshay.e@nxtwave.co.in',
-    level1ApproverEmail: 'sreejish.mohanakumar@nxtwave.co.in',
+    // Kerala L1 is Jijo Varghese after the 2026-07 hierarchy split
+    // (previously Hari Haran, then Sreejish covered TN+KL as one role).
+    level1ApproverEmail: 'jijo.varghese@nxtwave.co.in',
     level3ApproverEmail: MANSOOR_EMAIL,
     coveredStates: ['Kerala'],
   },
@@ -78,8 +80,11 @@ const WORKFLOW_CONFIG_BY_SUBMITTER: Record<string, WorkflowConfig> = {
     level3ApproverEmail: MANSOOR_EMAIL,
     coveredStates: ['Karnataka'],
   },
-  'hari.haran@nxtwave.co.in': {
-    submitterEmail: 'hari.haran@nxtwave.co.in',
+  // A genuine Tamil Nadu ABH whose L1 approver is the TN SBH (Sreejish).
+  // Replaced 'hari.haran@' here: Hari is an SBH (not an ABH) and is now
+  // INACTIVE after the 2026-07 change; Siranjeeva is a real ABH submitter.
+  'siranjeeva.c@nxtwave.co.in': {
+    submitterEmail: 'siranjeeva.c@nxtwave.co.in',
     level1ApproverEmail: 'sreejish.mohanakumar@nxtwave.co.in',
     level3ApproverEmail: MANSOOR_EMAIL,
     coveredStates: ['Tamil Nadu'],

@@ -39,6 +39,9 @@ const KNOWN_AUTH_USER_IDS = new Map([
   ['finance1@nxtwave.co.in', '1663b810-ddcd-4043-97a5-4fd73b1114c8'],
   ['finance2@nxtwave.co.in', 'fb523841-425c-437f-a5c4-8e7ce2d8459d'],
   ['chennakesava.konda@nxtwave.co.in', '437d117b-9e28-445a-9705-e2367acdad0b'],
+  // SSO-only account that sits beyond the listUsers pagination window
+  // (SUPABASE_DB_URL is unset, so the reliable DB lookup is skipped).
+  ['ravinder.jangili@nxtwave.co.in', '239ec437-20c7-4094-aaa5-ea7e81046df8'],
 ])
 
 let dbClient = null
@@ -87,7 +90,7 @@ async function findAuthUserIdByEmail(email) {
     return KNOWN_AUTH_USER_IDS.get(normalizedEmail) ?? null
   }
 
-  for (let page = 1; page <= 20; page += 1) {
+  for (let page = 1; page <= 100; page += 1) {
     const { data, error } = await supabase.auth.admin.listUsers({
       page,
       perPage: 100,
@@ -116,6 +119,19 @@ async function findAuthUserIdByEmail(email) {
 
 const DEFAULT_PASSWORD = 'Password@123'
 
+// Per-account password overrides. MUST stay in sync with PASSWORD_OVERRIDES in
+// e2e/fixtures/test-accounts.ts — the e2e login helper reads that map, so if the
+// provisioned password differs from what the fixture logs in with, that
+// account's login fails and every flow that needs it (e.g. Mansoor's HOD
+// approval) breaks. Mansoor is the one account that does NOT use the default.
+const PASSWORD_OVERRIDES = new Map([
+  ['mansoor@nxtwave.co.in', 'hod@Nxtwave'],
+])
+
+function resolvePassword(email) {
+  return PASSWORD_OVERRIDES.get(email.toLowerCase()) ?? DEFAULT_PASSWORD
+}
+
 const TEST_ACCOUNTS = [
   // Group 1 — Standard Flow (SRO / BOA / ABH → SBH → Mansoor → Finance)
   { email: 'yohan.mutluri@nxtwave.co.in',   label: 'SRO  | AP       | Yohan Mutluri' },
@@ -134,14 +150,52 @@ const TEST_ACCOUNTS = [
   { email: 'chennakesava.konda@nxtwave.co.in', label: 'Finance User 2 (Live)' },
 
   // Approvers needed for testing approval flows
-  { email: 'sreejish.mohanakumar@nxtwave.co.in',       label: 'SBH  | TN+Kerala   | Sreejish Mohana Kumar (legacy account)' },
+  { email: 'sreejish.mohanakumar@nxtwave.co.in',       label: 'SBH  | Tamil Nadu  | Sreejish Mohana Kumar (TN SBH — reactivated 2026-07)' },
   { email: 'harisanthosh.tibirisetty@nxtwave.co.in',   label: 'ZBH  | KA+MH       | Hari Santhosh Tibirisetty (L2 approver for Vignesh, Bhargav)' },
+
+  // ── Hierarchy changes 2026-07: the 9 new joiners + splits ──────────────────
+  // These employees were created by supabase/migrations/20260723*. They log in
+  // via Microsoft SSO in production; here we give them password auth so e2e and
+  // manual verification can drive their flows. Emails match employees rows.
+  //   docs/hierarchy-changes-2026-07-findings.md · -prod-runbook.md
+  { email: 'jijo.varghese@nxtwave.co.in',        label: 'SBH  | Kerala      | Jijo Varghese (new KL SBH — L1 for Kerala SROs)' },
+  { email: 'ashish.prakashpatil@nxtwave.co.in',  label: 'SBH  | Maharashtra | Ashish Prakash Patil (new MH SBH)' },
+  { email: 'bipin.sati@nxtwave.co.in',           label: 'SBH  | Delhi NCR   | Bipin Chandra Sati (new DL SBH)' },
+  { email: 'nithin.k@nxtwave.co.in',             label: 'SBH  | Karnataka   | Nithin K (2nd KA SBH — no reports yet)' },
+  { email: 'siranjeeva.c@nxtwave.co.in',         label: 'ABH  | Tamil Nadu  | Siranjeeva C (new TN ABH — L1 = Sreejish)' },
+  { email: 'c.rethinakumar@nxtwave.co.in',       label: 'ABH  | Tamil Nadu  | Rethina Kumar C (new TN ABH — L1 = Sreejish)' },
+  { email: 'nilesh.tiwari@nxtwave.co.in',        label: 'ABH  | Uttar Pradesh| Nilesh Tiwari (new UP ABH — L1 = Akshay)' },
+  { email: 'prathamesh.pawar@nxtwave.co.in',     label: 'ABH  | Maharashtra | Prathamesh Pawar (new MH ABH — L1 = Ashish)' },
+  { email: 'sparsh.gupta@nxtwave.co.in',         label: 'ABH  | Rajasthan   | Sparsh Gupta (new RJ ABH — L1 = Arka)' },
+
+  // Incoming approvers referenced by the new joiners' chains (may already exist).
+  { email: 'arkaprabha.ghosh@nxtwave.co.in',     label: 'SBH  | Rajasthan   | Arka Prabha Ghosh (moved MH -> RJ)' },
+  { email: 'akshaykumar.pal@nxtwave.co.in',      label: 'SBH  | Uttar Pradesh| Akshay Kumar Pal (narrowed DL -> UP)' },
+
+  // Demoted SBH -> ABH. The §9.1 regression case: as an ABH his flow is [1,2,3],
+  // so he must submit through his L1 approver (Arka). Needs a login to test that.
+  { email: 'adarshanand.digal@nxtwave.co.in',    label: 'ABH  | Rajasthan   | Adarsh Anand Digal (ex-SBH, submits via Arka)' },
+
+  // ── Full-regression per-state chains (added 2026-07-24) ────────────────────
+  // Untouched-state SBHs + one representative SRO submitter each, so every
+  // active state's submitter -> SBH -> Mansoor -> Finance path can be driven.
+  // States already provisioned above: AP, KL, KA, TN, RJ.
+  { email: 'ravinder.jangili@nxtwave.co.in',           label: 'SBH  | Telangana   | Ravinder Jangili' },
+  { email: 'sambitkumar.aich@nxtwave.co.in',           label: 'SBH  | Odisha/WB   | Sambit Kumar Aich' },
+  { email: 'indraneel.sanjayingole@nxtwave.co.in',     label: 'SRO  | Maharashtra | Indraneel Ingole (-> Ashish)' },
+  { email: 'veerabhadraswamy.attili@nxtwave.co.in',    label: 'SRO  | Telangana   | Attili Veera Bhadra Swamy (-> Ravinder)' },
+  { email: 'abhay.kumar@nxtwave.co.in',                label: 'SRO  | Delhi NCR   | Abhay Kumar (-> Bipin)' },
+  { email: 'ashish.patel@nxtwave.co.in',               label: 'SRO  | Uttar Pradesh| Ashish Patel (-> Akshay)' },
+  { email: 'badalranjan.rout@nxtwave.co.in',           label: 'SRO  | Odisha      | Badal Ranjan Rout (-> Sambit)' },
+  { email: 'kushal.mukherjee@nxtwave.co.in',           label: 'SRO  | West Bengal | Kushal Mukherjee (-> Sambit)' },
 ]
 
 async function upsertTestUser(email) {
+  const password = resolvePassword(email)
+
   const { data, error: createError } = await supabase.auth.admin.createUser({
     email,
-    password: DEFAULT_PASSWORD,
+    password,
     email_confirm: true,
     user_metadata: { email_verified: true },
   })
@@ -173,7 +227,7 @@ async function upsertTestUser(email) {
   const { error: updateError } = await supabase.auth.admin.updateUserById(
     existingUserId,
     {
-      password: DEFAULT_PASSWORD,
+      password,
       email_confirm: true,
       user_metadata: { email_verified: true },
     }
@@ -199,8 +253,12 @@ async function main() {
     }
   }
 
-  console.log('\n✅  Done. All accounts can now log in with:')
-  console.log(`   Password: ${DEFAULT_PASSWORD}\n`)
+  console.log('\n✅  Done. Accounts can now log in with:')
+  console.log(`   Default password: ${DEFAULT_PASSWORD}`)
+  for (const [email, password] of PASSWORD_OVERRIDES) {
+    console.log(`   Override:         ${email} -> ${password}`)
+  }
+  console.log('')
 
   if (dbClient) {
     await dbClient.end()

@@ -333,13 +333,11 @@ describe('expense approval workflow integration — standard flow', () => {
   it('routes SRO(Kerala) through correct SBH mapping', async () => {
     const config = getWorkflowConfig('akshay.e@nxtwave.co.in')
     expect(config.coveredStates).toContain('Kerala')
-    expect(config.level1ApproverEmail).toBe(
-      'sreejish.mohanakumar@nxtwave.co.in'
-    )
+    expect(config.level1ApproverEmail).toBe('jijo.varghese@nxtwave.co.in')
 
     await runStandardFlowScenario(
       'akshay.e@nxtwave.co.in',
-      'sreejish.mohanakumar@nxtwave.co.in',
+      'jijo.varghese@nxtwave.co.in',
       'finance1@nxtwave.co.in'
     )
   })
@@ -354,7 +352,7 @@ describe('expense approval workflow integration — standard flow', () => {
 
   it('handles ABH(Tamil Nadu) through SBH then Mansoor then Finance', async () => {
     await runStandardFlowScenario(
-      'hari.haran@nxtwave.co.in',
+      'siranjeeva.c@nxtwave.co.in',
       'sreejish.mohanakumar@nxtwave.co.in',
       'finance2@nxtwave.co.in'
     )

@@ -1,14 +1,29 @@
 import { type Page } from '@playwright/test'
 import { test, expect } from './fixtures/auth'
 import {
+  ABH_RAJASTHAN,
+  ABH_TAMIL_NADU,
   BOA_KARNATAKA,
   FINANCE_1,
   PM_MANSOOR,
   SBH_AP,
+  SBH_DELHI,
   SBH_KARNATAKA,
-  SBH_TN_KERALA,
+  SBH_KERALA,
+  SBH_MAHARASHTRA,
+  SBH_ODISHA_WB,
+  SBH_RAJASTHAN,
+  SBH_TAMIL_NADU,
+  SBH_TELANGANA,
+  SBH_UTTAR_PRADESH,
   SRO_AP,
+  SRO_DELHI,
   SRO_KERALA,
+  SRO_MAHARASHTRA,
+  SRO_ODISHA,
+  SRO_TELANGANA,
+  SRO_UTTAR_PRADESH,
+  SRO_WEST_BENGAL,
   ZBH_MULTI_STATE,
 } from './fixtures/test-accounts'
 import { ClaimsPage } from './pages/claims.page'
@@ -455,13 +470,13 @@ test.describe
     })
   })
 
-  test('Standard Flow 2: SRO Kerala -> Hari TN/Kerala L1 -> Mansoor -> Finance', async ({
+  test('Standard Flow 2: SRO Kerala -> Jijo (KL SBH) L1 -> Mansoor -> Finance', async ({
     page,
     loginAs,
   }) => {
     await runWorkflowPath(page, loginAs, {
       submitterEmail: SRO_KERALA.email,
-      level1ApproverEmail: SBH_TN_KERALA.email,
+      level1ApproverEmail: SBH_KERALA.email,
       level3ApproverEmail: PM_MANSOOR.email,
       financeEmail: FINANCE_1.email,
     })
@@ -479,13 +494,120 @@ test.describe
     })
   })
 
-  test('Direct Flow 5: Hari TN/Kerala replacement path -> Mansoor -> Finance', async ({
+  test('Standard Flow 4: ABH Tamil Nadu -> Sreejish (TN SBH) L1 -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    // Exercises the new post-2026-07 TN chain: a genuine TN ABH (Siranjeeva)
+    // whose L1 approver is the reactivated TN SBH (Sreejish).
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: ABH_TAMIL_NADU.email,
+      level1ApproverEmail: SBH_TAMIL_NADU.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('Direct Flow 5: SBH Tamil Nadu (Sreejish) -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    // Sreejish is an SBH, so his own claims skip L1 and go direct to the HOD.
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: SBH_TAMIL_NADU.email,
+      level1ApproverEmail: null,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('Standard Flow 6: ABH Rajasthan (Adarsh, ex-SBH) -> Arka L1 -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    // §9.1 regression test. Adarsh was demoted SBH -> ABH, so his flow became
+    // [1,2,3] and now starts at L1. If his level_1 approver were unset,
+    // shouldBlockForMissingLevel1Approver would reject the submission outright.
+    // This proves he submits cleanly and routes through Arka (the new RJ SBH).
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: ABH_RAJASTHAN.email,
+      level1ApproverEmail: SBH_RAJASTHAN.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  // ── Full-regression state chains: prove every remaining active state's
+  //    submitter -> SBH -> Mansoor -> Finance path still works end to end.
+  //    States already covered above: AP, KL, KA, TN, RJ.
+
+  test('State Chain MH: SRO Maharashtra -> Ashish (SBH) -> Mansoor -> Finance', async ({
     page,
     loginAs,
   }) => {
     await runWorkflowPath(page, loginAs, {
-      submitterEmail: SBH_TN_KERALA.email,
-      level1ApproverEmail: null,
+      submitterEmail: SRO_MAHARASHTRA.email,
+      level1ApproverEmail: SBH_MAHARASHTRA.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('State Chain TG: SRO Telangana -> Ravinder (SBH) -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: SRO_TELANGANA.email,
+      level1ApproverEmail: SBH_TELANGANA.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('State Chain DL: SRO Delhi NCR -> Bipin (SBH) -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: SRO_DELHI.email,
+      level1ApproverEmail: SBH_DELHI.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('State Chain UP: SRO Uttar Pradesh -> Akshay (SBH) -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: SRO_UTTAR_PRADESH.email,
+      level1ApproverEmail: SBH_UTTAR_PRADESH.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('State Chain OD: SRO Odisha -> Sambit (SBH) -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: SRO_ODISHA.email,
+      level1ApproverEmail: SBH_ODISHA_WB.email,
+      level3ApproverEmail: PM_MANSOOR.email,
+      financeEmail: FINANCE_1.email,
+    })
+  })
+
+  test('State Chain WB: SRO West Bengal -> Sambit (SBH) -> Mansoor -> Finance', async ({
+    page,
+    loginAs,
+  }) => {
+    await runWorkflowPath(page, loginAs, {
+      submitterEmail: SRO_WEST_BENGAL.email,
+      level1ApproverEmail: SBH_ODISHA_WB.email,
       level3ApproverEmail: PM_MANSOOR.email,
       financeEmail: FINANCE_1.email,
     })

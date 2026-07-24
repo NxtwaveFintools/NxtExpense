@@ -4,7 +4,7 @@ import { test, expect } from './fixtures/auth'
 import {
   PM_MANSOOR,
   SBH_AP,
-  SBH_TN_KERALA,
+  SBH_KERALA,
   SRO_AP,
   SRO_KERALA,
 } from './fixtures/test-accounts'
@@ -314,7 +314,7 @@ test.describe
     await rejectClaimAtCurrentLevel(
       page,
       loginAs,
-      SBH_TN_KERALA.email,
+      SBH_KERALA.email,
       claimNumber,
       false,
       'L1 rejection for E2E validation'
